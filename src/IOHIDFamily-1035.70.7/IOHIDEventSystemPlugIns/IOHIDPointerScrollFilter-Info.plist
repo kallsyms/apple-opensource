@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFPlugInDynamicRegistration</key>
+	<string>NO</string>
+	<key>CFPlugInFactories</key>
+	<dict>
+		<key>736169DC-A8BC-45B4-BC14-645B5526E585</key>
+		<string>IOHIDPointerScrollFilterFactory</string>
+	</dict>
+	<key>CFPlugInTypes</key>
+	<dict>
+		<key>6B0340D3-5798-4064-AA17-9204C7B06FFD</key>
+		<string>736169DC-A8BC-45B4-BC14-645B5526E585</string>
+	</dict>
+	<key>Matching</key>
+	<dict>
+		<key>DeviceUsagePairs</key>
+		<array>
+			<dict>
+				<key>DeviceUsage</key>
+				<integer>2</integer>
+				<key>DeviceUsagePage</key>
+				<integer>1</integer>
+			</dict>
+			<dict>
+				<key>DeviceUsage</key>
+				<integer>1</integer>
+				<key>DeviceUsagePage</key>
+				<integer>1</integer>
+			</dict>
+			<dict>
+				<key>DeviceUsage</key>
+				<integer>1</integer>
+				<key>DeviceUsagePage</key>
+				<integer>65280</integer>
+			</dict>
+		</array>
+	</dict>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2013 Apple Inc. All rights reserved.</string>
+</dict>
+</plist>

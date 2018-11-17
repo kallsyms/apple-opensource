@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>OpenSourceProject</key>
+		<string>apr</string>
+		<key>OpenSourceVersion</key>
+		<string>1.5.2</string>
+		<key>OpenSourceWebsiteURL</key>
+		<string>http://apr.apache.org/</string>
+		<key>OpenSourceURL</key>
+		<string>http://apache.org/dist/apr/apr-1.5.2.tar.bz2</string>
+		<key>OpenSourceSHA1</key>
+		<string>6d757fcf7c687fc300c1066076f2e8380ff8cbc0</string>
+		<key>OpenSourceImportDate</key>
+		<string>2016-04-15</string>
+		<key>OpenSourceModifications</key>
+		<array>
+			<string>libtool -arch fixes (4386677).</string>
+			<string>64-bit configure issues (4538922).</string>
+		</array>
+		<key>OpenSourceLicense</key>
+		<string>Apache</string>
+		<key>OpenSourceLicenseFile</key>
+		<string>apr.txt</string>
+	</dict>
+	<dict>
+		<key>OpenSourceProject</key>
+		<string>apr-util</string>
+		<key>OpenSourceVersion</key>
+		<string>1.5.4</string>
+		<key>OpenSourceWebsiteURL</key>
+		<string>http://apr.apache.org/</string>
+		<key>OpenSourceURL</key>
+		<string>http://apache.org/dist/apr/apr-util-1.5.4.tar.bz2</string>
+		<key>OpenSourceSHA1</key>
+		<string>b00038b5081472ed094ced28bcbf2b5bb56c589d</string>
+		<key>OpenSourceImportDate</key>
+		<string>2016-04-15</string>
+		<key>OpenSourceLicense</key>
+		<string>Apache</string>
+		<key>OpenSourceLicenseFile</key>
+		<string>apr-util.txt</string>
+	</dict>
+</array>
+</plist>

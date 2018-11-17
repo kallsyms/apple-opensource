@@ -1,0 +1,57 @@
+--- configure.orig	2017-12-14 06:57:48.000000000 -0800
++++ configure	2018-01-16 11:25:16.000000000 -0800
+@@ -5513,7 +5513,7 @@
+     test -n "$gcc_minor" || gcc_minor=0
+     # RUBY_APPEND_OPTIONS(XCFLAGS, ["-include ruby/config.h" "-include ruby/missing.h"])
+ else
+-    linker_flag=
++    linker_flag=-Wl,
+ fi
+ 
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker is GNU ld" >&5
+@@ -5621,13 +5621,7 @@
+ esac
+     done
+     target_archs="$universal_binary"
+-    unset universal_binary
+-    case "$target_archs" in #(
+-  *,*) :
+-    universal_binary=yes ;; #(
+-  *) :
+-    unset universal_archnames ;;
+-esac
++    universal_binary=yes
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $target_archs" >&5
+     colorize_result "$target_archs" ; }
+ 
+@@ -10781,20 +10775,15 @@
+ _ACEOF
+ if ac_fn_c_try_compile "$LINENO"; then :
+ 
+-	# Check for potential -arch flags.  It is not universal unless
+-	# there are at least two -arch flags with different values.
++	# Check for potential -arch flags.  It is then universal.
+ 	ac_arch=
+ 	ac_prev=
+ 	for ac_word in $CC $CFLAGS $CPPFLAGS $LDFLAGS; do
+ 	 if test -n "$ac_prev"; then
+ 	   case $ac_word in
+ 	     i?86 | x86_64 | ppc | ppc64)
+-	       if test -z "$ac_arch" || test "$ac_arch" = "$ac_word"; then
+-		 ac_arch=$ac_word
+-	       else
+ 		 ac_cv_c_bigendian=universal
+ 		 break
+-	       fi
+ 	       ;;
+ 	   esac
+ 	   ac_prev=
+@@ -23735,7 +23724,7 @@
+ 	    LIBRUBY_RELATIVE=yes
+ 	fi
+ 	LIBRUBY_DLDFLAGS="$LIBRUBY_DLDFLAGS "'-install_name '${libprefix}'/$(LIBRUBY_SO)'
+-	LIBRUBY_DLDFLAGS="$LIBRUBY_DLDFLAGS "'-compatibility_version $(MAJOR).$(MINOR)'
++	LIBRUBY_DLDFLAGS="$LIBRUBY_DLDFLAGS "'-compatibility_version 2.3.3'
+ 	LIBRUBY_DLDFLAGS="$LIBRUBY_DLDFLAGS "'-current_version $(RUBY_PROGRAM_VERSION)'
+ 	if test "$visibility_option" = ld; then
+ 	    LIBRUBY_DLDFLAGS="$LIBRUBY_DLDFLAGS "'-Wl,-unexported_symbol,_Init_*'

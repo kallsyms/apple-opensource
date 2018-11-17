@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OpenSourceImportDate</key>
+	<string>2006-10-17</string>
+	<key>OpenSourceLicense</key>
+	<string>GPL</string>
+	<key>OpenSourceLicenseFile</key>
+	<string>bash.txt</string>
+	<key>OpenSourceModifications</key>
+	<array>
+		<string>source /etc/profile and $HOME/profile even if posixly correct</string>
+		<string>change doc/Makefile.in to install bash.info from $cwd</string>
+		<string>Don't drop privileges if emulating Tiger's /bin/bash</string>
+		<string>Fix off-by-1 error in compact_jobs_list</string>
+		<string>Do not rl_forward_char past rl_end</string>
+		<string>Do not echo \e as ESC when in posix mode</string>
+		<string>Update to patchlevel 57 for CVE-2014-6271 and friends</string>
+		<string>CVE-2016-0634</string>
+		<string>Unblock all signals before running exit trap</string>
+	</array>
+	<key>OpenSourceProject</key>
+	<string>bash</string>
+	<key>OpenSourceSHA1</key>
+	<string>fe6466c7ee98061e044dae0347ca5d1a8eab4a0d</string>
+	<key>OpenSourceURL</key>
+	<string>ftp://ftp.cwru.edu/pub/bash/bash-3.2.tar.gz</string>
+	<key>OpenSourceVersion</key>
+	<string>3.2</string>
+	<key>OpenSourceWebsiteURL</key>
+	<string>http://www.gnu.org/software/bash/bash.html</string>
+</dict>
+</plist>

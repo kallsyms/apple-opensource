@@ -1,0 +1,25 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html#License
+tk{
+    Countries{
+        001{"Dunýä"}
+        AU{"Awstraliýa"}
+        AZ{"Azerbaýjan"}
+        CN{"Hytaý"}
+        DE{"Germaniýa"}
+        GB{"Britaniýa"}
+        IL{"Ysraýyl"}
+        IN{"Hindistan"}
+        IR{"Eýran"}
+        IT{"Italiýa"}
+        JP{"Ýaponiýa"}
+        PK{"Pakistan"}
+        RU{"Orusýet"}
+        TM{"Türkmenistan"}
+        TR{"Türkiýe"}
+        UA{"Ukraina"}
+        US{"A.B.Ş."}
+        UZ{"Özbegistan"}
+    }
+    Version{"2.1.31.86"}
+}

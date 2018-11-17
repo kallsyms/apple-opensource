@@ -1,0 +1,24 @@
+
+if  [ "x$SDKROOT" != "x" ] && [ "$1" == "--cflags" ] ; then
+	echo "-I$SDKROOT/usr/include/apr-1"
+	exit
+fi
+
+if  [ "x$SDKROOT" != "x" ] && [ "$1" == "--includedir" ] ; then
+	echo "$SDKROOT/usr/include/apr-1"
+	exit
+fi
+
+if  [ "x$SDKROOT" != "x" ] && [ "$1" == "--ldflags" ] ; then
+	echo "-I$SDKROOT/usr/lib  -lpcre -lpthread"
+	exit
+fi
+
+SDKOPTION=""
+if  [ "x$SDKROOT" != "x" ] ; then
+	SDKOPTION="--sdk"
+fi
+
+XCRUN_COMMAND="/usr/bin/xcrun --find pcre-config $SDKOPTION $SDKROOT"
+PCRE_CONFIG_TOOL=`$XCRUN_COMMAND`
+echo `$PCRE_CONFIG_TOOL $*`

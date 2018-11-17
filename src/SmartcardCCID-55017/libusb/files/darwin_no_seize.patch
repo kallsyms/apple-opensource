@@ -1,0 +1,20 @@
+--- libusb/os/darwin_usb.c
++++ libusb/os/darwin_usb.c
+@@ -577,7 +577,7 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct li
+   priv = (struct darwin_device_priv *)dev->os_priv;
+ 
+   /* try to open the device (we can usually continue even if this fails) */
+-  is_open = ((*device)->USBDeviceOpenSeize(device) == kIOReturnSuccess);
++  is_open = ((*device)->USBDeviceOpen (device) == kIOReturnSuccess);
+ 
+   /**** retrieve device descriptor ****/
+   do {
+@@ -803,7 +803,7 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
+     dpriv->device = darwin_device;
+ 
+     /* try to open the device */
+-    kresult = (*(dpriv->device))->USBDeviceOpenSeize (dpriv->device);
++    kresult = (*(dpriv->device))->USBDeviceOpen (dpriv->device);
+ 
+     if (kresult != kIOReturnSuccess) {
+       usbi_err (HANDLE_CTX (dev_handle), "USBDeviceOpen: %s", darwin_error_str(kresult));

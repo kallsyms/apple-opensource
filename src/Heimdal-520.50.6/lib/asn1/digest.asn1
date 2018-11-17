@@ -1,0 +1,45 @@
+-- $Id$
+
+DIGEST DEFINITIONS ::=
+BEGIN
+
+NTLMInit ::= [APPLICATION 1] SEQUENCE {
+    flags		[0] INTEGER (0..4294967295),
+    hostname		[1] UTF8String OPTIONAL,
+    domain		[2] UTF8String OPTIONAL
+}
+
+NTLMInitReply ::= SEQUENCE {
+    ntlmNegFlags	[0] INTEGER (0..4294967295),
+    opaque		[1] OCTET STRING,
+    challenge		[2] OCTET STRING,
+    targetinfo		[3] OCTET STRING
+}
+
+NTLMRequest2 ::= [APPLICATION 2] SEQUENCE {
+    loginUserName	[0] UTF8String,
+    loginDomainName	[1] UTF8String,
+    workstation		[2] UTF8String,
+    ntlmFlags		[3] INTEGER (0..4294967295),
+    lmchallenge		[4] OCTET STRING SIZE (8),
+    ntChallengeResponse [5] OCTET STRING,
+    lmChallengeResponse [6] OCTET STRING,
+    encryptedSessionKey [7] OCTET STRING,
+    t2targetname	[8] UTF8String,
+    acceptorUser	[9] UTF8String,
+    acceptorDomain	[10] UTF8String
+}
+
+NTLMReply ::= SEQUENCE {
+    success		[0] BOOLEAN,
+    avflags		[1] INTEGER (0..4294967295),
+    sessionkey		[2] OCTET STRING OPTIONAL,
+    user		[3] UTF8String,
+    domain		[4] UTF8String,
+    uuid		[5] OCTET STRING SIZE (16) OPTIONAL,
+    targetinfo		[6] OCTET STRING,
+    pac			[7] OCTET STRING OPTIONAL,
+    ntlmFlags		[8] INTEGER (0..4294967295)
+}
+
+END

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OpenSourceProject</key>
+	<string>zsh</string>
+	<key>OpenSourceVersion</key>
+	<string>5.3</string>
+	<key>OpenSourceWebsiteURL</key>
+	<string>http://www.zsh.org/</string>
+	<key>OpenSourceURL</key>
+	<string>http://www.zsh.org/pub/zsh-5.3.tar.xz</string>
+	<key>OpenSourceSHA1</key>
+	<string>edc16400cf3a141c60588a87be4193be9dbaa96d</string>
+	<key>OpenSourceImportDate</key>
+	<string>2016-12-20</string>
+	<key>OpenSourceModifications</key>
+	<array>
+		<string>Completion/Unix/Command/_subversion: 6087334</string>
+		<string>Src/init.c: 4384137</string>
+		<string>build fixes: no autotools, no strip, no zshcalsys</string>
+		<string>Src/builtin.c: workaround for 22966068</string>
+		<string>Completion/Base/Utility/_nothing: 24988289</string>
+	</array>
+	<key>OpenSourceLicense</key>
+	<string>Other</string>
+	<key>OpenSourceLicenseFile</key>
+	<string>zsh.txt</string>
+</dict>
+</plist>

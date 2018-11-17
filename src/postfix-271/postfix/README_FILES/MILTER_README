@@ -1,0 +1,626 @@
+Postfix before-queue Milter support
+
+-------------------------------------------------------------------------------
+
+Introduction
+
+Postfix implements support for the Sendmail version 8 Milter (mail filter)
+protocol. This protocol is used by applications that run outside the MTA to
+inspect SMTP events (CONNECT, DISCONNECT), SMTP commands (HELO, MAIL FROM,
+etc.) as well as mail content (headers and body). All this happens before mail
+is queued.
+
+The reason for adding Milter support to Postfix is that there exists a large
+collection of applications, not only to block unwanted mail, but also to verify
+authenticity (examples: OpenDKIM and DMARC) or to digitally sign mail (example:
+OpenDKIM). Having yet another Postfix-specific version of all that software is
+a poor use of human and system resources.
+
+The Milter protocol has evolved over time, and different Postfix versions
+implement different feature sets. See the workarounds and limitations sections
+at the end of this document for differences between Postfix and Sendmail
+implementations.
+
+This document provides information on the following topics:
+
+  * How Milter applications plug into Postfix
+  * Building Milter applications
+  * Running Milter applications
+  * Configuring Postfix
+  * Workarounds
+  * Limitations
+
+How Milter applications plug into Postfix
+
+The Postfix Milter implementation uses two different lists of mail filters: one
+list of filters for SMTP mail only, and one list of filters for non-SMTP mail.
+The two lists have different capabilities, which is unfortunate. Avoiding this
+would require major restructuring of Postfix.
+
+  * The SMTP-only filters handle mail that arrives via the Postfix smtpd(8)
+    server. They are typically used to filter unwanted mail and to sign mail
+    from authorized SMTP clients. You specify SMTP-only Milter applications
+    with the smtpd_milters parameter as described in a later section. Mail that
+    arrives via the Postfix smtpd(8) server is not filtered by the non-SMTP
+    filters that are described next.
+
+  * The non-SMTP filters handle mail that arrives via the Postfix sendmail(1)
+    command-line or via the Postfix qmqpd(8) server. They are typically used to
+    digitally sign mail only. Although non-SMTP filters can be used to filter
+    unwanted mail, they have limitations compared to the SMTP-only filters. You
+    specify non-SMTP Milter applications with the non_smtpd_milters parameter
+    as described in a later section.
+
+For those who are familiar with the Postfix architecture, the figure below
+shows how Milter applications plug into Postfix. Names followed by a number are
+Postfix commands or server programs, while unnumbered names inside shaded areas
+represent Postfix queues. To avoid clutter, the path for local submission is
+simplified (the OVERVIEW document has a more complete description of the
+Postfix architecture).
+
+               SMTP-only      non-SMTP
+                 filters       filters
+
+                     ^ |
+                     | v
+                                   ^ |
+                                   | |
+    Network ->   smtpd(8)          | |
+                                   | v
+
+                           \
+
+    Network ->   qmqpd(8)  -> cleanup(8) -> incoming
+
+                           /
+
+                pickup(8)
+
+                      :
+
+    Local   -> sendmail(1)
+
+Building Milter applications
+
+Milter applications have been written in C, JAVA and Perl, but this document
+deals with C applications only. For these, you need an object library that
+implements the Sendmail 8 Milter protocol. Postfix currently does not provide
+such a library, but Sendmail does.
+
+Some systems install the Sendmail libmilter library by default. With other
+systems, libmilter may be provided by a package (called "sendmail-devel" on
+some Linux systems).
+
+Once libmilter is installed, applications such as OpenDKIM and OpenDMARC build
+out of the box without requiring any tinkering:
+
+    $ gzcat opendkim-x.y.z.tar.gz | tar xf -
+    $ cd opendkim-x.y.z
+    $ ./configure ...options...
+    $ make
+    [...lots of output omitted...]
+    $ make install
+
+Running Milter applications
+
+To run a Milter application, see the documentation of the filter for options. A
+typical command looks like this:
+
+    # /some/where/opendkim -l -u userid -p inet:portnumber@localhost ...other
+    options...
+
+Please specify a userid value that isn't used for other applications (not
+"postfix", not "www", etc.).
+
+Configuring Postfix
+
+Like Sendmail, Postfix has a lot of configuration options that control how it
+talks to Milter applications. Besides global options that apply to all Milter
+applications, Postfix 3.0 and later support per-Milter timeouts, per-Milter
+error handling, etc.
+
+Information in this section:
+
+  * SMTP-Only Milter applications
+  * Non-SMTP Milter applications
+  * Milter error handling
+  * Milter protocol version
+  * Milter protocol timeouts
+  * Different settings for different Milter applications
+  * Different settings for different SMTP clients
+  * Sendmail macro emulation
+  * What macros will Postfix send to Milters?
+
+SMTP-Only Milter applications
+
+The SMTP-only Milter applications handle mail that arrives via the Postfix
+smtpd(8) server. They are typically used to filter unwanted mail, and to sign
+mail from authorized SMTP clients. Mail that arrives via the Postfix smtpd(8)
+server is not filtered by the non-SMTP filters that are described in the next
+section.
+
+    NOTE for Postfix versions that have a mail_release_date before 20141018: do
+    not use the header_checks(5) IGNORE action to remove Postfix's own
+    Received: message header. This causes problems with mail signing filters.
+    Instead, keep Postfix's own Received: message header and use the
+    header_checks(5) REPLACE action to sanitize information.
+
+You specify SMTP-only Milter applications (there can be more than one) with the
+smtpd_milters parameter. Each Milter application is identified by the name of
+its listening socket; other Milter configuration options will be discussed in
+later sections. Milter applications are applied in the order as specified, and
+the first Milter application that rejects a command will override the responses
+from other Milter applications.
+
+    /etc/postfix/main.cf:
+        # Milters for mail that arrives via the smtpd(8) server.
+        # See below for socket address syntax.
+        smtpd_milters = inet:localhost:portnumber ...other filters...
+
+The general syntax for listening sockets is as follows:
+
+    unix:pathname
+        Connect to the local UNIX-domain server that is bound to the specified
+        pathname. If the smtpd(8) or cleanup(8) process runs chrooted, an
+        absolute pathname is interpreted relative to the Postfix queue
+        directory.
+
+    inet:host:port
+        Connect to the specified TCP port on the specified local or remote
+        host. The host and port can be specified in numeric or symbolic form.
+
+        NOTE: Postfix syntax differs from Milter syntax which has the form
+        inet:port@host.
+
+For advanced configuration see "Different settings for different SMTP clients"
+and "Different settings for different Milter applications".
+
+Non-SMTP Milter applications
+
+The non-SMTP Milter applications handle mail that arrives via the Postfix
+sendmail(1) command-line or via the Postfix qmqpd(8) server. They are typically
+used to digitally sign mail. Although non-SMTP filters can be used to filter
+unwanted mail, there are limitations as discussed later in this section. Mail
+that arrives via the Postfix smtpd(8) server is not filtered by the non-SMTP
+filters.
+
+NOTE: Do not use the header_checks(5) IGNORE action to remove Postfix's own
+Received: message header. This causes problems with mail signing filters.
+Instead, keep Postfix's own Received: message header and use the header_checks
+(5) REPLACE action to sanitize information.
+
+You specify non-SMTP Milter applications with the non_smtpd_milters parameter.
+This parameter uses the same syntax as the smtpd_milters parameter in the
+previous section. As with the SMTP-only filters, you can specify more than one
+Milter application; they are applied in the order as specified, and the first
+Milter application that rejects a command will override the responses from the
+other applications.
+
+    /etc/postfix/main.cf:
+        # Milters for non-SMTP mail.
+        # See below for socket address syntax.
+        non_smtpd_milters = inet:localhost:portnumber ...other filters...
+
+There's one small complication when using Milter applications for non-SMTP
+mail: there is no SMTP session. To keep Milter applications happy, the Postfix
+cleanup(8) server actually has to simulate the SMTP client CONNECT and
+DISCONNECT events, and the SMTP client EHLO, MAIL FROM, RCPT TO and DATA
+commands.
+
+  * When new mail arrives via the sendmail(1) command line, the Postfix cleanup
+    (8) server pretends that the mail arrives with ESMTP from "localhost" with
+    IP address "127.0.0.1". The result is very similar to what happens with
+    command line submissions in Sendmail version 8.12 and later, although
+    Sendmail uses a different mechanism to achieve this result.
+
+  * When new mail arrives via the qmqpd(8) server, the Postfix cleanup(8)
+    server pretends that the mail arrives with ESMTP, and uses the QMQPD client
+    hostname and IP address.
+
+  * When old mail is re-injected into the queue with "postsuper -r", the
+    Postfix cleanup(8) server uses the same client information that was used
+    when the mail arrived as new mail.
+
+This generally works as expected, with only one exception: non-SMTP filters
+must not REJECT or TEMPFAIL simulated RCPT TO commands. When a
+non_smtpd_milters application REJECTs or TEMPFAILs a recipient, Postfix will
+report a configuration error, and mail will stay in the queue.
+
+Signing internally-generated bounce messages
+
+Postfix normally does not apply content filters to mail that is generated
+internally such as bounces or Postmaster notifications. Filtering internally-
+generated bounces would result in loss of mail when a filter rejects a message,
+as the resulting double-bounce message would almost certainly also be blocked.
+
+To sign Postfix's own bounce messages, enable filtering of internally-generated
+bounces (line 2 below), and don't reject any internally-generated bounces with
+non_smtpd_milters, header_checks or body_checks (lines 3-5 below).
+
+    1 /etc/postfix/main.cf:
+    2     internal_mail_filter_classes = bounce
+    3     non_smtpd_milters = don't reject internally-generated bounces
+    4     header_checks = don't reject internally-generated bounces
+    5     body_checks = don't reject internally-generated bounces
+
+Milter error handling
+
+The milter_default_action parameter specifies how Postfix handles Milter
+application errors. The default action is to respond with a temporary error
+status, so that the client will try again later. Specify "accept" if you want
+to receive mail as if the filter does not exist, and "reject" to reject mail
+with a permanent status. The "quarantine" action is like "accept" but freezes
+the message in the "hold" queue, and is available with Postfix 2.6 or later.
+
+    /etc/postfix/main.cf:
+        # What to do in case of errors? Specify accept, reject, tempfail,
+        # or quarantine (Postfix 2.6 or later).
+        milter_default_action = tempfail
+
+See "Different settings for different Milter applications" for advanced
+configuration options.
+
+Milter protocol version
+
+As Postfix is not built with the Sendmail libmilter library, you may need to
+configure the Milter protocol version that Postfix should use. The default
+version is 6 (before Postfix 2.6 the default version is 2).
+
+    /etc/postfix/main.cf:
+        # Postfix ≥ 2.6
+        milter_protocol = 6
+        # 2.3 ≤ Postfix ≤ 2.5
+        milter_protocol = 2
+
+If the Postfix milter_protocol setting specifies a too low version, the
+libmilter library will log an error message like this:
+
+    application name: st_optionneg[xxxxx]: 0xyy does not fulfill action
+    requirements 0xzz
+
+The remedy is to increase the Postfix milter_protocol version number. See,
+however, the limitations section below for features that aren't supported by
+Postfix.
+
+With Postfix 2.7 and earlier, if the Postfix milter_protocol setting specifies
+a too high version, the libmilter library simply hangs up without logging a
+warning, and you see a Postfix warning message like one of the following:
+
+    warning: milter inet:host:port: can't read packet header: Unknown error : 0
+    warning: milter inet:host:port: can't read packet header: Success
+    warning: milter inet:host:port: can't read SMFIC_DATA reply packet header:
+    No such file or directory
+
+The remedy is to lower the Postfix milter_protocol version number. Postfix 2.8
+and later will automatically turn off protocol features that the application's
+libmilter library does not expect.
+
+See "Different settings for different Milter applications" for advanced
+configuration options.
+
+Milter protocol timeouts
+
+Postfix uses different time limits at different Milter protocol stages. The
+table shows the timeout settings and the corresponding protocol stages (EOH =
+end of headers; EOM = end of message).
+
+     _________________________________________________________________
+    |Postfix parameter     |Time limit|Milter protocol stage          |
+    |______________________|__________|_______________________________|
+    |milter_connect_timeout|30s       |CONNECT                        |
+    |______________________|__________|_______________________________|
+    |milter_command_timeout|30s       |HELO, MAIL, RCPT, DATA, UNKNOWN|
+    |______________________|__________|_______________________________|
+    |milter_content_timeout|300s      |HEADER, EOH, BODY, EOM         |
+    |______________________|__________|_______________________________|
+
+Beware: 30s may be too short for Milter applications that do lots of DNS
+lookups. However, if you increase the above timeouts too much, remote SMTP
+clients may hang up and mail may be delivered multiple times. This is an
+inherent problem with before-queue filtering.
+
+See "Different settings for different Milter applications" for advanced
+configuration options.
+
+Different settings for different Milter applications
+
+The previous sections list a number of Postfix main.cf parameters that control
+time limits and other settings for all Postfix Milter clients. This is
+sufficient for simple configurations. With more complex configurations it
+becomes desirable to have different settings for different Milter clients. This
+is supported with Postfix 3.0 and later.
+
+The following example shows a "non-critical" Milter client with a short connect
+timeout, and with "accept" as default action when the service is unvailable.
+
+    1 /etc/postfix/main.cf:
+    2     smtpd_milters = { inet:host:port,
+    3         connect_timeout=10s, default_action=accept }
+
+Instead of a server endpoint, we now have a list enclosed in {}.
+
+  * Line 2: The first item in the list is the server endpoint. This supports
+    the exact same "inet" and "unix" syntax as described earlier.
+
+  * Line 3: The remainder of the list contains per-Milter settings. These
+    settings override global main.cf parameters, and have the same name as
+    those parameters, without the "milter_" prefix. The per-Milter settings
+    that are supported as of Postfix 3.0 are command_timeout, connect_timeout,
+    content_timeout, default_action, and protocol.
+
+Inside the list, syntax is similar to what we already know from main.cf: items
+separated by space or comma. There is one difference: you must enclose a
+setting in parentheses, as in "{ name = value }", if you want to have space or
+comma within a value or around "=".
+
+Different settings for different SMTP clients
+
+The smtpd_milter_maps feature supports different Milter settings for different
+client IP addresses. Lookup results override the the global smtpd_milters
+setting, and have the same syntax. For example, to disable Milter settings for
+local address ranges:
+
+/etc/postfix/main.cf:
+    smtpd_milter_maps = cidr:/etc/postfix/smtpd_milter_map
+    smtpd_milters = inet:host:port, { inet:host:port, ... }, ...
+
+/etc/postfix/smtpd_milter_map:
+    # Disable Milters for local clients.
+    127.0.0.0/8    DISABLE
+    192.168.0.0/16 DISABLE
+    ::/64          DISABLE
+    2001:db8::/32  DISABLE
+
+This feature is available with Postfix 3.2 and later.
+
+Sendmail macro emulation
+
+Postfix emulates a limited number of Sendmail macros, as shown in the table.
+Some macro values depend on whether a recipient is rejected (rejected
+recipients are available on request by the Milter application). Different
+macros are available at different Milter protocol stages (EOH = end-of-header,
+EOM = end-of-message); their availability is not always the same as in
+Sendmail. See the workarounds section below for solutions.
+
+     _________________________________________________________________________________________________________________________________________
+    |Sendmail macro      |Milter protocol stage                          |Description                                                         |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |i                   |DATA, EOH, EOM                                 |Queue ID, also Postfix queue file name                              |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |j                   |Always                                         |Value of myhostname                                                 |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |_                   |Always                                         |The validated client name and address                               |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{auth_authen}       |MAIL, DATA, EOH, EOM                           |SASL login name                                                     |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{auth_author}       |MAIL, DATA, EOH, EOM                           |SASL sender                                                         |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{auth_type}         |MAIL, DATA, EOH, EOM                           |SASL login method                                                   |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{client_addr}       |Always                                         |Remote client IP address                                            |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{client_connections}|CONNECT                                        |Connection concurrency for this client (zero if the client is       |
+    |                    |                                               |excluded from all smtpd_client_* limits).                           |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |                    |                                               |Remote client hostname                                              |
+    |{client_name}       |Always                                         |When address → name lookup or name → address verification fails:|
+    |                    |                                               |"unknown"                                                           |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{client_port}       |Always (Postfix ≥2.5)                        |Remote client TCP port                                              |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{client_ptr}        |CONNECT, HELO, MAIL, DATA                      |Client name from address → name lookup                            |
+    |                    |                                               |When address → name lookup fails: "unknown"                       |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{cert_issuer}       |HELO, MAIL, DATA, EOH, EOM                     |TLS client certificate issuer                                       |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{cert_subject}      |HELO, MAIL, DATA, EOH, EOM                     |TLS client certificate subject                                      |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{cipher_bits}       |HELO, MAIL, DATA, EOH, EOM                     |TLS session key size                                                |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{cipher}            |HELO, MAIL, DATA, EOH, EOM                     |TLS cipher                                                          |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{daemon_addr}       |Always (Postfix ≥3.2)                        |Local server IP address                                             |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{daemon_name}       |Always                                         |value of milter_macro_daemon_name                                   |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{daemon_port}       |Always (Postfix ≥3.2)                        |Local server TCP port                                               |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{mail_addr}         |MAIL                                           |Sender address                                                      |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{mail_host}         |MAIL (Postfix ≥ 2.6, only with smtpd_milters)|Sender next-hop destination                                         |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{mail_mailer}       |MAIL (Postfix ≥ 2.6, only with smtpd_milters)|Sender mail delivery transport                                      |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{rcpt_addr}         |RCPT                                           |Recipient address                                                   |
+    |                    |                                               |With rejected recipient: descriptive text                           |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{rcpt_host}         |RCPT (Postfix ≥ 2.6, only with smtpd_milters)|Recipient next-hop destination                                      |
+    |                    |                                               |With rejected recipient: enhanced status code                       |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{rcpt_mailer}       |RCPT (Postfix ≥ 2.6, only with smtpd_milters)|Recipient mail delivery transport                                   |
+    |                    |                                               |With rejected recipient: "error"                                    |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |{tls_version}       |HELO, MAIL, DATA, EOH, EOM                     |TLS protocol version                                                |
+    |____________________|_______________________________________________|____________________________________________________________________|
+    |v                   |Always                                         |value of milter_macro_v                                             |
+    |____________________|_______________________________________________|____________________________________________________________________|
+
+What macros will Postfix send to Milters?
+
+Postfix sends specific sets of macros at different Milter protocol stages. The
+sets are configured with the parameters as shown in the table below (EOH = end
+of headers; EOM = end of message). The protocol version is a number that
+Postfix sends at the beginning of the Milter protocol handshake.
+
+As of Sendmail 8.14.0, Milter applications can specify what macros they want to
+receive at different Milter protocol stages. An application-specified list
+takes precedence over a Postfix-specified list.
+
+     ___________________________________________________________________
+    |Postfix parameter            |Milter protocol|Milter protocol stage|
+    |                             |version        |                     |
+    |_____________________________|_______________|_____________________|
+    |milter_connect_macros        |2 or higher    |CONNECT              |
+    |_____________________________|_______________|_____________________|
+    |milter_helo_macros           |2 or higher    |HELO/EHLO            |
+    |_____________________________|_______________|_____________________|
+    |milter_mail_macros           |2 or higher    |MAIL FROM            |
+    |_____________________________|_______________|_____________________|
+    |milter_rcpt_macros           |2 or higher    |RCPT TO              |
+    |_____________________________|_______________|_____________________|
+    |milter_data_macros           |4 or higher    |DATA                 |
+    |_____________________________|_______________|_____________________|
+    |milter_end_of_header_macros  |6 or higher    |EOH                  |
+    |_____________________________|_______________|_____________________|
+    |milter_end_of_data_macros    |2 or higher    |EOM                  |
+    |_____________________________|_______________|_____________________|
+    |milter_unknown_command_macros|3 or higher    |unknown command      |
+    |_____________________________|_______________|_____________________|
+
+By default, Postfix will send only macros whose values have been updated with
+information from main.cf or master.cf, from an SMTP session (for example; SASL
+login, or TLS certificates) or from a Mail delivery transaction (for example;
+queue ID, sender, or recipient).
+
+To force a macro to be sent even when its value has not been updated, you may
+specify macro default values with the milter_macro_defaults parameter. Specify
+zero or more name=value pairs separated by comma or whitespace; you may even
+specify macro names that Postfix does know about!
+
+Workarounds
+
+  * To avoid breaking DKIM etc. signatures with an SMTP-based content filter,
+    update the before-filter SMTP client in master.cf, and add a line with "-
+    o disable_mime_output_conversion=yes" (note: no spaces around the "="). For
+    details, see the advanced content filter example.
+
+    /etc/postfix/master.cf:
+        # =============================================================
+        # service type  private unpriv  chroot  wakeup  maxproc command
+        #               (yes)   (yes)   (yes)   (never) (100)
+        # =============================================================
+        scan      unix  -       -       n       -       10      smtp
+            -o smtp_send_xforward_command=yes
+            -o disable_mime_output_conversion=yes
+            -o smtp_generic_maps=
+
+  * Some Milter applications use the "{if_addr}" macro to recognize local mail;
+    this macro does not exist in Postfix. Workaround: use the "{daemon_addr}"
+    (Postfix ≥ 3.2) or "{client_addr}" macro instead.
+
+  * Some Milter applications log a warning that looks like this:
+
+        sid-filter[36540]: WARNING: sendmail symbol 'i' not available
+
+    And they may insert an ugly message header with "unknown-msgid" like this:
+
+        X-SenderID: Sendmail Sender-ID Filter vx.y.z host.example.com <unknown-
+        msgid>
+
+    The problem is that Milter applications expect that the queue ID is known
+    before the MTA accepts the MAIL FROM (sender) command. Postfix does not
+    choose a queue ID, which is used as the queue file name, until after it
+    accepts the first valid RCPT TO (recipient) command.
+
+    If you experience the ugly header problem, see if a recent version of the
+    Milter application fixes it. For example, current versions of dkim-filter
+    and dk-filter already have code that looks up the Postfix queue ID at a
+    later protocol stage, and sid-filter version 1.0.0 no longer includes the
+    queue ID in the message header.
+
+    To fix the ugly message header, you will need to add code that looks up the
+    Postfix queue ID at some later point in time. The example below adds the
+    lookup after the end-of-message.
+
+      o Edit the filter source file (typically named xxx-filter/xxx-filter.c or
+        similar).
+
+      o Look up the mlfi_eom() function and add code near the top shown as bold
+        text below:
+
+        dfc = cc->cctx_msg;
+        assert(dfc != NULL);
+
+        /* Determine the job ID for logging. */
+        if (dfc->mctx_jobid == 0 || strcmp(dfc->mctx_jobid, JOBIDUNKNOWN) == 0)
+        {
+                char *jobid = smfi_getsymval(ctx, "i");
+                if (jobid != 0)
+                        dfc->mctx_jobid = jobid;
+        }
+
+    NOTES:
+
+      o Different mail filters use slightly different names for variables. If
+        the above code does not compile, look elsewhere in the mail filter
+        source file for code that looks up the "i" macro value, and copy that
+        code.
+
+      o This change fixes only the ugly message header, but not the WARNING
+        message. Fortunately, many Milters log that message only once.
+
+Limitations
+
+This section lists limitations of the Postfix Milter implementation. Some
+limitations will be removed as the implementation is extended over time. Of
+course the usual limitations of before-queue filtering will always apply. See
+the CONTENT_INSPECTION_README document for a discussion.
+
+  * The Milter protocol has evolved over time. Therefore, different Postfix
+    versions implement different feature sets.
+
+     ________________________________________________________________________
+    |Postfix|Supported Milter requests                                       |
+    |_______|________________________________________________________________|
+    |   2.6 |All Milter requests of Sendmail 8.14.0 (see notes below).       |
+    |_______|________________________________________________________________|
+    |       |All Milter requests of Sendmail 8.14.0, except:                 |
+    |       |SMFIP_RCPT_REJ (report rejected recipients to the mail filter), |
+    |   2.5 |SMFIR_CHGFROM (replace sender, with optional ESMTP parameters), |
+    |       |SMFIR_ADDRCPT_PAR (add recipient, with optional ESMTP           |
+    |       |parameters).                                                    |
+    |_______|________________________________________________________________|
+    |   2.4 |All Milter requests of Sendmail 8.13.0.                         |
+    |_______|________________________________________________________________|
+    |   2.3 |All Milter requests of Sendmail 8.13.0, except:                 |
+    |       |SMFIR_REPLBODY (replace message body).                          |
+    |_______|________________________________________________________________|
+
+  * For Milter applications that are written in C, you need to use the Sendmail
+    libmilter library.
+
+  * Postfix has TWO sets of mail filters: filters that are used for SMTP mail
+    only (specified with the smtpd_milters parameter), and filters for non-SMTP
+    mail (specified with the non_smtpd_milters parameter). The non-SMTP filters
+    are primarily for local submissions.
+
+    When mail is filtered by non_smtpd_milters, the Postfix cleanup(8) server
+    has to simulate SMTP client requests. This works as expected, with only one
+    exception: non_smtpd_milters must not REJECT or TEMPFAIL simulated RCPT TO
+    commands. When this rule is violated, Postfix will report a configuration
+    error, and mail will stay in the queue.
+
+  * When you use the before-queue content filter for incoming SMTP mail (see
+    SMTPD_PROXY_README), Milter applications have access only to the SMTP
+    command information; they have no access to the message header or body, and
+    cannot make modifications to the message or to the envelope.
+
+  * Postfix 2.6 ignores the optional ESMTP parameters in requests to replace
+    the sender (SMFIR_CHGFROM) or to append a recipient (SMFIR_ADDRCPT_PAR).
+    Postfix logs a warning message when a Milter application supplies such
+    ESMTP parameters:
+
+    warning: queue-id: cleanup_chg_from: ignoring ESMTP arguments "whatever"
+    warning: queue-id: cleanup_add_rcpt: ignoring ESMTP arguments "whatever"
+
+  * Postfix 2.3 does not implement requests to replace the message body. Milter
+    applications log a warning message when they need this unsupported
+    operation:
+
+    st_optionneg[134563840]: 0x3d does not fulfill action requirements 0x1e
+
+    The solution is to use Postfix version 2.4 or later.
+
+  * Most Milter configuration options are global. Future Postfix versions may
+    support per-Milter timeouts, per-Milter error handling, etc.
+

@@ -1,0 +1,11 @@
+--- Makefile.in.orig	2017-05-19 16:08:20.000000000 -0700
++++ Makefile.in	2017-05-19 16:08:25.000000000 -0700
+@@ -1338,7 +1338,7 @@
+ 	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu Makefile'; \
+ 	$(am__cd) $(top_srcdir) && \
+ 	  $(AUTOMAKE) --gnu Makefile
+-Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
++Makefile:
+ 	@case '$?' in \
+ 	  *config.status*) \
+ 	    echo ' $(SHELL) ./config.status'; \

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OpenSourceProject</key>
+	<string>libxslt</string>
+	<key>OpenSourceVersion</key>
+	<string>1.1.29</string>
+	<key>OpenSourceWebsiteURL</key>
+	<string>http://xmlsoft.org/</string>
+	<key>OpenSourceURL</key>
+	<string>http://xmlsoft.org/sources/libxslt-1.1.29.tar.gz</string>
+	<key>OpenSourceMD5</key>
+	<string>a129d3c44c022de3b9dcf6d6f288d72e</string>
+	<key>OpenSourceImportDate</key>
+	<string>2016-05-24</string>
+	<key>OpenSourceLicense</key>
+	<string>other</string>
+	<key>OpenSourceLicenseFile</key>
+	<string>libxslt/COPYING</string>
+	<key>OpenSourceModifications</key>
+	<array>
+		<string>rdar://problem/5014274</string>
+		<string>rdar://problem/6139289</string>
+		<string>rdar://problem/7342418</string>
+		<string>rdar://problem/9930624</string>
+		<string>rdar://problem/12811401</string>
+		<string>rdar://problem/26927392</string>
+	</array>
+</dict>
+</plist>

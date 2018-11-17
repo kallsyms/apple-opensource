@@ -1,0 +1,2 @@
+/^#undef TT_CONFIG_OPTION_COMPONENT_OFFSET_SCALED/s/undef/define/
+w

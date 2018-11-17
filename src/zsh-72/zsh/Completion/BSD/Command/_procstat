@@ -1,0 +1,24 @@
+#compdef procstat
+
+_arguments -s -A "-*" -S \
+  '-b[show binary information]' \
+  '-c[show command line arguments]' \
+  '-e[show environment variables]' \
+  '-f[show file descriptor information]' \
+  '-i[show signal pending and disposition]' \
+  '-k[show stacks of kernel threads]' \
+  '-l[show resource limits]' \
+  '-r[show resource usage]' \
+  '-s[show security credential information]' \
+  '-S[show cpuset information]' \
+  '-t[show thread information]' \
+  '-v[show virtual memory mappings]' \
+  '-x[show ELF auxiliary vector]' \
+  '-h[suppress table headers]' \
+  '(1)-a[all processes]' \
+  '-w+[repeat information after specified interval]:delay (seconds)' \
+  '-C[print additional capability information for file descriptors]' \
+  '-H[statistics per-thread rather than per-process]' \
+  '-n[numeric form for signals]' \
+  '1::core file:_path_files -g "*core*(-.)"' \
+  '*:process id:_pids'

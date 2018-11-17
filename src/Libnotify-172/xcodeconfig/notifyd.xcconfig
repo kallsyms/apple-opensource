@@ -1,0 +1,10 @@
+#include "base.xcconfig"
+
+INSTALL_PATH = /usr/sbin
+
+// Sandbox settings
+SANDBOX_PATH = /System/Library/Sandbox/Profiles
+SANDBOX_PATH[sdk=iphone*] =
+SANDBOX_NAME = com.apple.notifyd
+SANDBOX_PROFILE = com.apple.notifyd.sb
+

@@ -1,0 +1,134 @@
+diff -Naur net-snmp-5.6.2.1.orig/include/net-snmp/system/darwin16.h net-snmp-5.6.2.1.work/include/net-snmp/system/darwin16.h
+--- net-snmp-5.6.2.1.orig/include/net-snmp/system/darwin18.h        1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.6.2.1.work/include/net-snmp/system/darwin18.h     2017-04-05 16:28:21.000000000 -0800
+@@ -0,0 +1,11 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin18
++   Currently this just entails including darwin17.h, Yes we are still kicking this can down the road.
++*/
++
++#include "darwin17.h"
++
++#ifndef darwin18
++#   define darwin18 darwin
++#endif
++
++
+diff -Naur net-snmp-5.6.orig/include/net-snmp/system/darwin16.h net-snmp-5.6/include/net-snmp/system/darwin16.h
+--- net-snmp-5.6.orig/include/net-snmp/system/darwin17.h        1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.6/include/net-snmp/system/darwin17.h     2016-03-05 16:28:21.000000000 -0800
+@@ -0,0 +1,11 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin17
++   Currently this just entails including darwin16.h
++*/
++
++#include "darwin16.h"
++
++#ifndef darwin17
++#   define darwin17 darwin
++#endif
++
++
+diff -Naur net-snmp-5.6.orig/include/net-snmp/system/darwin16.h net-snmp-5.6/include/net-snmp/system/darwin16.h
+--- net-snmp-5.6.orig/include/net-snmp/system/darwin16.h        1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.6/include/net-snmp/system/darwin16.h     2014-11-05 16:28:21.000000000 -0800
+@@ -0,0 +1,11 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin16
++   Currently this just entails including darwin15.h
++*/
++
++#include "darwin15.h"
++
++#ifndef darwin16
++#   define darwin16 darwin
++#endif
++
++
+diff -Naur net-snmp-5.6.orig/include/net-snmp/system/darwin15.h net-snmp-5.6/include/net-snmp/system/darwin15.h
+--- net-snmp-5.6.orig/include/net-snmp/system/darwin15.h	1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.6/include/net-snmp/system/darwin15.h	2014-11-05 16:28:21.000000000 -0800
+@@ -0,0 +1,11 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin15
++   Currently this just entails including darwin14.h
++*/
++
++#include "darwin14.h"
++
++#ifndef darwin15
++#   define darwin15 darwin
++#endif
++
++
+diff -Naur net-snmp-5.6.orig/include/net-snmp/system/darwin14.h net-snmp-5.6.working/include/net-snmp/system/darwin14.h
+--- net-snmp-5.6.orig/include/net-snmp/system/darwin14.h	1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.6.working/include/net-snmp/system/darwin14.h	2013-10-02 16:23:54.000000000 -0700
+@@ -0,0 +1,11 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin14
++   Currently this just entails including darwin13.h
++*/
++
++#include "darwin13.h"
++
++#ifndef darwin14
++#   define darwin14 darwin
++#endif
++
++
+diff -Naur net-snmp-5.6.orig/include/net-snmp/system/darwin13.h net-snmp-5.6.working/include/net-snmp/system/darwin13.h
+--- net-snmp-5.6.orig/include/net-snmp/system/darwin13.h	1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.6.working/include/net-snmp/system/darwin13.h	2013-04-25 17:56:45.000000000 -0700
+@@ -0,0 +1,15 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin13 
++   Currently this just entails including darwin12.h
++*/
++
++/* for now copy the constant into our sources, see <rdar://problem/12801140>  */
++#ifndef PR_SLOWHZ
++#define PR_SLOWHZ       2               /* 2 slow timeouts per second */
++#endif
++
++#include "darwin12.h"
++
++#ifndef darwin13
++#   define darwin13 darwin
++#endif
++
+diff -Naur net-snmp-5.4.1.orig/include/net-snmp/system/darwin12.h net-snmp-5.4.1/include/net-snmp/system/darwin12.h
+--- net-snmp-5.4.1.orig/include/net-snmp/system/darwin12.h      1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.4.1/include/net-snmp/system/darwin12.h   2009-10-30 15:13:42.000000000 -0800
+@@ -0,0 +1,9 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin12 
++   Currently this just entails including darwin11.h
++*/
++
++#include "darwin11.h"
++
++#ifndef darwin12
++#   define darwin12 darwin
++#endif
+diff -Naur net-snmp-5.4.1.orig/include/net-snmp/system/darwin11.h net-snmp-5.4.1/include/net-snmp/system/darwin11.h
+--- net-snmp-5.4.1.orig/include/net-snmp/system/darwin11.h      1969-12-31 16:00:00.000000000 -0800
++++ net-snmp-5.4.1/include/net-snmp/system/darwin11.h   2009-10-30 15:13:42.000000000 -0800
+@@ -0,0 +1,10 @@
++/* This is a place for the changes needed to get net_snmp runnning on darwin11 including
++   support for the new UNAME_RELEASE version
++   Currently this just enatils including darwin10.h
++*/
++
++#include "darwin10.h"
++
++#ifndef darwin11
++#   define darwin11 darwin
++#endif
+diff -Naur net-snmp-5.6.2.1.orig/Makefile.in net-snmp-5.6.2.1.work/Makefile.in
+--- net-snmp-5.6.2.1.orig/Makefile.in	2014-02-20 06:49:27.000000000 -0800
++++ net-snmp-5.6.2.1.work/Makefile.in	2017-04-13 14:20:17.000000000 -0700
+@@ -17,7 +17,8 @@
+ INSTALLHEADERS=version.h
+ INCLUDESUBDIR=system
+ INCLUDESUBDIRHEADERS= aix.h bsd.h bsdi3.h bsdi4.h bsdi.h cygwin.h \
+-	darwin.h darwin7.h darwin8.h darwin9.h darwin10.h dragonfly.h dynix.h \
++	darwin.h darwin7.h darwin8.h darwin9.h darwin10.h darwin11.h darwin12.h \
++	darwin13.h darwin14.h darwin15.h darwin16.h darwin17.h darwin18.h dragonfly.h dynix.h \
+ 	freebsd2.h freebsd3.h freebsd4.h freebsd5.h freebsd6.h \
+ 	freebsd7.h freebsd8.h freebsd9.h freebsd10.h freebsd.h \
+         generic.h \

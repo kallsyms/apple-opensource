@@ -1,0 +1,79 @@
+--- docs/conf/httpd.conf.in.orig	2014-03-14 15:48:11.000000000 -0700
++++ docs/conf/httpd.conf.in	2014-03-14 15:48:17.000000000 -0700
+@@ -49,7 +49,12 @@
+ # prevent Apache from glomming onto all bound IP addresses.
+ #
+ #Listen 12.34.56.78:80
+-Listen @@Port@@
++<IfDefine SERVER_APP_HAS_DEFAULT_PORTS>
++    Listen 8080
++</IfDefine>
++<IfDefine !SERVER_APP_HAS_DEFAULT_PORTS>
++    Listen @@Port@@
++</IfDefine>
+
+ #
+ # Dynamic Shared Object (DSO) Support
+@@ -64,6 +64,9 @@
+ # LoadModule foo_module modules/mod_foo.so
+ #
+ @@LoadModule@@
++#LoadModule php7_module libexec/apache2/libphp7.so
++#LoadModule perl_module libexec/apache2/mod_perl.so
++LoadModule hfs_apple_module libexec/apache2/mod_hfs_apple.so
+ 
+ <IfModule unixd_module>
+ #
+@@ -74,8 +76,8 @@
+ # It is usually good practice to create a dedicated user and group for
+ # running httpd, as with most system services.
+ #
+-User daemon
+-Group daemon
++User _www
++Group _www
+ 
+ </IfModule>
+ 
+@@ -143,7 +145,8 @@
+     # http://httpd.apache.org/docs/2.4/mod/core.html#options
+     # for more information.
+     #
+-    Options Indexes FollowSymLinks
++    Options FollowSymLinks Multiviews
++    MultiviewsMatch Any
+ 
+     #
+     # AllowOverride controls what directives may be placed in .htaccess files.
+@@ -369,6 +372,8 @@
+ #EnableMMAP off
+ #EnableSendfile on
+ 
++TraceEnable off
++
+ # Supplemental configuration
+ #
+ # The configuration files in the @rel_sysconfdir@/extra/ directory can be 
+@@ -377,13 +382,13 @@
+ # necessary.
+ 
+ # Server-pool management (MPM specific)
+-#Include @rel_sysconfdir@/extra/httpd-mpm.conf
++Include @rel_sysconfdir@/extra/httpd-mpm.conf
+ 
+ # Multi-language error messages
+ #Include @rel_sysconfdir@/extra/httpd-multilang-errordoc.conf
+ 
+ # Fancy directory listings
+-#Include @rel_sysconfdir@/extra/httpd-autoindex.conf
++Include @rel_sysconfdir@/extra/httpd-autoindex.conf
+ 
+ # Language settings
+ #Include @rel_sysconfdir@/extra/httpd-languages.conf
+@@ -422,6 +424,9 @@
+ SSLRandomSeed startup builtin
+ SSLRandomSeed connect builtin
+ </IfModule>
++
++Include @rel_sysconfdir@/other/*.conf
++

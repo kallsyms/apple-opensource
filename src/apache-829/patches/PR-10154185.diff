@@ -1,0 +1,140 @@
+--- modules/ssl/mod_ssl.c.orig	2014-03-27 16:55:26.000000000 -0700
++++ modules/ssl/mod_ssl.c	2014-03-27 16:50:10.000000000 -0700
+@@ -79,6 +79,9 @@
+     SSL_CMD_SRV(FIPS, FLAG,
+                 "Enable FIPS-140 mode "
+                 "(`on', `off')")
++    SSL_CMD_SRV(AllowEmptyFragments, FLAG,
++                "Allow empty fragments "
++                "(`on', `off')")
+     SSL_CMD_ALL(CipherSuite, TAKE1,
+                 "Colon-delimited list of permitted SSL Ciphers "
+                 "('XXX:...:XXX' - see manual)")
+--- modules/ssl/ssl_engine_config.c.orig	2014-03-27 17:05:39.000000000 -0700
++++ modules/ssl/ssl_engine_config.c	2014-03-27 16:47:28.000000000 -0700
+@@ -218,6 +218,7 @@
+ #ifdef HAVE_FIPS
+     sc->fips                   = UNSET;
+ #endif
++	sc->allow_empty_fragments  = UNSET;
+ #ifndef OPENSSL_NO_COMP
+     sc->compression            = UNSET;
+ #endif
+@@ -400,6 +401,8 @@
+ #endif
+     cfgMergeBool(session_tickets);
+ 
++    cfgMergeBool(allow_empty_fragments);
++
+     modssl_ctx_cfg_merge_server(p, base->server, add->server, mrg->server);
+ 
+     return mrg;
+@@ -645,6 +648,22 @@
+     return NULL;
+ }
+ 
++const char *ssl_cmd_SSLAllowEmptyFragments(cmd_parms *cmd, void *dcfg, int flag)
++{
++    SSLSrvConfigRec *sc = mySrvConfig(cmd->server);
++    const char *err;
++
++    if ((err = ap_check_cmd_context(cmd, GLOBAL_ONLY))) {
++        return err;
++    }
++
++    if ((sc->allow_empty_fragments != UNSET) && (sc->allow_empty_fragments != (BOOL)(flag ? TRUE : FALSE)))
++        return "Conflicting SSLAllowEmptyFragments options, cannot be both On and Off";
++    sc->allow_empty_fragments = flag ? TRUE : FALSE;
++
++    return NULL;
++}
++
+ const char *ssl_cmd_SSLCipherSuite(cmd_parms *cmd,
+                                    void *dcfg,
+                                    const char *arg)
+
+--- modules/ssl/ssl_engine_init.c.orig	2014-03-27 16:56:41.000000000 -0700
++++ modules/ssl/ssl_engine_init.c	2014-03-27 17:12:40.000000000 -0700
+@@ -254,6 +254,9 @@
+             sc->fips = FALSE;
+         }
+ #endif
++        if (sc->allow_empty_fragments == UNSET)
++            sc->allow_empty_fragments = TRUE;
++
+     }
+ 
+ #if APR_HAS_THREADS && OPENSSL_VERSION_NUMBER < 0x10100000L
+@@ -583,6 +583,10 @@
+ 
+     SSL_CTX_set_options(ctx, SSL_OP_ALL);
+ 
++    if (sc->allow_empty_fragments) {
++        SSL_CTX_clear_options(ctx, SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS);
++    }
++
+ #if OPENSSL_VERSION_NUMBER < 0x10100000L
+     /* always disable SSLv2, as per RFC 6176 */
+     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
+--- modules/ssl/ssl_private.h.orig	2014-03-27 16:57:27.000000000 -0700
++++ modules/ssl/ssl_private.h	2014-03-28 14:13:32.000000000 -0700
+@@ -625,6 +625,7 @@
+ #ifdef HAVE_FIPS
+     BOOL             fips;
+ #endif
++    BOOL             allow_empty_fragments;
+ #ifndef OPENSSL_NO_COMP
+     BOOL             compression;
+ #endif
+@@ -732,6 +733,7 @@
+ #endif
+ 
+ const char *ssl_cmd_SSLFIPS(cmd_parms *cmd, void *dcfg, int flag);
++const char *ssl_cmd_SSLAllowEmptyFragments(cmd_parms *cmd, void *dcfg, int flag);
+ 
+ /**  module initialization  */
+ apr_status_t ssl_init_Module(apr_pool_t *, apr_pool_t *, apr_pool_t *, server_rec *);
+--- docs/manual/mod/directives.html.en.orig	2011-09-03 12:52:08.000000000 -0500
++++ docs/manual/mod/directives.html.en	2011-12-06 15:31:24.000000000 -0600
+@@ -392,6 +392,7 @@
+ <li><a href="mod_include.html#ssistarttag">SSIStartTag</a></li>
+ <li><a href="mod_include.html#ssitimeformat">SSITimeFormat</a></li>
+ <li><a href="mod_include.html#ssiundefinedecho">SSIUndefinedEcho</a></li>
++<li><a href="mod_ssl.html#sslallowemptyfragments">SSLAllowEmptyFragments</a></li>
+ <li><a href="mod_ssl.html#sslcacertificatefile">SSLCACertificateFile</a></li>
+ <li><a href="mod_ssl.html#sslcacertificatepath">SSLCACertificatePath</a></li>
+ <li><a href="mod_ssl.html#sslcadnrequestfile">SSLCADNRequestFile</a></li>
+--- docs/manual/mod/mod_ssl.html.en.orig	2013-07-11 06:00:57.000000000 -0700
++++ docs/manual/mod/mod_ssl.html.en	2013-11-12 12:55:11.000000000 -0800
+@@ -45,6 +45,7 @@ to provide the cryptography engine.</p>
+ </div>
+ <div id="quickview"><h3 class="directives">Directives</h3>
+ <ul id="toc">
++<li><img alt="" src="../images/down.gif" /> <a href="#sslallowemptyfragments">SSLAllowEmptyFragments</a></li>
+ <li><img alt="" src="../images/down.gif" /> <a href="#sslcacertificatefile">SSLCACertificateFile</a></li>
+ <li><img alt="" src="../images/down.gif" /> <a href="#sslcacertificatepath">SSLCACertificatePath</a></li>
+ <li><img alt="" src="../images/down.gif" /> <a href="#sslcadnrequestfile">SSLCADNRequestFile</a></li>
+@@ -319,6 +320,23 @@ string in <code class="module"><a href="
+ 
+ </div>
+ <div class="top"><a href="#page-header"><img alt="top" src="../images/up.gif" /></a></div>
++<div class="directive-section"><h2><a name="SSLAllowEmptyFragments" id="SSLAllowEmptyFragments">SSLAllowEmptyFragments</a> <a name="sslallowemptyfragments" id="sslallowemptyfragments">Directive</a></h2>
++<table class="directive">
++<tr><th><a href="directive-dict.html#Description">Description:</a></th><td>Allow or prevent sending empty fragments</td></tr>
++<tr><th><a href="directive-dict.html#Syntax">Syntax:</a></th><td><code>SSLAllowEmptyFragments on|off</code></td></tr>
++<tr><th><a href="directive-dict.html#Default">Default:</a></th><td><code>SSLAllowEmptyFragments on</code></td></tr>
++<tr><th><a href="directive-dict.html#Context">Context:</a></th><td>server config</td></tr>
++<tr><th><a href="directive-dict.html#Status">Status:</a></th><td>Extension</td></tr>
++<tr><th><a href="directive-dict.html#Module">Module:</a></th><td>mod_ssl</td></tr>
++</table>
++<p>See the description of <code>SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS</code> in the documentation for OpenSSL's
++<a href="http://www.openssl.org/docs/ssl/SSL_CTX_set_options.html#item_SSL_OP_DONT_INSERT_EMPTY_FRAGMEN">SSL_CTX_set_options</a> function.</p>
++<p>When <code>SSLAllowEmptyFragments</code> is <code>on</code>, mod_ssl clears the <code>SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS</code> option.
++When <code>SSLAllowEmptyFragments</code> is <code>off</code>, mod_ssl sets the <code>SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS</code> option.</p>
++<p>The default is <code>on</code> to address the <a href="http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2011-3389">BEAST security vulnerability</a>
++but it may cause compatibility problems with certain clients or network gear (not known).  If SSL connection problems occur turn this <code>off</code>.</p>
++</div>
++<div class="top"><a href="#page-header"><img alt="top" src="../images/up.gif" /></a></div>
+ <div class="directive-section"><h2><a name="SSLCACertificateFile" id="SSLCACertificateFile">SSLCACertificateFile</a> <a name="sslcacertificatefile" id="sslcacertificatefile">Directive</a></h2>
+ <table class="directive">
+ <tr><th><a href="directive-dict.html#Description">Description:</a></th><td>File of concatenated PEM-encoded CA Certificates

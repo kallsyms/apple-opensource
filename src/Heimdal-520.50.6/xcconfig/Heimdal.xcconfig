@@ -1,0 +1,53 @@
+
+SDKROOT = macosx.internal
+
+HEIMDAL_HOST_TOOLCHAIN = $(DT_TOOLCHAIN_DIR)/usr/local/bin
+
+HEIMDAL_AKS_LIBS[sdk=iphoneos*] = -laks
+HEIMDAL_AKS_LIBS[sdk=macosx*] = -laks
+
+HEIMDAL_BIN_DIR = /usr/bin
+HEIMDAL_BIN_DIR[sdk=iphoneos*] = /usr/local/bin
+HEIMDAL_BIN_DIR[sdk=iphonesimulator*] = /usr/local/bin
+
+HEIMDAL_XNU_SYS_HEADERS = $(SDKROOT)/System/Library/Frameworks/System.framework/PrivateHeaders
+
+HEIMDAL_PLATFORM_CFLAGS = -D__GSSAPI_APPLE_API_PRIVATE 
+HEIMDAL_PLATFORM_CFLAGS[sdk=iphoneos*] = -D__APPLE_TARGET_EMBEDDED__ -D__GSSAPI_APPLE_API_PRIVATE
+HEIMDAL_PLATFORM_CFLAGS[sdk=iphonesimulator*] = -D__APPLE_TARGET_EMBEDDED__ -D__GSSAPI_APPLE_API_PRIVATE
+HEIMDAL_PLATFORM_CFLAGS[sdk=applematch*] = -D__APPLE_TARGET_EMBEDDED__ -D__GSSAPI_APPLE_API_PRIVATE
+HEIMDAL_PLATFORM_CFLAGS[sdk=appletv*] = -D__APPLE_TARGET_EMBEDDED__ -D__GSSAPI_APPLE_API_PRIVATE
+
+HEIMDAL_OPENDIRECTORY_FRAMEWORK = -framework OpenDirectory
+HEIMDAL_OPENDIRECTORY_FRAMEWORK[sdk=iphoneos*] =
+HEIMDAL_OPENDIRECTORY_FRAMEWORK[sdk=iphonesimulator*] =
+HEIMDAL_OPENDIRECTORY_FRAMEWORK[sdk=watchos*] =
+HEIMDAL_OPENDIRECTORY_FRAMEWORK[sdk=appletvos*] =
+
+HEIMDAL_ASN1BASE_INSTALL_PATH = /usr/local
+
+WARNING_CFLAGS_MOST = $(inherit) -Weverything -Werror=all -Wno-undef -Wno-missing-variable-declarations -Wno-padded -Wno-unused-macros -Wno-cast-align -Wno-extended-offsetof -Wno-assign-enum -Wno-documentation-unknown-command -Wno-used-but-marked-unused -Wno-switch-enum -Wno-gnu-union-cast -Wno-pedantic -Wno-missing-noreturn -Wno-system-headers -Wno-unreachable-code-aggressive -Wno-reserved-id-macro -Wno-cast-qual -Wno-cstring-format-directive
+
+CODE_SIGN_IDENTITY = -
+
+WARNING_CFLAGS = $(WARNING_CFLAGS_MOST)
+WARNING_CFLAGS_YL = $(WARNING_CFLAGS_MOST) -Wno-documentation -Wno-missing-noreturn
+
+HEIMDAL_GSS_MODULEMAP_FILE = Modules/GSS.modulemap
+HEIMDAL_GSS_MODULEMAP_FILE[sdk=iphoneos*] = Modules/GSS-iPhoneOS.modulemap
+HEIMDAL_GSS_MODULEMAP_FILE[sdk=iphonesimulator*] = Modules/GSS-iPhoneOS.modulemap
+HEIMDAL_GSS_MODULEMAP_FILE[sdk=matchos*] = Modules/GSS-iPhoneOS.modulemap
+HEIMDAL_GSS_MODULEMAP_FILE[sdk=appletvos*] = Modules/GSS-iPhoneOS.modulemap
+
+HEIMDAL_STATISTICS_FRAMEWORK[sdk=macosx*] = -lDiagnosticMessagesClient
+HEIMDAL_STATISTICS_FRAMEWORK[sdk=iphoneos*] = -framework AggregateDictionary
+HEIMDAL_STATISTICS_FRAMEWORK[sdk=watchos*] = -framework AggregateDictionary
+HEIMDAL_STATISTICS_FRAMEWORK[sdk=appletvos*] = -framework AggregateDictionary
+
+
+SUPPORTED_PLATFORMS = macosx iphoneos iphonesimulator appletvos appletvsimulator watchos watchsimulator
+
+// GCC_OPTIMIZATION_LEVEL = 0
+
+// #include Coverage.xcconfig
+GCC_PREPROCESSOR_DEFINITIONS = CORECRYPTO_DONOT_USE_TRANSPARENT_UNION=1 $(GCC_PREPROCESSOR_DEFINITIONS)

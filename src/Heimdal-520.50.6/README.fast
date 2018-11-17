@@ -1,0 +1,11 @@
+
+-- in order of preference
+
+- client: plugin support for fast plugins
+
+- kdc: plugin support for fast plugins
+	partly done with "struct kdc_patypes"
+
+- kcm: support FAST armor ticket
+-- using PK-INIT anonymous
+-- using host key

@@ -1,0 +1,20 @@
+<plist version="1.0">
+<array>
+<dict>
+        <key>OpenSourceProject</key>
+        <string>bind9</string>
+        <key>OpenSourceVersion</key>
+        <string>9.9.7-P3</string>
+        <key>OpenSourceURL</key>
+        <string>https://www.isc.org/downloads/file/bind-9-9-7-p3/?version=tar-gz</string>
+        <key>OpenSourceSHA1</key>
+        <string>44786ddeb1b35eb61d521c9e46375dae7d85f378</string>
+        <key>OpenSourceImportDate</key>
+        <string>2015-09-08</string>
+        <key>OpenSourceLicense</key>
+        <string>Other</string>
+        <key>OpenSourceLicenseFile</key>
+        <string>bind9/COPYRIGHT</string>
+</dict>
+</array>
+</plist>
