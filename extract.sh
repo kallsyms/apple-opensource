@@ -16,7 +16,7 @@ do
 done
 
 if [ -n "$(git status --porcelain)" ]; then
-    git add -A
+    git add src
     git commit -m "$(date +%Y-%m-%d)"
     git push
 fi
