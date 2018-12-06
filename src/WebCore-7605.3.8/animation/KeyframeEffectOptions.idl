@@ -1,5 +1,0 @@
-
-dictionary KeyframeEffectOptions : AnimationEffectTimingProperties {
-    IterationCompositeOperation iterationComposite = "replace";
-    CompositeOperation composite = "replace";
-};
