@@ -1,0 +1,5 @@
+FROM ubuntu:18.04
+
+RUN apt-get update && apt-get install -y git python3 python3-requests wget git
+
+ENTRYPOINT ["./update.py"]
