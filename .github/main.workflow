@@ -4,6 +4,6 @@ workflow "Update sources" {
 }
 
 action "update" {
-  uses = "./update.py"
+  uses = "./"
   secrets = ["GITHUB_TOKEN"]
 }
