@@ -9,6 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Update packages
-      uses: ./
+      uses: ../
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
