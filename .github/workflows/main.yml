@@ -9,6 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Update packages
-      uses: ./
+      uses: kallsyms/apple-opensource
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
