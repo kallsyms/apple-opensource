@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OpenSourceProject</key>
+	<string>libxml2</string>
+	<key>OpenSourceVersion</key>
+	<string>2.9.4</string>
+	<key>OpenSourceWebsiteURL</key>
+	<string>http://xmlsoft.org/</string>
+	<key>OpenSourceURL</key>
+	<string>http://xmlsoft.org/sources/libxml2-2.9.4.tar.gz</string>
+	<key>OpenSourceMD5</key>
+	<string>ae249165c173b1ff386ee8ad676815f5</string>
+	<key>OpenSourceImportDate</key>
+	<string>2016-05-27</string>
+	<key>OpenSourceLicense</key>
+	<string>other</string>
+	<key>OpenSourceLicenseFile</key>
+	<string>libxml2.txt</string>
+	<key>OpenSourceModifications</key>
+	<array>
+		<string>rdar://problem/3874282</string>
+		<string>rdar://problem/3960539</string>
+		<string>rdar://problem/4723997</string>
+		<string>rdar://problem/5014269</string>
+		<string>rdar://problem/6514625</string>
+		<string>rdar://problem/8371582</string>
+		<string>rdar://problem/8677255</string>
+		<string>rdar://problem/9791139</string>
+		<string>rdar://problem/10141425</string>
+		<string>rdar://problem/10646045</string>
+		<string>rdar://problem/10646344</string>
+		<string>rdar://problem/10734584</string>
+		<string>rdar://problem/10734593</string>
+		<string>rdar://problem/10772343</string>
+		<string>rdar://problem/12751928</string>
+		<string>rdar://problem/12938958</string>
+		<string>rdar://problem/26527606</string>
+	</array>
+</dict>
+</plist>

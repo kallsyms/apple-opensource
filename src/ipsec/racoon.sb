@@ -1,0 +1,63 @@
+;; OriginatingProject: ipsec
+(version 1)
+(deny default)
+
+(import "system.sb")
+
+(allow system-socket sysctl-read sysctl-write)
+
+(allow system-info (info-type "net.link.addr"))
+
+(allow file-read*)
+
+(allow file-write*)
+
+(allow ipc-posix* (ipc-posix-name "com.apple.securityd"))
+
+(allow ipc-posix-shm
+	(ipc-posix-name "apple.shm.notification_center")
+	(ipc-posix-name "com.apple.AppleDatabaseChanged"))
+
+(allow ipc-posix-shm-read*
+	(ipc-posix-name-regex #"^apple\.shm\.cfprefsd\."))
+
+(allow iokit-open
+	(iokit-user-client-class "RootDomainUserClient"))
+
+(allow mach-lookup
+	(global-name "com.apple.PowerManagement.control")
+	(global-name "com.apple.SecurityServer")
+	(global-name "com.apple.SystemConfiguration.configd")
+	(global-name "com.apple.nehelper")
+	(global-name "com.apple.securityd.xpc")
+	(global-name "com.apple.ocspd")
+	(global-name "com.apple.aggregated")
+	(global-name "com.apple.cfprefsd.daemon")
+	(global-name "com.apple.cfprefsd.agent")
+	(local-name "com.apple.cfprefsd.agent")
+	(global-name "com.apple.securityd")
+	(global-name "com.apple.bsd.dirhelper")
+	(global-name "com.apple.system.logger")
+	(global-name "com.apple.system.notification_center")
+	(global-name "com.apple.system.libinfo.muser"))
+
+(allow network*
+	(local udp "*:500" "*:4500")
+	(remote udp "*:*"))
+
+(allow network-inbound
+	(path "/private/var/run/vpncontrol.sock"))
+
+;;; Allow read access to standard system paths.
+(allow network-outbound
+	(literal "/private/var/run/asl_input")
+	(literal "/private/var/run/syslog")
+	(subpath "/private/var/tmp/launchd"))
+
+(allow sysctl-write
+	(sysctl-name "kern.ipc.maxsockbuf")
+	(sysctl-name "net.inet.ipsec.esp_port"))
+
+;;; Allow racoon to check entitlements
+(allow iokit-open
+	(iokit-user-client-class "AppleMobileFileIntegrityUserClient"))

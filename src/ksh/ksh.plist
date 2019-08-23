@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>OpenSourceImportDate</key>
+		<string>2011-07-12</string>
+		<key>OpenSourceLicense</key>
+		<string>Other</string>
+		<key>OpenSourceLicenseFile</key>
+		<string>ksh.txt</string>
+		<key>OpenSourceMD5</key>
+		<string>3a6e2d01b1b049bdef968dc5a24c1ea7</string>
+		<key>OpenSourceModifications</key>
+		<array>
+			<string>Change va_arg order for x86_64</string>
+			<string>http://rhn.redhat.com/errata/RHBA-2017-1378.html</string>
+		</array>
+		<key>OpenSourceProject</key>
+		<string>ksh</string>
+		<key>OpenSourceURL</key>
+		<string>http://www2.research.att.com/~astopen/download/tgz/ast-ksh.2012-08-01.tgz</string>
+		<key>OpenSourceVersion</key>
+		<string>2012-08-01</string>
+		<key>OpenSourceWebsiteURL</key>
+		<string>http://www2.research.att.com/sw/download/</string>
+	</dict>
+	<dict>
+		<key>OpenSourceImportDate</key>
+		<string>2013-10-22</string>
+		<key>OpenSourceLicense</key>
+		<string>Other</string>
+		<key>OpenSourceLicenseFile</key>
+		<string>ksh.txt</string>
+		<key>OpenSourceMD5</key>
+		<string>af699318bea7398f0f413b839bfcd762</string>
+		<key>OpenSourceProject</key>
+		<string>ksh</string>
+		<key>OpenSourceURL</key>
+		<string>http://www2.research.att.com/~astopen/download/tgz/INIT.2012-08-01.tgz</string>
+		<key>OpenSourceVersion</key>
+		<string>2012-08-01</string>
+		<key>OpenSourceWebsiteURL</key>
+		<string>http://www2.research.att.com/sw/download/</string>
+	</dict>
+</array>
+</plist>

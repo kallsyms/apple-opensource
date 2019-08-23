@@ -1,0 +1,45 @@
+diff -Naur net-snmp-5.6.2.1.orig/agent/mibgroup/mibII/ipv6.c net-snmp-5.6.2.1.working/agent/mibgroup/mibII/ipv6.c
+--- net-snmp-5.6.2.1.orig/agent/mibgroup/mibII/ipv6.c	2015-10-06 16:42:15.000000000 -0700
++++ net-snmp-5.6.2.1.working/agent/mibgroup/mibII/ipv6.c	2015-10-06 17:20:08.000000000 -0700
+@@ -1312,8 +1312,10 @@
+     caddr_t         p;
+ #if defined(openbsd4)
+     static struct inpcb in6pcb, savpcb;
+-#else
++#else if STRUCT_in6pcb_HAS_inp_vflag
+     static struct in6pcb in6pcb, savpcb;
++#else
++    static struct inpcb in6pcb, savpcb;
+ #endif
+     int             found, savnameLen;
+ #if defined(__NetBSD__) && __NetBSD_Version__ >= 106250000 || defined(openbsd4) 	/*1.6Y*/
+@@ -1534,8 +1536,13 @@
+     int             result;
+     int             i, j;
+     caddr_t         p;
+-    static struct in6pcb in6pcb, savpcb;
+-    struct tcp6cb   tcp6cb;
++#if STRUCT_in6pcb_HAS_inp_vflag
++     static struct in6pcb in6pcb, savpcb;
++     struct tcp6cb   tcp6cb;
++#else
++    static struct inpcb in6pcb, savpcb;
++    struct tcpcb    tcp6cb;
++#endif
+     int             found, savnameLen;
+     static int      tcp6statemap[TCP6_NSTATES];
+     static int      initialized = 0;
+@@ -1755,8 +1762,10 @@
+     caddr_t         p;
+ #if defined(openbsd4)
+     static struct inpcb in6pcb, savpcb;
++#else if STRUCT_in6pcb_HAS_inp_vflag
++     static struct in6pcb in6pcb, savpcb;
+ #else
+-    static struct in6pcb in6pcb, savpcb;
++    static struct inpcb in6pcb, savpcb;
+ #endif
+     struct tcpcb    tcpcb;
+     int             found, savnameLen;
+
+

@@ -1,0 +1,13 @@
+--- docs/conf/extra/httpd-mpm.conf.in.orig	2012-08-14 16:59:24.000000000 -0700
++++ docs/conf/extra/httpd-mpm.conf.in	2013-11-12 15:01:35.000000000 -0800
+@@ -26,8 +26,8 @@
+ # MaxConnectionsPerChild: maximum number of connections a server process serves
+ #                         before terminating
+ <IfModule mpm_prefork_module>
+-    StartServers             5
+-    MinSpareServers          5
++    StartServers             1
++    MinSpareServers          1
+     MaxSpareServers         10
+     MaxRequestWorkers      250
+     MaxConnectionsPerChild   0

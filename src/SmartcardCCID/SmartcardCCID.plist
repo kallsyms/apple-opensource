@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>OpenSourceProject</key>
+		<string>ccid</string>
+		<key>OpenSourceVersion</key>
+		<string>1.4.27</string>
+		<key>OpenSourceWebsiteURL</key>
+		<string>http://pcsclite.alioth.debian.org/ccid.html</string>
+		<key>OpenSourceURL</key>
+		<string>https://alioth.debian.org/frs/download.php/file/4218/ccid-1.4.27.tar.bz2</string>
+		<key>OpenSourceImportDate</key>
+		<string>2017-06-02</string>
+		<key>OpenSourceModifications</key>
+		<array>
+			<string>destDirFix.patch - makefile.in, customized destination directory</string>
+			<string>ForceWithoutPcsc.patch - Makefile.am, Makefile.in, define PROVIDED_BY_PCSC</string>
+			<string>ccid-info-plist.patch - Info.plist.src, ifdLogLevel 0x0001</string>
+			<string>osxConfigure.patch - configure, if [[ (&quot;$*&quot; =~ &quot;--no-configure&quot;) ]]; then exit 0 fi</string>
+		</array>
+		<key>OpenSourceLicense</key>
+		<string>LGPL</string>
+		<key>OpenSourceLicenseFile</key>
+		<string>SmartcardCCID.txt</string>
+	</dict>
+	<dict>
+		<key>OpenSourceProject</key>
+		<string>libusb</string>
+		<key>OpenSourceVersion</key>
+		<string>1.0.9</string>
+		<key>OpenSourceWebsiteURL</key>
+		<string>http://www.libusb.org</string>
+		<key>OpenSourceURL</key>
+		<string>http://sourceforge.net/projects/libusb/files/libusb-1.0/libusb-1.0.9/libusb-1.0.9.tar.bz2/download</string>
+		<key>OpenSourceImportDate</key>
+		<string>2013-12-10</string>
+		<key>OpenSourceModifications</key>
+		<array>
+			<string>darwin_no_seize.patch - darwin.c, replace USBDeviceOpenSeize by USBDeviceOpen</string>
+		</array>
+		<key>OpenSourceLicense</key>
+		<string>LGPL</string>
+		<key>OpenSourceLicenseFile</key>
+		<string>SmartcardCCID.txt</string>
+	</dict>
+</array>
+</plist>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>OpenSourceImportDate</key>
+		<string>2015-09-09</string>
+		<key>OpenSourceLicense</key>
+		<string>Other</string>
+		<key>OpenSourceLicenseFile</key>
+		<string>lsof.txt</string>
+		<key>OpenSourceModifications</key>
+		<array>
+			<string>All non-&quot;darwin&quot; OS dialects were removed from the lsof sources before being imported</string>
+			<string>Updated &quot;Configure&quot; script for recent OS versions</string>
+		</array>
+		<key>OpenSourceProject</key>
+		<string>lsof</string>
+		<key>OpenSourceSHA1</key>
+		<string>ea8fb2588c9732f1b22d73ffab17dd055590df2c</string>
+		<key>OpenSourceURL</key>
+		<string>ftp://lsof.itap.purdue.edu/pub/tools/unix/lsof/lsof_4.89.tar.bz2</string>
+		<key>OpenSourceVersion</key>
+		<string>4.89</string>
+	</dict>
+</array>
+</plist>

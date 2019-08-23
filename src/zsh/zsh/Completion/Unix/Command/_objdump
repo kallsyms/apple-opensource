@@ -1,0 +1,3 @@
+#compdef objdump
+
+_arguments -- '*:object file:_object_files'

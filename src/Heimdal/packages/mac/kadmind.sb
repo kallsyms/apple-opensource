@@ -1,0 +1,100 @@
+;;
+;; kadmind - sandbox profile
+;; Copyright (c) 2009 Apple Inc.  All Rights reserved.
+;;
+;; WARNING: The sandbox rules in this file currently constitute 
+;; Apple System Private Interface and are subject to change at any time and
+;; without notice. The contents of this file are also auto-generated and not
+;; user editable; it may be overwritten at any time.
+;;
+(version 1)
+
+(deny default)
+
+(import "com.apple.corefoundation.sb")
+(import "system.sb")
+(import "opendirectory.sb")
+
+(corefoundation)
+
+(allow file-ioctl
+       (literal "/dev/dtracehelper"))
+
+;; This is needed for realpath on system keychain
+(allow file-read-metadata
+       (literal "/private")
+       (literal "/private/var")
+       (literal "/private/var/db"))
+
+(allow file-read*
+       (literal "/")
+       (literal "/Library")
+       (literal "/Library/Keychains")
+       (literal "/Library/Keychains/System.keychain")
+       (literal "/Library/Security/Trust Settings/Admin.plist")
+       (literal "/Library/Preferences/edu.mit.Kerberos")
+       (literal "/Library/Preferences/com.apple.Kerberos.plist")
+       (regex #"^/Library/Preferences/com\.apple\.GSS\.")
+       (literal "/Library/Preferences/com.apple.security.plist")
+       (literal "/Library/Preferences/.GlobalPreferences.plist")
+       (literal "/Library/Preferences/SystemConfiguration/preferences.plist")
+       (literal "/Library")
+       (literal "/dev/dtracehelper")
+       (literal "/dev/null")
+       (literal "/dev/random")
+       (literal "/tmp")
+       (literal "/etc")
+       (literal "/var")
+       (literal "/private/etc/hosts")
+       (literal "/private/etc/localtime")
+       (subpath "/private/var/db/mds")
+       (subpath "/private/var/var/db/krb5kdc")
+       (subpath "/System")
+       (subpath "/usr/lib")
+       (subpath "/usr/share")
+       )
+
+(allow file-write*
+       (literal "/private/var/log/krb5kdc/kadmin.log")
+       (literal "/private/var/run/kadmin.pid")
+       (subpath "/private/var/db/krb5kdc")
+       )
+
+(allow file-write-data
+       (literal "/dev/dtracehelper")
+       (literal "/private/var/db/mds/system/mds.lock")
+       (literal "/private/var/log/krb5kdc/kadmin.log"))
+
+(allow ipc-posix-shm)
+
+(allow mach-lookup
+       (global-name "com.apple.CoreServices.coreservicesd")
+       (global-name "com.apple.SecurityServer")
+       (global-name "com.apple.SystemConfiguration.SCNetworkReachability")
+       (global-name "com.apple.SystemConfiguration.configd")
+       (global-name "com.apple.TrustEvaluationAgent")
+       (global-name "com.apple.ocspd")
+       (global-name "com.apple.networkd")
+       (global-name "com.apple.system.notification_center"))
+
+(allow network-inbound
+       (local tcp "*:749")
+       (local udp "*:749"))
+
+(allow network-outbound
+       (literal "/var/run/passwordserver")
+       (literal "/private/var/run/mDNSResponder")
+       (literal "/private/var/rpc/ncalrpc/NETLOGON")
+       (literal "/var/run/ldapi")
+       (remote udp)
+       (remote tcp))
+
+(allow sysctl-read)
+
+;;
+;; Make more kadmind quiet in syslog
+;;
+
+(deny file*
+      (subpath "/private/var/root")
+      (with no-log))

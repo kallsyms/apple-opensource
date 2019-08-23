@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OpenSourceImportDate</key>
+	<string>2014-09-03</string>
+	<key>OpenSourceLicense</key>
+	<string>BSD</string>
+	<key>OpenSourceLicenseFile</key>
+	<string>tcsh.txt</string>
+	<key>OpenSourceModifications</key>
+	<array>
+		<string>Patch host.defs for x86_64</string>
+		<string>Do not define SAVESIGVEC</string>
+		<string>define KAI to avoid log builtin</string>
+	</array>
+	<key>OpenSourceProject</key>
+	<string>tcsh</string>
+	<key>OpenSourceSHA1</key>
+	<string>eee2035645737197ff8059c84933a75d23cd76f9</string>
+	<key>OpenSourceURL</key>
+	<string>ftp://ftp.astron.com/pub/tcsh/tcsh-6.18.01.tar.gz</string>
+	<key>OpenSourceVersion</key>
+	<string>6.18.01</string>
+	<key>OpenSourceWebsiteURL</key>
+	<string>http://www.tcsh.org</string>
+</dict>
+</plist>
