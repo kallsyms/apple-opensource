@@ -1,0 +1,16 @@
+name: Update
+
+on:
+  schedule:
+    cron: "0 0 * * *"
+
+jobs:
+  update_job:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+    - name: Update packages
+      uses: ./
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
