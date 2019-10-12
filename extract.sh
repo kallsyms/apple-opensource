@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+set -xueo pipefail
+
+git checkout master
 
 for pkg in "$@"
 do
