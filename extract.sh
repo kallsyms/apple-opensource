@@ -1,7 +1,5 @@
 #!/bin/bash
-set -xueo pipefail
-
-git checkout master
+set -ueo pipefail
 
 for pkg in "$@"
 do
@@ -18,6 +16,11 @@ do
 
     rm "${tarball}"
 done
+
+if [ "${GITHUB_ACTION+x}" ]; then
+    git checkout master
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+fi
 
 if [ -n "$(git status --porcelain)" ]; then
     git config user.email "opensource@apple.com"
