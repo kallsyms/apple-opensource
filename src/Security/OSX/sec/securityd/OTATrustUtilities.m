@@ -183,6 +183,7 @@ static uint64_t GetSystemVersion(CFStringRef key);
 #if !TARGET_OS_BRIDGE
 static BOOL UpdateFromAsset(NSURL *localURL, NSNumber *asset_version, NSError **error);
 static BOOL UpdateOTACheckInDate(void);
+static void UpdateKillSwitch(NSString *key, bool value);
 #endif
 #if TARGET_OS_IPHONE
 static void TriggerUnlockNotificationOTATrustAssetCheck(dispatch_queue_t queue);
@@ -198,12 +199,16 @@ NSString *kOTATrustContextFilename = @"OTAPKIContext.plist";
 NSString *kOTATrustTrustedCTLogsFilename = @"TrustedCTLogs.plist";
 NSString *kOTATrustAnalyticsSamplingRatesFilename = @"AnalyticsSamplingRates.plist";
 NSString *kOTATrustAppleCertifcateAuthoritiesFilename = @"AppleCertificateAuthorities.plist";
+NSString *kOTATrustCTKillSwitch = @"CTKillSwitch";
+
+const CFStringRef kOTAPKIKillSwitchCT = CFSTR("CTKillSwitch");
 
 #if !TARGET_OS_BRIDGE
 const NSString *OTATrustMobileAssetType = @"com.apple.MobileAsset.PKITrustSupplementals";
 #define kOTATrustMobileAssetNotification "com.apple.MobileAsset.PKITrustSupplementals.cached-metadata-updated"
 #define kOTATrustOnDiskAssetNotification "com.apple.trustd.asset-updated"
 #define kOTATrustCheckInNotification "com.apple.trustd.asset-check-in"
+#define kOTATrustKillSwitchNotification "com.apple.trustd.kill-switch"
 const NSUInteger OTATrustMobileAssetCompatibilityVersion = 1;
 #define kOTATrustDefaultUpdatePeriod 60*60*12 // 12 hours
 #define kOTATrustMinimumUpdatePeriod 60*5     // 5 min
@@ -483,6 +488,30 @@ static BOOL CopyFileToDisk(NSString *filename, NSURL *localURL, NSError **error)
     return NO;
 }
 
+static void GetKillSwitchAttributes(NSDictionary *attributes) {
+    bool killSwitchEnabled = false;
+
+    // CT Kill Switch
+    NSNumber *ctKillSwitch = [attributes objectForKey:kOTATrustCTKillSwitch];
+    if (isNSNumber(ctKillSwitch)) {
+        NSError *error = nil;
+        UpdateOTAContextOnDisk(kOTATrustCTKillSwitch, ctKillSwitch, &error);
+        UpdateKillSwitch(kOTATrustCTKillSwitch, [ctKillSwitch boolValue]);
+        secnotice("OTATrust", "got CT kill switch = %d", [ctKillSwitch boolValue]);
+        killSwitchEnabled = true;
+    }
+
+    /* Other kill switches TBD.
+     * When adding one, make sure to add to the Analytics Samplers since these kill switches
+     * are installed before the full asset is downloaded and installed. (A device can have the
+     * kill switches without having the asset version that contained them.) */
+
+    // notify the other trustds if any kill switch was read
+    if (SecOTAPKIIsSystemTrustd() && killSwitchEnabled) {
+        notify_post(kOTATrustKillSwitchNotification);
+    }
+}
+
 // MARK: Fetch and Update Functions
 #if TARGET_OS_IPHONE
 static NSNumber *UpdateAndPurgeAsset(MAAsset *asset, NSNumber *asset_version, NSError **error) {
@@ -547,7 +576,7 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
         @autoreleasepool {
             os_transaction_t transaction = os_transaction_create("com.apple.trustd.PKITrustSupplementals.download");
             if (result != MADownloadSucceesful) {
-                MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MADownLoadResult", result,
+                MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MADownLoadResult", (OSStatus)result,
                                   @"failed to download catalog: %ld", (long)result);
                 if (result == MADownloadDaemonNotReady) {
                     /* mobileassetd has to wait for first unlock to downalod. trustd usually launches before first unlock. */
@@ -561,7 +590,7 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
             secnotice("OTATrust", "begin MobileAsset metadata sync request");
             MAQueryResult queryResult = [query queryMetaDataSync];
             if (queryResult != MAQuerySucceesful) {
-                MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MAQueryResult", queryResult,
+                MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MAQueryResult", (OSStatus)queryResult,
                                   @"failed to query MobileAsset metadata: %ld", (long)queryResult);
                 return;
             }
@@ -598,6 +627,8 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
                     continue;
                 }
 
+                GetKillSwitchAttributes(asset.attributes);
+
                 switch (asset.state) {
                     default:
                         MakeOTATrustError(&ma_error, OTATrustLogLevelError, NSOSStatusErrorDomain, errSecInternal,
@@ -609,7 +640,7 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
                         updated_version = UpdateAndPurgeAsset(asset, asset_version, &ma_error);
                         break;
                     case MAUnknown:
-                        MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MAAssetState", asset.state,
+                        MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MAAssetState", (OSStatus)asset.state,
                                           @"asset is unknown");
                         continue;
                     case MADownloading:
@@ -622,7 +653,7 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
                             @autoreleasepool {
                                 os_transaction_t inner_transaction = os_transaction_create("com.apple.trustd.PKITrustSupplementals.downloadAsset");
                                 if (downloadResult != MADownloadSucceesful) {
-                                    MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MADownLoadResult", downloadResult,
+                                    MakeOTATrustError(&ma_error, OTATrustLogLevelError, @"MADownLoadResult", (OSStatus)downloadResult,
                                                       @"failed to download asset: %ld", (long)downloadResult);
                                     return;
                                 }
@@ -786,6 +817,8 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
             continue;
         }
 
+        GetKillSwitchAttributes(attributes);
+
         ASProgressHandler OTATrustHandler = ^(NSDictionary *state, NSError *progressError){
             NSString *operationState = nil;
             if (progressError) {
@@ -847,6 +880,9 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
                     began_async_job = true;
                 }
                 break;
+            case ASAssetStateStalled:
+                secdebug("OTATrust", "OTATrust asset stalled");
+                // drop through
             case ASAssetStateDownloading:
                 secdebug("OTATrust", "OTATrust asset downloading");
                 asset.progressHandler = OTATrustHandler;
@@ -887,6 +923,27 @@ static BOOL DownloadOTATrustAsset(BOOL isLocalOnly, BOOL wait, NSError **error) 
     return result;
 }
 #endif /* !TARGET_OS_IPHONE */
+
+static bool InitializeKillSwitch(NSString *key) {
+#if !TARGET_OS_BRIDGE
+    NSError *error = nil;
+    NSDictionary *OTAPKIContext = [NSDictionary dictionaryWithContentsOfURL:GetAssetFileURL(kOTATrustContextFilename) error:&error];
+    if (isNSDictionary(OTAPKIContext)) {
+        NSNumber *killSwitchValue = OTAPKIContext[key];
+        if (isNSNumber(killSwitchValue)) {
+            secinfo("OTATrust", "found on-disk kill switch %{public}@ with value %d", key, [killSwitchValue boolValue]);
+            return [killSwitchValue boolValue];
+        } else {
+            MakeOTATrustError(&error, OTATrustLogLevelNotice, NSOSStatusErrorDomain, errSecInvalidValue,
+                              @"OTAContext.plist missing check-in");
+        }
+    } else {
+        MakeOTATrustError(&error, OTATrustLogLevelNotice, NSOSStatusErrorDomain, errSecMissingValue,
+                          @"OTAContext.plist missing dictionary");
+    }
+#endif
+    return false;
+}
 
 static void InitializeOTATrustAsset(dispatch_queue_t queue) {
     /* Only the "system" trustd does updates */
@@ -929,6 +986,10 @@ static void InitializeOTATrustAsset(dispatch_queue_t queue) {
         notify_register_dispatch(kOTATrustCheckInNotification, &out_token2, queue, ^(int __unused token) {
             secinfo("OTATrust", "Got notification about successful PKITrustSupplementals asset check-in");
             (void)UpdateOTACheckInDate();
+        });
+        int out_token3 = 0;
+        notify_register_dispatch(kOTATrustKillSwitchNotification, &out_token3, queue, ^(int __unused token) {
+            UpdateKillSwitch(kOTATrustCTKillSwitch, InitializeKillSwitch(kOTATrustCTKillSwitch));
         });
     }
 }
@@ -1484,6 +1545,7 @@ struct _OpaqueSecOTAPKI {
     CFDateRef           _lastAssetCheckIn;
     CFDictionaryRef     _eventSamplingRates;
     CFArrayRef          _appleCAs;
+    bool                _ctKillSwitch;
 };
 
 CFGiblisFor(SecOTAPKI)
@@ -1686,7 +1748,10 @@ static SecOTAPKIRef SecOTACreate() {
 #if !TARGET_OS_BRIDGE
     /* Initialize our update handling */
     InitializeOTATrustAsset(kOTABackgroundQueue);
-#endif
+    otapkiref->_ctKillSwitch = InitializeKillSwitch(kOTATrustCTKillSwitch);
+#else // TARGET_OS_BRIDGE
+    otapkiref->_ctKillSwitch = true; // bridgeOS never enforces CT
+#endif // TARGET_OS_BRIDGE
 
     return otapkiref;
 }
@@ -1701,10 +1766,12 @@ SecOTAPKIRef SecOTAPKICopyCurrentOTAPKIRef() {
                                                                                  QOS_CLASS_BACKGROUND, 0);
             attr = dispatch_queue_attr_make_with_autorelease_frequency(attr, DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM);
             kOTABackgroundQueue = dispatch_queue_create("com.apple.security.OTAPKIBackgroundQueue", attr);
-            kCurrentOTAPKIRef = SecOTACreate();
             if (!kOTAQueue || !kOTABackgroundQueue) {
                 secerror("Failed to create OTAPKI Queues. May crash later.");
             }
+            dispatch_sync(kOTAQueue, ^{
+                kCurrentOTAPKIRef = SecOTACreate();
+            });
         }
     });
 
@@ -1736,6 +1803,14 @@ static BOOL UpdateOTACheckInDate(void) {
     } else {
         return NO;
     }
+}
+
+static void UpdateKillSwitch(NSString *key, bool value) {
+    dispatch_sync(kOTAQueue, ^{
+        if ([key isEqualToString:kOTATrustCTKillSwitch]) {
+            kCurrentOTAPKIRef->_ctKillSwitch = value;
+        }
+    });
 }
 
 static BOOL UpdateFromAsset(NSURL *localURL, NSNumber *asset_version, NSError **error) {
@@ -2062,6 +2137,16 @@ CFArrayRef SecOTAPKICopyAppleCertificateAuthorities(SecOTAPKIRef otapkiRef) {
 #endif
 
     return CFRetainSafe(otapkiRef->_appleCAs);
+}
+
+bool SecOTAPKIKillSwitchEnabled(SecOTAPKIRef otapkiRef, CFStringRef key) {
+    if (NULL == otapkiRef || NULL == key) {
+        return false;
+    }
+    if (CFEqualSafe(key, kOTAPKIKillSwitchCT)) {
+        return otapkiRef->_ctKillSwitch;
+    }
+    return false;
 }
 
 /* Returns an array of certificate data (CFDataRef) */

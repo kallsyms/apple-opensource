@@ -29,7 +29,9 @@
 
 #include "NetworkCacheData.h"
 #include "SharedMemory.h"
+#include <WebCore/SharedBuffer.h>
 #include <wtf/RefPtr.h>
+#include <wtf/Variant.h>
 
 namespace IPC {
 class Decoder;
@@ -42,7 +44,7 @@ class WebCompiledContentRuleListData {
 public:
     WebCompiledContentRuleListData() = default;
 
-    WebCompiledContentRuleListData(RefPtr<SharedMemory>&& data, NetworkCache::Data fileData, unsigned conditionsApplyOnlyToDomainOffset, unsigned actionsOffset, unsigned actionsSize, unsigned filtersWithoutConditionsBytecodeOffset, unsigned filtersWithoutConditionsBytecodeSize, unsigned filtersWithConditionsBytecodeOffset, unsigned filtersWithConditionsBytecodeSize, unsigned topURLFiltersBytecodeOffset, unsigned topURLFiltersBytecodeSize)
+    WebCompiledContentRuleListData(Variant<RefPtr<SharedMemory>, RefPtr<WebCore::SharedBuffer>>&& data, NetworkCache::Data fileData, unsigned conditionsApplyOnlyToDomainOffset, unsigned actionsOffset, unsigned actionsSize, unsigned filtersWithoutConditionsBytecodeOffset, unsigned filtersWithoutConditionsBytecodeSize, unsigned filtersWithConditionsBytecodeOffset, unsigned filtersWithConditionsBytecodeSize, unsigned topURLFiltersBytecodeOffset, unsigned topURLFiltersBytecodeSize)
         : data(WTFMove(data))
         , fileData(fileData)
         , conditionsApplyOnlyToDomainOffset(conditionsApplyOnlyToDomainOffset)
@@ -58,9 +60,12 @@ public:
     }
 
     void encode(IPC::Encoder&) const;
-    static std::optional<WebCompiledContentRuleListData> decode(IPC::Decoder&);
+    static Optional<WebCompiledContentRuleListData> decode(IPC::Decoder&);
 
-    RefPtr<SharedMemory> data;
+    size_t size() const;
+    const void* dataPointer() const;
+    
+    Variant<RefPtr<SharedMemory>, RefPtr<WebCore::SharedBuffer>> data;
     NetworkCache::Data fileData;
     unsigned conditionsApplyOnlyToDomainOffset { 0 };
     unsigned actionsOffset { 0 };

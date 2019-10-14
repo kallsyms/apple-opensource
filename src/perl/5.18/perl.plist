@@ -1,17 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>OpenSourceImportDate</key>
-	<string>2014-01-27</string>
+	<string>2019-03-25</string>
 	<key>OpenSourceProject</key>
 	<string>perl</string>
 	<key>OpenSourceVersion</key>
-	<string>5.18.2</string>
+	<string>5.18.4</string>
 	<key>OpenSourceWebsiteURL</key>
 	<string>http://www.perl.com/</string>
 	<key>OpenSourceURL</key>
-	<string>http://www.cpan.org/src/5.0/perl-5.18.2.tar.bz2</string>
-	<key>OpenSourceSHA1</key>
-	<string>b8b87ef46630b5a2287b86b6e0c69088da36adfd</string>
+	<string>http://www.cpan.org/src/5.0/perl-5.18.4.tar.bz2</string>
+	<key>OpenSourceSHA512256</key>
+	<string>3056cdc39332caa0a58bd531fba6d62035d4e987b39e545f789583a8f2dd53da</string>
 	<key>OpenSourceModifications</key>
 	<array>
 		<string>regenerate perly.h with bison 2.3</string>
@@ -22,7 +24,10 @@
 		<string>added new /Library/Perl/Updates/%lt;version%gt; directory that comes before the system perl directories in the module search order; installprivlib and installarchlib now point to this Updates directory</string>
 		<string>regcomp.c: CVE-2017-12837 34337696</string>
 		<string>regcomp.c: CVE-2018-6797 37828841</string>
+		<string>regcomp.c: CVE-2018-18313 45830522</string>
 		<string>CVE-2018-6913 37828808</string>
+		<string>util.c: CVE-2018-18311 45830462</string>
+		<string>CVE-2018-12015 45830482</string>
 	</array>
 	<key>OpenSourceLicense</key>
 	<string>Artistic</string>

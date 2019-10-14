@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Samsung Electronics. All rights reserved.
+ * Copyright (C) 2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,18 +40,13 @@ WebColorPicker::~WebColorPicker()
 {
 }
 
-void WebColorPicker::invalidate()
-{
-    endPicker();
-    m_client = 0;
-}
-
 void WebColorPicker::endPicker()
 {
     if (!m_client)
         return;
 
-    m_client->didEndColorPicker();
+    if (auto client = std::exchange(m_client, nullptr))
+        client->didEndColorPicker();
 }
 
 void WebColorPicker::setSelectedColor(const WebCore::Color& color)

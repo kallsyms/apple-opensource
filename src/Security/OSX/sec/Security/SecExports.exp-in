@@ -356,6 +356,7 @@ _SecCertificateCopyCommonName
 _SecCertificateCopyCommonNames
 _SecCertificateCopyCompanyName
 _SecCertificateCopyCountry
+_SecCertificateGetDeveloperIDDate
 _SecCertificateCopyDNSNames
 _SecCertificateCopyDNSNamesFromSAN
 _SecCertificateCopyDNSNamesFromSubject
@@ -1078,10 +1079,12 @@ _SecKeyCopyPublicKeyHash
 _SecKeyCreate
 _SecKeyCreateAttestation
 _SecKeyCreateDecryptedData
+_SecKeyCreateDecryptedDataWithParameters
 _SecKeyCreateDuplicate
 _SecKeyCreateECPrivateKey
 _SecKeyCreateECPublicKey
 _SecKeyCreateEncryptedData
+_SecKeyCreateEncryptedDataWithParameters
 _SecKeyCreateFromAttributeDictionary
 
 #if TARGET_OS_OSX
@@ -1248,9 +1251,14 @@ _kSecKeyAlgorithmRSASignatureRawCCUnit
 #if TARGET_OS_OSX
 _kSecKeyAttributeName
 #endif /* TARGET_OS_OSX */
+_kSecKeyEncryptionParameterRecryptParameters
+_kSecKeyEncryptionParameterRecryptCertificate
+_kSecKeyEncryptionParameterSymmetricAAD
+_kSecKeyEncryptionParameterSymmetricKeySizeInBits
 _kSecKeyKeyExchangeParameterRequestedSize
 _kSecKeyKeyExchangeParameterSharedInfo
 _kSecKeyParameterSETokenAttestationNonce
+_kSecKeyApplePayEnabled
 _kSecPrivateKeyAttrs
 _kSecPublicKeyAttrs
 

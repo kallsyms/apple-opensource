@@ -9,21 +9,11 @@
 #ifndef IOGraphicsDiagnose_h
 #define IOGraphicsDiagnose_h
 
-#include "GTraceTypes.h"
-
-
-#define IOGRAPHICS_DIAGNOSE_VERSION             6
+#define IOGRAPHICS_DIAGNOSE_VERSION             9
 
 #define IOGRAPHICS_MAXIMUM_REPORTS              16
-#define IOGRAPHICS_TOKENBUFFERSIZE              (kGTraceMaximumLineCount * (sizeof(sGTrace) / sizeof(uint64_t))) // ensure >= kGTraceMaximumLineCount
+#define IOGRAPHICS_MAXIMUM_FBS                  96
 
-
-// Client Interfaces
-#define kIOGSharedInterface_IOGDiagnose         0
-#define kIOGSharedInterface_ReservedB           1
-#define kIOGSharedInterface_ReservedC           2
-#define kIOGSharedInterface_ReservedD           3
-#define kIOGSharedInterface_ReservedE           4
 
 
 // stateBits
@@ -95,12 +85,12 @@ typedef struct _iostamp {
     uint32_t        lastEvent;
 } IOStamp;
 
-typedef struct _ionotify {
+typedef struct IONotify {
     uint64_t        groupID;
     IOStamp         stamp[IOGRAPHICS_MAXIMUM_REPORTS];
 } IONotify;
 
-typedef struct _iogreport {
+typedef struct IOGReport {
     uint32_t        stateBits;
     uint32_t        pendingPowerState;
 
@@ -126,24 +116,23 @@ typedef struct _iogreport {
     uint32_t        lastSuccessfulMode;
     uint32_t        aliasID;
 
-    uint64_t        reservedC[15];
+    uint32_t        lastWSAAStatus;
+
+    uint32_t        reservedA;
+    uint64_t        reservedB[14];
 } IOGReport;
 
-typedef struct _iogdiagnose {
+typedef struct IOGDiagnose {
     // Kernel to User
     uint64_t        version;
     uint64_t        framebufferCount;
-    uint32_t        length;
-    uint32_t        _reservedA;
-    IOGReport       fbState[IOGRAPHICS_MAXIMUM_REPORTS];
 
-    uint32_t        _reservedB[8];
+    uint32_t        length;
+    uint32_t        _reservedB[7];
 
     uint64_t        systemBootEpochTime;
-    uint32_t        tokenLine;
-    uint32_t        tokenLineCount;
-    uint32_t        tokenSize;
-    uint64_t        tokenBuffer[IOGRAPHICS_TOKENBUFFERSIZE];
+
+    IOGReport       fbState[IOGRAPHICS_MAXIMUM_FBS];
 } IOGDiagnose;
 #pragma pack(pop)
 

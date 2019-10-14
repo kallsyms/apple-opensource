@@ -32,7 +32,9 @@
 #include "cdattst.h"
 #include "cformtst.h"
 #include "cmemory.h"
+#if !U_PLATFORM_HAS_WIN32_API
 #include "unicode/uatimeunitformat.h" /* Apple-specific */
+#endif
 
 #include <math.h>
 
@@ -43,10 +45,13 @@ static void TestContext(void);
 static void TestCalendarDateParse(void);
 static void TestParseErrorReturnValue(void);
 static void TestFormatForFields(void);
+static void TestForceGannenNumbering(void);
 static void TestStandardPatterns(void);
 static void TestApplyPatnOverridesTimeSep(void);
 static void Test12HrFormats(void);
+#if !U_PLATFORM_HAS_WIN32_API
 static void TestTimeUnitFormat(void); /* Apple-specific */
+#endif
 static void TestRemapPatternWithOpts(void); /* Apple-specific */
 
 void addDateForTest(TestNode** root);
@@ -67,10 +72,13 @@ void addDateForTest(TestNode** root)
     TESTCASE(TestOverrideNumberFormat);
     TESTCASE(TestParseErrorReturnValue);
     TESTCASE(TestFormatForFields);
+    TESTCASE(TestForceGannenNumbering);
     TESTCASE(TestStandardPatterns);
     TESTCASE(TestApplyPatnOverridesTimeSep);
     TESTCASE(Test12HrFormats);
+#if !U_PLATFORM_HAS_WIN32_API
     TESTCASE(TestTimeUnitFormat); /* Apple-specific */
+#endif
     TESTCASE(TestRemapPatternWithOpts); /* Apple-specific */
 }
 /* Testing the DateFormat API */
@@ -1931,6 +1939,44 @@ static void TestFormatForFields(void) {
     }
 }
 
+static void TestForceGannenNumbering(void) {
+    UErrorCode status;
+    const char* locID = "ja_JP@calendar=japanese";
+    UDate refDate = 600336000000.0; // 1989 Jan 9 Monday = Heisei 1
+    const UChar* testSkeleton = u"yMMMd";
+
+    // Test Gannen year forcing
+    status = U_ZERO_ERROR;
+    UDateTimePatternGenerator* dtpgen = udatpg_open(locID, &status);
+    if (U_FAILURE(status)) {
+        log_data_err("Fail in udatpg_open locale %s: %s", locID, u_errorName(status));
+    } else {
+        UChar pattern[kUbufMax];
+        int32_t patlen = udatpg_getBestPattern(dtpgen, testSkeleton, -1, pattern, kUbufMax, &status);
+        if (U_FAILURE(status)) {
+            log_data_err("Fail in udatpg_getBestPattern locale %s: %s", locID, u_errorName(status));
+        } else  {
+            UDateFormat *testFmt = udat_open(UDAT_PATTERN, UDAT_PATTERN, locID, NULL, 0, pattern, patlen, &status);
+            if (U_FAILURE(status)) {
+                log_data_err("Fail in udat_open locale %s: %s", locID, u_errorName(status));
+            } else {
+                UChar testString[kUbufMax];
+                int32_t testStrLen = udat_format(testFmt, refDate, testString, kUbufMax, NULL, &status);
+                if (U_FAILURE(status)) {
+                    log_err("Fail in udat_format locale %s: %s", locID, u_errorName(status));
+                } else if (testStrLen < 3 || testString[2] != 0x5143) {
+                    char bbuf[kBbufMax];
+                    UErrorCode convStatus = U_ZERO_ERROR;
+                    u_strToUTF8(bbuf, kBbufMax, NULL, testString, testStrLen, &convStatus);
+                    log_err("Formatting year 1 as Gannen, (conv status %s) got %s but expected 3rd char to be 0x5143", u_errorName(convStatus), bbuf);
+                }
+                udat_close(testFmt);
+            }
+        }
+        udatpg_close(dtpgen);
+    }
+}
+
 /* defined above
 static const UChar zoneGMT[] = { 0x47,0x4D,0x54,0 }; // "GMT"
 static const UDate date2015Feb25 = 1424841000000.0; // Wednesday, February 25, 2015 at 5:10:00 AM GMT
@@ -2151,6 +2197,7 @@ static void Test12HrFormats(void) {
     }
 }
 
+#if !U_PLATFORM_HAS_WIN32_API
 /* *** */
 
 typedef struct {
@@ -2235,6 +2282,7 @@ static void TestTimeUnitFormat(void) { /* Apple-specific */
     }
 
 }
+#endif
 
 typedef enum RemapTesttype {
     REMAP_TESTTYPE_FULL     = UDAT_FULL,       // 0

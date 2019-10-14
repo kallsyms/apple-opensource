@@ -55,7 +55,7 @@ OSDefineMetaClassAndStructors( IOHIDResourceDeviceUserClient, IOUserClient )
 const IOExternalMethodDispatch IOHIDResourceDeviceUserClient::_methods[kIOHIDResourceDeviceUserClientMethodCount] = {
     {   // kIOHIDResourceDeviceUserClientMethodCreate
         (IOExternalMethodAction) &IOHIDResourceDeviceUserClient::_createDevice,
-        1, -1, /* 1 struct input : the report descriptor */
+        1, kIOUCVariableStructureSize, /* 1 struct input : the report descriptor */
         0, 0
     },
     {   // kIOHIDResourceDeviceUserClientMethodTerminate
@@ -65,12 +65,12 @@ const IOExternalMethodDispatch IOHIDResourceDeviceUserClient::_methods[kIOHIDRes
     },
     {   // kIOHIDResourceDeviceUserClientMethodHandleReport
         (IOExternalMethodAction) &IOHIDResourceDeviceUserClient::_handleReport,
-        1, -1, /* 1 struct input : the buffer */
+        1, kIOUCVariableStructureSize, /* 1 struct input : the buffer */
         0, 0
     },
     {   // kIOHIDResourceDeviceUserClientMethodPostReportResult
         (IOExternalMethodAction) &IOHIDResourceDeviceUserClient::_postReportResult,
-        kIOHIDResourceUserClientResponseIndexCount, -1, /* 1 scalar input: the result, 1 struct input : the buffer */
+        kIOHIDResourceUserClientResponseIndexCount, kIOUCVariableStructureSize, /* 1 scalar input: the result, 1 struct input : the buffer */
         0, 0
     }
 };
@@ -1076,13 +1076,28 @@ Boolean IOHIDResourceQueue::enqueueReport(IOHIDResourceDataQueueHeader * header,
         }
     }
 
-    // Update tail with release barrier
+    // Publish the data we just enqueued
     _enqueueTS = mach_continuous_time();
     __c11_atomic_store((_Atomic UInt32 *)&dataQueue->tail, newTail, __ATOMIC_RELEASE);
-    
+
+    if (tail != head) {
+        // From <rdar://problem/43093190> IOSharedDataQueue stalls
+        //
+        // The memory barrier below pairs with the one in ::dequeue
+        // so that either our store to the tail cannot be missed by
+        // the next dequeue attempt, or we will observe the dequeuer
+        // making the queue empty.
+        //
+        // Of course, if we already think the queue is empty,
+        // there's no point paying this extra cost.
+        //
+        __c11_atomic_thread_fence(__ATOMIC_SEQ_CST);
+        head = __c11_atomic_load((_Atomic UInt32 *)&dataQueue->head, __ATOMIC_RELAXED);
+    }
+
     // Send notification (via mach message) that data is available if either the
     // queue was empty prior to enqueue() or queue was emptied during enqueue()
-    if ( ( head == tail ) || ( __c11_atomic_load((_Atomic UInt32 *)&dataQueue->head, __ATOMIC_ACQUIRE) == tail ) ) {
+    if (head == tail) {
         sendDataAvailableNotification();
     }
 

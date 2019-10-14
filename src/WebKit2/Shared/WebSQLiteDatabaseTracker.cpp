@@ -33,9 +33,8 @@
 #include <WebCore/SQLiteDatabaseTracker.h>
 #include <wtf/MainThread.h>
 
-using namespace WebCore;
-
 namespace WebKit {
+using namespace WebCore;
 
 WebSQLiteDatabaseTracker::WebSQLiteDatabaseTracker(NetworkProcess& process)
     : m_process(process)
@@ -76,6 +75,8 @@ void WebSQLiteDatabaseTracker::hysteresisUpdated(PAL::HysteresisState state)
     case ChildProcessType::Network:
         m_process.parentProcessConnection()->send(Messages::NetworkProcessProxy::SetIsHoldingLockedFiles(state == PAL::HysteresisState::Started), 0);
         break;
+    default:
+        ASSERT_NOT_REACHED();
     }
 }
 

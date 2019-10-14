@@ -38,22 +38,20 @@
 #import "WebResourceLoadStatisticsTelemetry.h"
 #import "WebsiteDataFetchOption.h"
 #import "_WKWebsiteDataStoreConfiguration.h"
-#import <WebCore/URL.h>
 #import <WebKit/ServiceWorkerProcessProxy.h>
 #import <wtf/BlockPtr.h>
-
-using namespace WebCore;
+#import <wtf/URL.h>
 
 @implementation WKWebsiteDataStore
 
 + (WKWebsiteDataStore *)defaultDataStore
 {
-    return WebKit::wrapper(API::WebsiteDataStore::defaultDataStore().get());
+    return wrapper(API::WebsiteDataStore::defaultDataStore());
 }
 
 + (WKWebsiteDataStore *)nonPersistentDataStore
 {
-    return [WebKit::wrapper(API::WebsiteDataStore::createNonPersistentDataStore().leakRef()) autorelease];
+    return wrapper(API::WebsiteDataStore::createNonPersistentDataStore());
 }
 
 - (void)dealloc
@@ -112,7 +110,7 @@ using namespace WebCore;
 
 - (WKHTTPCookieStore *)httpCookieStore
 {
-    return WebKit::wrapper(_websiteDataStore->httpCookieStore());
+    return wrapper(_websiteDataStore->httpCookieStore());
 }
 
 static WallTime toSystemClockTime(NSDate *date)
@@ -199,21 +197,29 @@ static Vector<WebKit::WebsiteDataRecord> toWebsiteDataRecords(NSArray *dataRecor
     auto config = API::WebsiteDataStore::defaultDataStoreConfiguration();
 
     if (configuration._webStorageDirectory)
-        config.localStorageDirectory = configuration._webStorageDirectory.path;
+        config->setLocalStorageDirectory(configuration._webStorageDirectory.path);
     if (configuration._webSQLDatabaseDirectory)
-        config.webSQLDatabaseDirectory = configuration._webSQLDatabaseDirectory.path;
+        config->setWebSQLDatabaseDirectory(configuration._webSQLDatabaseDirectory.path);
     if (configuration._indexedDBDatabaseDirectory)
-        config.indexedDBDatabaseDirectory = configuration._indexedDBDatabaseDirectory.path;
+        config->setIndexedDBDatabaseDirectory(configuration._indexedDBDatabaseDirectory.path);
     if (configuration._cookieStorageFile)
-        config.cookieStorageFile = configuration._cookieStorageFile.path;
+        config->setCookieStorageFile(configuration._cookieStorageFile.path);
     if (configuration._resourceLoadStatisticsDirectory)
-        config.resourceLoadStatisticsDirectory = configuration._resourceLoadStatisticsDirectory.path;
+        config->setResourceLoadStatisticsDirectory(configuration._resourceLoadStatisticsDirectory.path);
     if (configuration._cacheStorageDirectory)
-        config.cacheStorageDirectory = configuration._cacheStorageDirectory.path;
+        config->setCacheStorageDirectory(configuration._cacheStorageDirectory.path);
     if (configuration._serviceWorkerRegistrationDirectory)
-        config.serviceWorkerRegistrationDirectory = configuration._serviceWorkerRegistrationDirectory.path;
+        config->setServiceWorkerRegistrationDirectory(configuration._serviceWorkerRegistrationDirectory.path);
+    if (configuration.sourceApplicationBundleIdentifier)
+        config->setSourceApplicationBundleIdentifier(configuration.sourceApplicationBundleIdentifier);
+    if (configuration.sourceApplicationSecondaryIdentifier)
+        config->setSourceApplicationSecondaryIdentifier(configuration.sourceApplicationSecondaryIdentifier);
+    if (configuration.httpProxy)
+        config->setHTTPProxy(configuration.httpProxy);
+    if (configuration.httpsProxy)
+        config->setHTTPSProxy(configuration.httpsProxy);
 
-    API::Object::constructInWrapper<API::WebsiteDataStore>(self, config, PAL::SessionID::generatePersistentSessionID());
+    API::Object::constructInWrapper<API::WebsiteDataStore>(self, WTFMove(config), PAL::SessionID::generatePersistentSessionID());
 
     return self;
 }
@@ -224,7 +230,7 @@ static Vector<WebKit::WebsiteDataRecord> toWebsiteDataRecords(NSArray *dataRecor
 
     OptionSet<WebKit::WebsiteDataFetchOption> fetchOptions;
     if (options & _WKWebsiteDataStoreFetchOptionComputeSizes)
-        fetchOptions |= WebKit::WebsiteDataFetchOption::ComputeSizes;
+        fetchOptions.add(WebKit::WebsiteDataFetchOption::ComputeSizes);
 
     _websiteDataStore->websiteDataStore().fetchData(WebKit::toWebsiteDataTypes(dataTypes), fetchOptions, [completionHandlerCopy = WTFMove(completionHandlerCopy)](auto websiteDataRecords) {
         Vector<RefPtr<API::Object>> elements;
@@ -310,6 +316,28 @@ static Vector<WebKit::WebsiteDataRecord> toWebsiteDataRecords(NSArray *dataRecor
 - (void)_setProxyConfiguration:(NSDictionary *)configuration
 {
     _websiteDataStore->websiteDataStore().setProxyConfiguration((__bridge CFDictionaryRef)configuration);
+}
+
+- (NSString *)_sourceApplicationBundleIdentifier
+{
+    return _websiteDataStore->websiteDataStore().sourceApplicationBundleIdentifier();
+}
+
+- (void)_setSourceApplicationBundleIdentifier:(NSString *)identifier
+{
+    if (!_websiteDataStore->websiteDataStore().setSourceApplicationBundleIdentifier(identifier))
+        [NSException raise:NSGenericException format:@"_setSourceApplicationBundleIdentifier cannot be called after networking has begun"];
+}
+
+- (NSString *)_sourceApplicationSecondaryIdentifier
+{
+    return _websiteDataStore->websiteDataStore().sourceApplicationSecondaryIdentifier();
+}
+
+- (void)_setSourceApplicationSecondaryIdentifier:(NSString *)identifier
+{
+    if (!_websiteDataStore->websiteDataStore().setSourceApplicationSecondaryIdentifier(identifier))
+        [NSException raise:NSGenericException format:@"_setSourceApplicationSecondaryIdentifier cannot be called after networking has begun"];
 }
 
 - (NSDictionary *)_proxyConfiguration

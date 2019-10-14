@@ -903,6 +903,7 @@ enum {
     kConnectionEnable                   = 'enab',
     kConnectionCheckEnable              = 'cena',
     kConnectionProbe                    = 'prob',
+    kConnectionIgnore                   = '\0igr',
     kConnectionChanged                  = 'chng',
     kConnectionPower                    = 'powr',
     kConnectionPostWake                 = 'pwak',
@@ -1073,7 +1074,7 @@ enum {
     // connection types for IOServiceOpen
     kIOFBServerConnectType              = 0,
     kIOFBSharedConnectType              = 1,
-    kIOFBDiagnoseConnectType            = 2,
+    kIOGDiagnoseConnectType             = 38744,  // On Display Wrangler
 };
 
 enum {
@@ -1222,7 +1223,7 @@ enum {
     // MCCS
     kIOFBMCCSInterruptType                  = 'mccs',
     // early vram notification
-    kIOFBWakeInterruptType                  = 'vwak'
+    kIOFBWakeInterruptType                  = 'vwak',
 };
 
 // IOAppleTimingID's

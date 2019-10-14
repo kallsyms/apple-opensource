@@ -68,6 +68,7 @@
 #include "UserTypingGestureIndicator.h"
 #include "WindowFeatures.h"
 #include "markup.h"
+#include <wtf/SetForScope.h>
 #include <wtf/WallTime.h>
 #include <wtf/unicode/CharacterNames.h>
 
@@ -97,6 +98,11 @@ void ContextMenuController::clearContextMenu()
 
 void ContextMenuController::handleContextMenuEvent(Event& event)
 {
+    if (m_isHandlingContextMenuEvent)
+        return;
+
+    SetForScope<bool> isHandlingContextMenuEventForScope(m_isHandlingContextMenuEvent, true);
+
     m_contextMenu = maybeCreateContextMenu(event);
     if (!m_contextMenu)
         return;
@@ -360,7 +366,7 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuAction action, co
     case ContextMenuItemTagSpellingGuess: {
         VisibleSelection selection = frame->selection().selection();
         if (frame->editor().shouldInsertText(title, selection.toNormalizedRange().get(), EditorInsertAction::Pasted)) {
-            ReplaceSelectionCommand::CommandOptions replaceOptions = ReplaceSelectionCommand::MatchStyle | ReplaceSelectionCommand::PreventNesting;
+            OptionSet<ReplaceSelectionCommand::CommandOption> replaceOptions { ReplaceSelectionCommand::MatchStyle, ReplaceSelectionCommand::PreventNesting };
 
             if (frame->editor().behavior().shouldAllowSpellingSuggestionsWithoutSelection()) {
                 ASSERT(selection.isCaretOrRange());
@@ -369,7 +375,7 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuAction action, co
                 frame->selection().setSelection(wordSelection);
             } else {
                 ASSERT(frame->editor().selectedText().length());
-                replaceOptions |= ReplaceSelectionCommand::SelectReplacement;
+                replaceOptions.add(ReplaceSelectionCommand::SelectReplacement);
             }
 
             Document* document = frame->document();
@@ -429,13 +435,13 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuAction action, co
         m_client.stopSpeaking();
         break;
     case ContextMenuItemTagDefaultDirection:
-        frame->editor().setBaseWritingDirection(NaturalWritingDirection);
+        frame->editor().setBaseWritingDirection(WritingDirection::Natural);
         break;
     case ContextMenuItemTagLeftToRight:
-        frame->editor().setBaseWritingDirection(LeftToRightWritingDirection);
+        frame->editor().setBaseWritingDirection(WritingDirection::LeftToRight);
         break;
     case ContextMenuItemTagRightToLeft:
-        frame->editor().setBaseWritingDirection(RightToLeftWritingDirection);
+        frame->editor().setBaseWritingDirection(WritingDirection::RightToLeft);
         break;
     case ContextMenuItemTagTextDirectionDefault:
         frame->editor().command("MakeTextWritingDirectionNatural").execute();
@@ -1336,7 +1342,7 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
             break;
         case ContextMenuItemTagDownloadImageToDisk:
 #if PLATFORM(MAC)
-            if (WebCore::protocolIs(m_context.hitTestResult().absoluteImageURL(), "file"))
+            if (WTF::protocolIs(m_context.hitTestResult().absoluteImageURL(), "file"))
                 shouldEnable = false;
 #endif
             break;
@@ -1351,7 +1357,7 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
                 item.setTitle(contextMenuItemTagDownloadVideoToDisk());
             else
                 item.setTitle(contextMenuItemTagDownloadAudioToDisk());
-            if (WebCore::protocolIs(m_context.hitTestResult().absoluteImageURL(), "file"))
+            if (WTF::protocolIs(m_context.hitTestResult().absoluteImageURL(), "file"))
                 shouldEnable = false;
             break;
         case ContextMenuItemTagCopyMediaLinkToClipboard:

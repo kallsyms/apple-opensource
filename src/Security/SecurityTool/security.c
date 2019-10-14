@@ -57,6 +57,7 @@
 #include "createFVMaster.h"
 #include "smartcards.h"
 #include "translocate.h"
+#include "requirement.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -505,10 +506,11 @@ const command commands[] =
 	  "Import items into a keychain." },
 
     { "export-smartcard" , ctk_export,
-        "[-i id] [-t type] \n"
+        "[-i id] [-t type] [-e exportPath] \n"
         "    -i  id of the smartcard to export (available IDs can be listed by list-smartcards\n"
-        "        command, default: export all smartcards)\n"
-        "    -t  Type = certs|privKeys|identities|all  (Default: all)\n",
+        "        command, default: export/display all smartcards)\n"
+        "    -t  Type = certs|privKeys|identities|all  (Default: all)\n"
+        "    -e  Specify path to export certificates and public keys. This option cannot be combined with -t option.\n",
         "Export items from a smartcard." },
 
 	{ "cms", cms_util,
@@ -731,7 +733,13 @@ const command commands[] =
         "If the provided path is translocated, display the original path\n"
         "If the provided path is not translocated, display the passed in path",
         "Find the original path for a translocated path." },
-	{}
+
+    { "requirement-evaluate", requirement_evaluate,
+        "<requirements> [<DER certificate file> ...]\n"
+        "Evaluates the given requirement string against the given cert chain.",
+        "Evaluate a requirement against a cert chain." },
+
+    {}
 };
 
 /* Global variables. */

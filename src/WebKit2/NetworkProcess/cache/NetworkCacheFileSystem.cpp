@@ -38,7 +38,7 @@
 #include <sys/time.h>
 #endif
 
-#if PLATFORM(IOS) && !PLATFORM(IOS_SIMULATOR)
+#if PLATFORM(IOS_FAMILY) && !PLATFORM(IOS_FAMILY_SIMULATOR)
 #include <sys/attr.h>
 #include <unistd.h>
 #endif
@@ -51,9 +51,9 @@
 namespace WebKit {
 namespace NetworkCache {
 
+#if !OS(WINDOWS)
 static DirectoryEntryType directoryEntryType(uint8_t dtype)
 {
-#if !OS(WINDOWS)
     switch (dtype) {
     case DT_DIR:
         return DirectoryEntryType::Directory;
@@ -63,10 +63,9 @@ static DirectoryEntryType directoryEntryType(uint8_t dtype)
         ASSERT_NOT_REACHED();
         return DirectoryEntryType::File;
     }
-#else
     return DirectoryEntryType::File;
-#endif
 }
+#endif
 
 void traverseDirectory(const String& path, const Function<void (const String&, DirectoryEntryType)>& function)
 {
@@ -146,9 +145,24 @@ void updateFileModificationTimeIfNeeded(const String& path)
 #endif
 }
 
+static String& pathRegisteredAsUnsafeToMemoryMapForTesting()
+{
+    static NeverDestroyed<String> path;
+    return path.get();
+}
+
+void registerPathAsUnsafeToMemoryMapForTesting(const String& path)
+{
+    pathRegisteredAsUnsafeToMemoryMapForTesting() = path;
+}
+
+    
 bool isSafeToUseMemoryMapForPath(const String& path)
 {
-#if PLATFORM(IOS) && !PLATFORM(IOS_SIMULATOR)
+    if (path == pathRegisteredAsUnsafeToMemoryMapForTesting())
+        return false;
+
+#if PLATFORM(IOS_FAMILY) && !PLATFORM(IOS_FAMILY_SIMULATOR)
     struct {
         uint32_t length;
         uint32_t protectionClass;

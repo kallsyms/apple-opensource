@@ -32,9 +32,8 @@
 #include "NetworkProcessProxyMessages.h"
 #include "WebCompiledContentRuleList.h"
 
-using namespace WebCore;
-
 namespace WebKit {
+using namespace WebCore;
 
 NetworkContentRuleListManager::NetworkContentRuleListManager() = default;
 NetworkContentRuleListManager::~NetworkContentRuleListManager()
@@ -63,15 +62,14 @@ void NetworkContentRuleListManager::contentExtensionsBackend(UserContentControll
     NetworkProcess::singleton().parentProcessConnection()->send(Messages::NetworkProcessProxy::ContentExtensionRules { identifier }, 0);
 }
 
-void NetworkContentRuleListManager::addContentRuleLists(UserContentControllerIdentifier identifier, const Vector<std::pair<String, WebCompiledContentRuleListData>>& contentRuleLists)
+void NetworkContentRuleListManager::addContentRuleLists(UserContentControllerIdentifier identifier, Vector<std::pair<String, WebCompiledContentRuleListData>>&& contentRuleLists)
 {
     auto& backend = *m_contentExtensionBackends.ensure(identifier, [] {
         return std::make_unique<WebCore::ContentExtensions::ContentExtensionsBackend>();
     }).iterator->value;
 
-    for (const auto& contentRuleList : contentRuleLists) {
-        WebCompiledContentRuleListData contentRuleListData = contentRuleList.second;
-        auto compiledContentRuleList = WebCompiledContentRuleList::create(WTFMove(contentRuleListData));
+    for (auto&& contentRuleList : contentRuleLists) {
+        auto compiledContentRuleList = WebCompiledContentRuleList::create(WTFMove(contentRuleList.second));
         backend.addContentExtension(contentRuleList.first, WTFMove(compiledContentRuleList), ContentExtensions::ContentExtension::ShouldCompileCSS::No);
     }
 
