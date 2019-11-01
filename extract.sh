@@ -25,7 +25,7 @@ fi
 if [ -n "$(git status --porcelain)" ]; then
     git config user.email "opensource@apple.com"
     git config user.name "Apple Open Source"
-    git add src
+    git add -- log src/
     git commit -m "$(date +%Y-%m-%d)"
     git push
 fi
