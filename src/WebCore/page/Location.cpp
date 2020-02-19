@@ -34,10 +34,13 @@
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "NavigationScheduler.h"
+#include <wtf/IsoMallocInlines.h>
 #include <wtf/URL.h>
 #include "SecurityOrigin.h"
 
 namespace WebCore {
+
+WTF_MAKE_ISO_ALLOCATED_IMPL(Location);
 
 Location::Location(DOMWindow& window)
     : DOMWindowProperty(&window)
@@ -225,15 +228,25 @@ ExceptionOr<void> Location::assign(DOMWindow& activeWindow, DOMWindow& firstWind
     return setLocation(activeWindow, firstWindow, url);
 }
 
-void Location::replace(DOMWindow& activeWindow, DOMWindow& firstWindow, const String& url)
+void Location::replace(DOMWindow& activeWindow, DOMWindow& firstWindow, const String& urlString)
 {
     auto* frame = this->frame();
     if (!frame)
         return;
     ASSERT(frame->document());
     ASSERT(frame->document()->domWindow());
+
+    Frame* firstFrame = firstWindow.frame();
+    if (!firstFrame || !firstFrame->document())
+        return;
+
+    URL completedURL = firstFrame->document()->completeURL(urlString);
+    // FIXME: The specification says to throw a SyntaxError if the URL is not valid.
+    if (completedURL.isNull())
+        return;
+
     // We call DOMWindow::setLocation directly here because replace() always operates on the current frame.
-    frame->document()->domWindow()->setLocation(activeWindow, firstWindow, url, LockHistoryAndBackForwardList);
+    frame->document()->domWindow()->setLocation(activeWindow, completedURL, LockHistoryAndBackForwardList);
 }
 
 void Location::reload(DOMWindow& activeWindow)
@@ -264,15 +277,26 @@ void Location::reload(DOMWindow& activeWindow)
     frame->navigationScheduler().scheduleRefresh(activeDocument);
 }
 
-ExceptionOr<void> Location::setLocation(DOMWindow& activeWindow, DOMWindow& firstWindow, const String& url)
+ExceptionOr<void> Location::setLocation(DOMWindow& activeWindow, DOMWindow& firstWindow, const String& urlString)
 {
     auto* frame = this->frame();
     ASSERT(frame);
-    if (!activeWindow.document()->canNavigate(frame))
+
+    Frame* firstFrame = firstWindow.frame();
+    if (!firstFrame || !firstFrame->document())
+        return { };
+
+    URL completedURL = firstFrame->document()->completeURL(urlString);
+    // FIXME: The specification says to throw a SyntaxError if the URL is not valid.
+    if (completedURL.isNull())
+        return { };
+
+    if (!activeWindow.document()->canNavigate(frame, completedURL))
         return Exception { SecurityError };
+
     ASSERT(frame->document());
     ASSERT(frame->document()->domWindow());
-    frame->document()->domWindow()->setLocation(activeWindow, firstWindow, url);
+    frame->document()->domWindow()->setLocation(activeWindow, completedURL);
     return { };
 }
 

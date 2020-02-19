@@ -197,12 +197,13 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node, bool igno
     case Phi:
     case Flush:
     case PhantomLocal:
-    case SetArgument:
+    case SetArgumentDefinitely:
+    case SetArgumentMaybe:
     case ArithBitNot:
     case ArithBitAnd:
     case ArithBitOr:
     case ArithBitXor:
-    case BitLShift:
+    case ArithBitLShift:
     case BitRShift:
     case BitURShift:
     case ValueToInt32:
@@ -231,11 +232,15 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node, bool igno
     case ValueBitAnd:
     case ValueBitXor:
     case ValueBitOr:
+    case ValueBitNot:
+    case ValueBitLShift:
     case ValueNegate:
     case ValueAdd:
     case ValueSub:
     case ValueMul:
     case ValueDiv:
+    case ValueMod:
+    case ValuePow:
     case TryGetById:
     case DeleteById:
     case DeleteByVal:
@@ -327,6 +332,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node, bool igno
     case InstanceOfCustom:
     case IsEmpty:
     case IsUndefined:
+    case IsUndefinedOrNull:
     case IsBoolean:
     case IsNumber:
     case NumberIsInteger:
@@ -543,13 +549,13 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node, bool igno
         // know anything about inferred types. But if we have a proof derived from watching a
         // structure that has a type proof, then the next case below will deal with it.
         if (state.structureClobberState() == StructuresAreWatched) {
-            if (JSObject* knownBase = node->child1()->dynamicCastConstant<JSObject*>(graph.m_vm)) {
+            if (JSObject* knownBase = node->child2()->dynamicCastConstant<JSObject*>(graph.m_vm)) {
                 if (graph.isSafeToLoad(knownBase, offset))
                     return true;
             }
         }
         
-        StructureAbstractValue& value = state.forNode(node->child1()).m_structure;
+        StructureAbstractValue& value = state.forNode(node->child2()).m_structure;
         if (value.isInfinite())
             return false;
         for (unsigned i = value.size(); i--;) {

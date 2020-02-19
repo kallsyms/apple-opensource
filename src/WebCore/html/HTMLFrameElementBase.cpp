@@ -65,15 +65,12 @@ bool HTMLFrameElementBase::isURLAllowed() const
 
 bool HTMLFrameElementBase::isURLAllowed(const URL& completeURL) const
 {
-    if (document().page() && document().page()->subframeCount() >= Page::maxNumberOfFrames)
-        return false;
-
     if (completeURL.isEmpty())
         return true;
 
     if (WTF::protocolIsJavaScript(completeURL)) {
         RefPtr<Document> contentDoc = this->contentDocument();
-        if (contentDoc && !ScriptController::canAccessFromCurrentOrigin(contentDoc->frame()))
+        if (contentDoc && !ScriptController::canAccessFromCurrentOrigin(contentDoc->frame(), document()))
             return false;
     }
 
@@ -103,7 +100,7 @@ void HTMLFrameElementBase::openURL(LockHistory lockHistory, LockBackForwardList 
     parentFrame->loader().subframeLoader().requestFrame(*this, m_URL, frameName, lockHistory, lockBackForwardList);
 }
 
-void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const AtomicString& value)
+void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const AtomString& value)
 {
     if (name == srcdocAttr)
         setLocation("about:srcdoc");
@@ -171,7 +168,7 @@ void HTMLFrameElementBase::setLocation(const String& str)
     if (document().settings().needsAcrobatFrameReloadingQuirk() && m_URL == str)
         return;
 
-    m_URL = AtomicString(str);
+    m_URL = AtomString(str);
 
     if (isConnected())
         openURL(LockHistory::No, LockBackForwardList::No);

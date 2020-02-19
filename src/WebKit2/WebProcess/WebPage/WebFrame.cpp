@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -110,7 +110,7 @@ static uint64_t generateListenerID()
 Ref<WebFrame> WebFrame::createWithCoreMainFrame(WebPage* page, WebCore::Frame* coreFrame)
 {
     auto frame = create(std::unique_ptr<WebFrameLoaderClient>(static_cast<WebFrameLoaderClient*>(&coreFrame->loader().client())));
-    page->send(Messages::WebPageProxy::DidCreateMainFrame(frame->frameID()), page->pageID());
+    page->send(Messages::WebPageProxy::DidCreateMainFrame(frame->frameID()));
 
     frame->m_coreFrame = coreFrame;
     frame->m_coreFrame->tree().setName(String());
@@ -121,7 +121,7 @@ Ref<WebFrame> WebFrame::createWithCoreMainFrame(WebPage* page, WebCore::Frame* c
 Ref<WebFrame> WebFrame::createSubframe(WebPage* page, const String& frameName, HTMLFrameOwnerElement* ownerElement)
 {
     auto frame = create(std::make_unique<WebFrameLoaderClient>());
-    page->send(Messages::WebPageProxy::DidCreateSubframe(frame->frameID()), page->pageID());
+    page->send(Messages::WebPageProxy::DidCreateSubframe(frame->frameID()));
 
     auto coreFrame = Frame::create(page->corePage(), ownerElement, frame->m_frameLoaderClient.get());
     frame->m_coreFrame = coreFrame.ptr();
@@ -233,6 +233,7 @@ uint64_t WebFrame::setUpWillSubmitFormListener(CompletionHandler<void()>&& compl
 
 void WebFrame::continueWillSubmitForm(uint64_t listenerID)
 {
+    Ref<WebFrame> protectedThis(*this);
     if (auto completionHandler = m_willSubmitFormCompletionHandlers.take(listenerID))
         completionHandler();
     invalidatePolicyListener();
@@ -519,11 +520,17 @@ bool WebFrame::allowsFollowingLink(const URL& url) const
 
 JSGlobalContextRef WebFrame::jsContext()
 {
+    if (!m_coreFrame)
+        return nullptr;
+
     return toGlobalRef(m_coreFrame->script().globalObject(mainThreadNormalWorld())->globalExec());
 }
 
 JSGlobalContextRef WebFrame::jsContextForWorld(InjectedBundleScriptWorld* world)
 {
+    if (!m_coreFrame)
+        return nullptr;
+
     return toGlobalRef(m_coreFrame->script().globalObject(world->coreWorld())->globalExec());
 }
 
@@ -637,7 +644,7 @@ RefPtr<InjectedBundleHitTestResult> WebFrame::hitTest(const IntPoint point) cons
     if (!m_coreFrame)
         return nullptr;
 
-    return InjectedBundleHitTestResult::create(m_coreFrame->eventHandler().hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowUserAgentShadowContent));
+    return InjectedBundleHitTestResult::create(m_coreFrame->eventHandler().hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowUserAgentShadowContent | HitTestRequest::AllowChildFrameContent));
 }
 
 bool WebFrame::getDocumentBackgroundColor(double* red, double* green, double* blue, double* alpha)
@@ -812,7 +819,7 @@ void WebFrame::setTextDirection(const String& direction)
 
 void WebFrame::documentLoaderDetached(uint64_t navigationID)
 {
-    if (auto * page = this->page())
+    if (auto* page = this->page())
         page->send(Messages::WebPageProxy::DidDestroyNavigation(navigationID));
 }
 

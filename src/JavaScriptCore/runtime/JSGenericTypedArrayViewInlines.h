@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2018 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@
 #include "JSGenericTypedArrayView.h"
 #include "TypeError.h"
 #include "TypedArrays.h"
+#include <wtf/text/StringConcatenateNumbers.h>
 
 namespace JSC {
 
@@ -76,8 +77,7 @@ JSGenericTypedArrayView<Adaptor>* JSGenericTypedArrayView<Adaptor>::createWithFa
 }
 
 template<typename Adaptor>
-JSGenericTypedArrayView<Adaptor>* JSGenericTypedArrayView<Adaptor>::createUninitialized(
-    ExecState* exec, Structure* structure, unsigned length)
+JSGenericTypedArrayView<Adaptor>* JSGenericTypedArrayView<Adaptor>::createUninitialized(ExecState* exec, Structure* structure, unsigned length)
 {
     VM& vm = exec->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -351,14 +351,22 @@ bool JSGenericTypedArrayView<Adaptor>::getOwnPropertySlot(
         }
 
         if (thisObject->canGetIndexQuickly(index.value())) {
-            slot.setValue(thisObject, PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly, thisObject->getIndexQuickly(index.value()));
+            slot.setValue(thisObject, static_cast<unsigned>(PropertyAttribute::DontDelete), thisObject->getIndexQuickly(index.value()));
             return true;
         }
 
-        slot.setValue(thisObject, PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly, jsUndefined());
         return false;
     }
-    
+
+    if (isCanonicalNumericIndexString(propertyName)) {
+        if (thisObject->isNeutered()) {
+            slot.setCustom(thisObject, static_cast<unsigned>(PropertyAttribute::None), throwNeuteredTypedArrayTypeError);
+            return true;
+        }
+
+        return false;
+    }
+
     return Base::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
 
@@ -367,15 +375,24 @@ bool JSGenericTypedArrayView<Adaptor>::put(
     JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value,
     PutPropertySlot& slot)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSGenericTypedArrayView* thisObject = jsCast<JSGenericTypedArrayView*>(cell);
 
     // https://tc39.github.io/ecma262/#sec-integer-indexed-exotic-objects-set-p-v-receiver
     // Ignore the receiver even if the receiver is altered to non base value.
     // 9.4.5.5-2-b-i Return ? IntegerIndexedElementSet(O, numericIndex, V).
     if (Optional<uint32_t> index = parseIndex(propertyName))
-        return putByIndex(thisObject, exec, index.value(), value, slot.isStrictMode());
-    
-    return Base::put(thisObject, exec, propertyName, value, slot);
+        RELEASE_AND_RETURN(scope, putByIndex(thisObject, exec, index.value(), value, slot.isStrictMode()));
+
+    if (isCanonicalNumericIndexString(propertyName)) {
+        if (thisObject->isNeutered())
+            throwTypeError(exec, scope, typedArrayBufferHasBeenDetachedErrorMessage);
+        return false;
+    }
+
+    RELEASE_AND_RETURN(scope, Base::put(thisObject, exec, propertyName, value, slot));
 }
 
 template<typename Adaptor>
@@ -390,9 +407,12 @@ bool JSGenericTypedArrayView<Adaptor>::defineOwnProperty(
     if (Optional<uint32_t> index = parseIndex(propertyName)) {
         auto throwTypeErrorIfNeeded = [&] (const char* errorMessage) -> bool {
             if (shouldThrow)
-                throwTypeError(exec, scope, makeString(errorMessage, String::number(*index)));
+                throwTypeError(exec, scope, makeString(errorMessage, *index));
             return false;
         };
+
+        if (index.value() >= thisObject->m_length)
+            return false;
 
         if (descriptor.isAccessorDescriptor())
             return throwTypeErrorIfNeeded("Attempting to store accessor property on a typed array at index: ");
@@ -403,13 +423,15 @@ bool JSGenericTypedArrayView<Adaptor>::defineOwnProperty(
         if (!descriptor.enumerable() || !descriptor.writable())
             return throwTypeErrorIfNeeded("Attempting to store non-enumerable or non-writable property on a typed array at index: ");
 
-        if (descriptor.value()) {
-            PutPropertySlot unused(JSValue(thisObject), shouldThrow);
-            RELEASE_AND_RETURN(scope, thisObject->put(thisObject, exec, propertyName, descriptor.value(), unused));
-        }
+        if (descriptor.value())
+            RELEASE_AND_RETURN(scope, thisObject->putByIndex(thisObject, exec, index.value(), descriptor.value(), shouldThrow));
+
         return true;
     }
-    
+
+    if (isCanonicalNumericIndexString(propertyName))
+        return false;
+
     RELEASE_AND_RETURN(scope, Base::defineOwnProperty(thisObject, exec, propertyName, descriptor, shouldThrow));
 }
 
@@ -432,7 +454,7 @@ bool JSGenericTypedArrayView<Adaptor>::deleteProperty(
 
 template<typename Adaptor>
 bool JSGenericTypedArrayView<Adaptor>::getOwnPropertySlotByIndex(
-    JSObject* object, ExecState* exec, unsigned propertyName, PropertySlot& slot)
+    JSObject* object, ExecState*, unsigned propertyName, PropertySlot& slot)
 {
     JSGenericTypedArrayView* thisObject = jsCast<JSGenericTypedArrayView*>(object);
 
@@ -441,11 +463,6 @@ bool JSGenericTypedArrayView<Adaptor>::getOwnPropertySlotByIndex(
         return true;
     }
 
-    if (propertyName > MAX_ARRAY_INDEX) {
-        return thisObject->methodTable(exec->vm())->getOwnPropertySlot(
-            thisObject, exec, Identifier::from(exec, propertyName), slot);
-    }
-    
     if (!thisObject->canGetIndexQuickly(propertyName))
         return false;
     
@@ -455,15 +472,9 @@ bool JSGenericTypedArrayView<Adaptor>::getOwnPropertySlotByIndex(
 
 template<typename Adaptor>
 bool JSGenericTypedArrayView<Adaptor>::putByIndex(
-    JSCell* cell, ExecState* exec, unsigned propertyName, JSValue value, bool shouldThrow)
+    JSCell* cell, ExecState* exec, unsigned propertyName, JSValue value, bool)
 {
     JSGenericTypedArrayView* thisObject = jsCast<JSGenericTypedArrayView*>(cell);
-
-    if (propertyName > MAX_ARRAY_INDEX) {
-        PutPropertySlot slot(JSValue(thisObject), shouldThrow);
-        return thisObject->methodTable(exec->vm())->put(thisObject, exec, Identifier::from(exec, propertyName), value, slot);
-    }
-    
     return thisObject->setIndex(exec, propertyName, value);
 }
 
@@ -495,7 +506,7 @@ size_t JSGenericTypedArrayView<Adaptor>::estimatedSize(JSCell* cell, VM& vm)
 
     if (thisObject->m_mode == OversizeTypedArray)
         return Base::estimatedSize(thisObject, vm) + thisObject->byteSize();
-    if (thisObject->m_mode == FastTypedArray && thisObject->m_vector)
+    if (thisObject->m_mode == FastTypedArray && thisObject->hasVector())
         return Base::estimatedSize(thisObject, vm) + thisObject->byteSize();
 
     return Base::estimatedSize(thisObject, vm);
@@ -514,7 +525,7 @@ void JSGenericTypedArrayView<Adaptor>::visitChildren(JSCell* cell, SlotVisitor& 
     {
         auto locker = holdLock(thisObject->cellLock());
         mode = thisObject->m_mode;
-        vector = thisObject->m_vector.getMayBeNull();
+        vector = thisObject->vector();
         byteSize = thisObject->byteSize();
     }
     

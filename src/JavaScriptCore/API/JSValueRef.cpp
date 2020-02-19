@@ -36,6 +36,7 @@
 #include "JSCallbackObject.h"
 #include "JSGlobalObject.h"
 #include "JSONObject.h"
+#include "JSObjectRefPrivate.h"
 #include "JSString.h"
 #include "LiteralParser.h"
 #include "Protect.h"
@@ -330,13 +331,12 @@ JSValueRef JSValueMakeSymbol(JSContextRef ctx, JSStringRef description)
         return nullptr;
     }
     ExecState* exec = toJS(ctx);
+    VM& vm = exec->vm();
     JSLockHolder locker(exec);
-    auto scope = DECLARE_CATCH_SCOPE(exec->vm());
 
-    JSString* jsDescription = jsString(exec, description ? description->string() : String());
-    RETURN_IF_EXCEPTION(scope, nullptr);
-
-    return toRef(exec, Symbol::create(exec, jsDescription));
+    if (!description)
+        return toRef(exec, Symbol::create(vm));
+    return toRef(exec, Symbol::createWithDescription(vm, description->string()));
 }
 
 JSValueRef JSValueMakeString(JSContextRef ctx, JSStringRef string)

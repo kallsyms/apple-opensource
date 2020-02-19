@@ -56,11 +56,13 @@ static uint64_t nextSessionID()
 
 class UserMediaCaptureManager::Source : public RealtimeMediaSource {
 public:
-    Source(String&& sourceID, Type type, String&& name, String&& hashSalt, uint64_t id, UserMediaCaptureManager& manager)
+    Source(String&& sourceID, Type type, CaptureDevice::DeviceType deviceType, String&& name, String&& hashSalt, uint64_t id, UserMediaCaptureManager& manager)
         : RealtimeMediaSource(type, WTFMove(name), WTFMove(sourceID), WTFMove(hashSalt))
         , m_id(id)
         , m_manager(manager)
+        , m_deviceType(deviceType)
     {
+        ASSERT(deviceType != CaptureDevice::DeviceType::Unknown);
         if (type == Type::Audio)
             m_ringBuffer = std::make_unique<CARingBuffer>(makeUniqueRef<SharedRingBufferStorage>(nullptr));
     }
@@ -163,29 +165,33 @@ public:
 
     void applyConstraintsSucceeded(const WebCore::RealtimeMediaSourceSettings& settings)
     {
-        auto callbacks = m_pendingApplyConstraintsCallbacks.takeFirst();
         setSettings(WebCore::RealtimeMediaSourceSettings(settings));
-        callbacks.successHandler();
+
+        auto callback = m_pendingApplyConstraintsCallbacks.takeFirst();
+        callback({ });
     }
 
-    void applyConstraintsFailed(const String& failedConstraint, const String& errorMessage)
+    void applyConstraintsFailed(String&& failedConstraint, String&& errorMessage)
     {
-        auto callbacks = m_pendingApplyConstraintsCallbacks.takeFirst();
-        callbacks.failureHandler(failedConstraint, errorMessage);
+        auto callback = m_pendingApplyConstraintsCallbacks.takeFirst();
+        callback(ApplyConstraintsError { WTFMove(failedConstraint), WTFMove(errorMessage) });
     }
 
 private:
     void startProducingData() final { m_manager.startProducingData(m_id); }
     void stopProducingData() final { m_manager.stopProducingData(m_id); }
     bool isCaptureSource() const final { return true; }
+    CaptureDevice::DeviceType deviceType() const final { return m_deviceType; }
 
     // RealtimeMediaSource
     void beginConfiguration() final { }
     void commitConfiguration() final { }
+    void hasEnded() final { m_manager.sourceEnded(m_id); }
 
-    void applyConstraints(const WebCore::MediaConstraints& constraints, SuccessHandler&& successHandler, FailureHandler&& failureHandler) final {
+    void applyConstraints(const WebCore::MediaConstraints& constraints, ApplyConstraintsHandler&& completionHandler) final
+    {
         m_manager.applyConstraints(m_id, constraints);
-        m_pendingApplyConstraintsCallbacks.append({ WTFMove(successHandler), WTFMove(failureHandler)});
+        m_pendingApplyConstraintsCallbacks.append(WTFMove(completionHandler));
     }
 
     uint64_t m_id;
@@ -197,12 +203,9 @@ private:
     std::unique_ptr<CARingBuffer> m_ringBuffer;
 
     std::unique_ptr<ImageTransferSessionVT> m_imageTransferSession;
+    CaptureDevice::DeviceType m_deviceType { CaptureDevice::DeviceType::Unknown };
 
-    struct ApplyConstraintsCallback {
-        SuccessHandler successHandler;
-        FailureHandler failureHandler;
-    };
-    Deque<ApplyConstraintsCallback> m_pendingApplyConstraintsCallbacks;
+    Deque<ApplyConstraintsHandler> m_pendingApplyConstraintsCallbacks;
 };
 
 UserMediaCaptureManager::UserMediaCaptureManager(WebProcess& process)
@@ -251,61 +254,65 @@ WebCore::CaptureSourceOrError UserMediaCaptureManager::createCaptureSource(const
         return WTFMove(errorMessage);
 
     auto type = device.type() == CaptureDevice::DeviceType::Microphone ? WebCore::RealtimeMediaSource::Type::Audio : WebCore::RealtimeMediaSource::Type::Video;
-    auto source = adoptRef(*new Source(String::number(id), type, String { settings.label() }, WTFMove(hashSalt), id, *this));
+    auto source = adoptRef(*new Source(String::number(id), type, device.type(), String { settings.label() }, WTFMove(hashSalt), id, *this));
     source->setSettings(WTFMove(settings));
-    m_sources.set(id, source.copyRef());
+    m_sources.add(id, source.copyRef());
     return WebCore::CaptureSourceOrError(WTFMove(source));
 }
 
 void UserMediaCaptureManager::sourceStopped(uint64_t id)
 {
-    ASSERT(m_sources.contains(id));
-    m_sources.get(id)->stop();
+    if (auto source = m_sources.get(id)) {
+        source->stop();
+        sourceEnded(id);
+    }
 }
 
 void UserMediaCaptureManager::captureFailed(uint64_t id)
 {
-    ASSERT(m_sources.contains(id));
-    m_sources.get(id)->captureFailed();
+    if (auto source = m_sources.get(id)) {
+        source->captureFailed();
+        sourceEnded(id);
+    }
 }
 
 void UserMediaCaptureManager::sourceMutedChanged(uint64_t id, bool muted)
 {
-    ASSERT(m_sources.contains(id));
-    m_sources.get(id)->setMuted(muted);
+    if (auto source = m_sources.get(id))
+        source->setMuted(muted);
 }
 
 void UserMediaCaptureManager::sourceSettingsChanged(uint64_t id, const RealtimeMediaSourceSettings& settings)
 {
-    ASSERT(m_sources.contains(id));
-    m_sources.get(id)->setSettings(RealtimeMediaSourceSettings(settings));
+    if (auto source = m_sources.get(id))
+        source->setSettings(RealtimeMediaSourceSettings(settings));
 }
 
 void UserMediaCaptureManager::storageChanged(uint64_t id, const SharedMemory::Handle& handle, const WebCore::CAAudioStreamDescription& description, uint64_t numberOfFrames)
 {
-    ASSERT(m_sources.contains(id));
-    m_sources.get(id)->setStorage(handle, description, numberOfFrames);
+    if (auto source = m_sources.get(id))
+        source->setStorage(handle, description, numberOfFrames);
 }
 
 void UserMediaCaptureManager::ringBufferFrameBoundsChanged(uint64_t id, uint64_t startFrame, uint64_t endFrame)
 {
-    ASSERT(m_sources.contains(id));
-    m_sources.get(id)->setRingBufferFrameBounds(startFrame, endFrame);
+    if (auto source = m_sources.get(id))
+        source->setRingBufferFrameBounds(startFrame, endFrame);
 }
 
 void UserMediaCaptureManager::audioSamplesAvailable(uint64_t id, MediaTime time, uint64_t numberOfFrames, uint64_t startFrame, uint64_t endFrame)
 {
-    ASSERT(m_sources.contains(id));
-    auto& source = *m_sources.get(id);
-    source.setRingBufferFrameBounds(startFrame, endFrame);
-    source.audioSamplesAvailable(time, numberOfFrames);
+    if (auto source = m_sources.get(id)) {
+        source->setRingBufferFrameBounds(startFrame, endFrame);
+        source->audioSamplesAvailable(time, numberOfFrames);
+    }
 }
 
 #if HAVE(IOSURFACE)
 void UserMediaCaptureManager::remoteVideoSampleAvailable(uint64_t id, RemoteVideoSample&& sample)
 {
-    ASSERT(m_sources.contains(id));
-    m_sources.get(id)->remoteVideoSampleAvailable(WTFMove(sample));
+    if (auto source = m_sources.get(id))
+        source->remoteVideoSampleAvailable(WTFMove(sample));
 }
 #else
 NO_RETURN_DUE_TO_ASSERT void UserMediaCaptureManager::remoteVideoSampleAvailable(uint64_t, RemoteVideoSample&&)
@@ -341,19 +348,37 @@ void UserMediaCaptureManager::applyConstraints(uint64_t id, const WebCore::Media
     m_process.send(Messages::UserMediaCaptureManagerProxy::ApplyConstraints(id, constraints), 0);
 }
 
-void UserMediaCaptureManager::applyConstraintsSucceeded(uint64_t id, const WebCore::RealtimeMediaSourceSettings& settings)
+void UserMediaCaptureManager::sourceEnded(uint64_t id)
 {
-    ASSERT(m_sources.contains(id));
-    auto& source = *m_sources.get(id);
-    source.applyConstraintsSucceeded(settings);
+    m_process.send(Messages::UserMediaCaptureManagerProxy::End(id), 0);
+    m_sources.remove(id);
 }
 
-void UserMediaCaptureManager::applyConstraintsFailed(uint64_t id, const String& failedConstraint, const String& message)
+void UserMediaCaptureManager::applyConstraintsSucceeded(uint64_t id, const WebCore::RealtimeMediaSourceSettings& settings)
 {
-    ASSERT(m_sources.contains(id));
-    auto& source = *m_sources.get(id);
-    source.applyConstraintsFailed(failedConstraint, message);
+    if (auto source = m_sources.get(id))
+        source->applyConstraintsSucceeded(settings);
 }
+
+void UserMediaCaptureManager::applyConstraintsFailed(uint64_t id, String&& failedConstraint, String&& message)
+{
+    if (auto source = m_sources.get(id))
+        source->applyConstraintsFailed(WTFMove(failedConstraint), WTFMove(message));
+}
+
+#if PLATFORM(IOS_FAMILY)
+void UserMediaCaptureManager::setAudioCapturePageState(bool interrupted, bool pageMuted)
+{
+    if (auto* activeSource = static_cast<AudioCaptureFactory*>(this)->activeSource())
+        activeSource->setInterrupted(interrupted, pageMuted);
+}
+
+void UserMediaCaptureManager::setVideoCapturePageState(bool interrupted, bool pageMuted)
+{
+    if (auto* activeSource = static_cast<VideoCaptureFactory*>(this)->activeSource())
+        activeSource->setInterrupted(interrupted, pageMuted);
+}
+#endif
 
 }
 
