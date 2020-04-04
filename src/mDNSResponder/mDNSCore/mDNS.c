@@ -7357,8 +7357,7 @@ mDNSlocal const AuthRecord *FindRRSet(const mDNS *const m, const CacheRecord *co
     {
         if (IdenticalResourceRecord(&rr->resrec, &pktrr->resrec))
         {
-            while (rr->RRSet && rr != rr->RRSet) rr = rr->RRSet;
-            return(rr);
+            return(rr->RRSet ? rr->RRSet : rr);
         }
     }
     return(mDNSNULL);
@@ -8140,7 +8139,18 @@ mDNSlocal DNSQuestion *ExpectingUnicastResponseForQuestion(const mDNS *const m, 
             if (mDNSSameOpaque16(q->TargetQID, id)) return(q);
             else
             {
-                if (!tcp && suspiciousQ) *suspiciousQ = q;
+                // Everything but the QIDs match up, should we be suspicious?
+                if (!tcp && suspiciousQ)
+                {
+#if MDNSRESPONDER_SUPPORTS(APPLE, SUSPICIOUS_REPLY_DEFENSE)
+                    if (mDNSSameOpaque16(q->LastTargetQID, id)) // Only be suspicious if this is also not the "last" used QID (on a DNS server set change)
+                    {
+                        LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_ERROR, "Ignored but not suspicious LastTargetQID %d TargetQID %d", mDNSVal16(q->LastTargetQID), mDNSVal16(q->TargetQID));
+                    }
+                    else
+#endif
+                    *suspiciousQ = q;
+                }
                 return(mDNSNULL);
             }
         }
@@ -8279,6 +8289,25 @@ mDNSexport CacheRecord *CreateNewCacheEntry(mDNS *const m, const mDNSu32 slot, C
         }
     }
     return(rr);
+}
+
+mDNSlocal void RefreshCacheRecordCacheGroupOrder(CacheGroup *cg, CacheRecord *cr)
+{   //  Move the cache record to the tail of the cache group to maintain a fresh ordering
+    if (cg->rrcache_tail != &cr->next)          // If not already at the tail
+    {
+        CacheRecord **rp;
+        for (rp = &cg->members; *rp; rp = &(*rp)->next)
+        {
+            if (*rp == cr)                      // This item points to this record
+            {
+                *rp = cr->next;                 // Remove this record
+                break;
+            }
+        }
+        cr->next = mDNSNULL;                    // This record is now last
+        *(cg->rrcache_tail) = cr;               // Append this record to tail of cache group
+        cg->rrcache_tail = &(cr->next);         // Advance tail pointer
+    }
 }
 
 mDNSlocal void RefreshCacheRecord(mDNS *const m, CacheRecord *rr, mDNSu32 ttl)
@@ -8862,6 +8891,9 @@ mDNSexport CacheRecord* mDNSCoreReceiveCacheCheck(mDNS *const m, const DNSMessag
 
                 if (cr->resrec.rroriginalttl == 0) debugf("uDNS rescuing %s", CRDisplayString(m, cr));
                 RefreshCacheRecord(m, cr, m->rec.r.resrec.rroriginalttl);
+                // RefreshCacheRecordCacheGroupOrder will modify the cache group member list that is currently being iterated over in this for-loop.
+                // It is safe to call because the else-if body will unconditionally break out of the for-loop now that it has found the entry to update.
+                RefreshCacheRecordCacheGroupOrder(cg, cr);
                 cr->responseFlags = response->h.flags;
 
                 // If we may have NSEC records returned with the answer (which we don't know yet as it
@@ -8898,7 +8930,7 @@ mDNSexport CacheRecord* mDNSCoreReceiveCacheCheck(mDNS *const m, const DNSMessag
                         }
                     }
                 }
-                break;
+                break;  // Check usage of RefreshCacheRecordCacheGroupOrder before removing (See note above)
             }
             else
             {
@@ -12024,6 +12056,9 @@ mDNSexport mStatus mDNS_StartQuery_internal(mDNS *const m, DNSQuestion *const qu
 
 #ifndef UNICAST_DISABLED
     question->TargetQID = Question_uDNS(question) ? mDNS_NewMessageID(m) : zeroID;
+#if MDNSRESPONDER_SUPPORTS(APPLE, SUSPICIOUS_REPLY_DEFENSE)
+    question->LastTargetQID = zeroID;
+#endif
 #else
     question->TargetQID = zeroID;
 #endif
@@ -12570,13 +12605,30 @@ mDNSlocal void mDNS_HostNameCallback(mDNS *const m, AuthRecord *const rr, mStatu
 mDNSlocal void mDNS_RandomizedHostNameCallback(mDNS *m, AuthRecord *rr, mStatus result);
 #endif
 
-mDNSlocal NetworkInterfaceInfo *FindFirstAdvertisedInterface(mDNS *const m)
+mDNSlocal AuthRecord *GetInterfaceAddressRecord(NetworkInterfaceInfo *intf, mDNSBool forRandHostname)
+{
+#if MDNSRESPONDER_SUPPORTS(APPLE, RANDOM_AWDL_HOSTNAME)
+        return(forRandHostname ? &intf->RR_AddrRand : &intf->RR_A);
+#else
+        (void)forRandHostname; // Unused.
+        return(&intf->RR_A);
+#endif
+}
+
+mDNSlocal AuthRecord *GetFirstAddressRecordEx(const mDNS *const m, const mDNSBool forRandHostname)
 {
     NetworkInterfaceInfo *intf;
     for (intf = m->HostInterfaces; intf; intf = intf->next)
-        if (intf->Advertise) break;
-    return(intf);
+    {
+        if (!intf->Advertise) continue;
+#if MDNSRESPONDER_SUPPORTS(APPLE, RANDOM_AWDL_HOSTNAME)
+        if (mDNSPlatformInterfaceIsAWDL(intf->InterfaceID)) continue;
+#endif
+        return(GetInterfaceAddressRecord(intf, forRandHostname));
+    }
+    return(mDNSNULL);
 }
+#define GetFirstAddressRecord(M)    GetFirstAddressRecordEx(M, mDNSfalse)
 
 // The parameter "set" here refers to the set of AuthRecords used to advertise this interface.
 // (It's a set of records, not a set of interfaces.)
@@ -12586,7 +12638,6 @@ mDNSlocal void AdvertiseInterface(mDNS *const m, NetworkInterfaceInfo *set, mDNS
 mDNSlocal void AdvertiseInterface(mDNS *const m, NetworkInterfaceInfo *set)
 #endif
 {
-    NetworkInterfaceInfo *primary;
     const domainname *hostname;
     mDNSRecordCallback *hostnameCallback;
     AuthRecord *addrAR;
@@ -12676,22 +12727,15 @@ mDNSlocal void AdvertiseInterface(mDNS *const m, NetworkInterfaceInfo *set)
         ptrAR->ForceMCast = mDNStrue;           // This PTR points to our dot-local name, so don't ever try to write it into a uDNS server
     }
 
-    primary = FindFirstAdvertisedInterface(m);
-    if (!primary) primary = set; // If no existing advertised interface, this new NetworkInterfaceInfo becomes our new primary
-    // We should never have primary be NULL, because even if there is
-    // no other interface yet, we should always find ourself in the list.
-
 #if MDNSRESPONDER_SUPPORTS(APPLE, RANDOM_AWDL_HOSTNAME)
-    if (!interfaceIsAWDL && useRandomizedHostname)
-    {
-        addrAR->RRSet = &primary->RR_AddrRand;
-    }
-    else
+    addrAR->RRSet = interfaceIsAWDL ? addrAR : GetFirstAddressRecordEx(m, useRandomizedHostname);
+#else
+    addrAR->RRSet = GetFirstAddressRecord(m);
 #endif
-    {
-        addrAR->RRSet = &primary->RR_A;
-    }
+    if (!addrAR->RRSet) addrAR->RRSet = addrAR;
     mDNS_Register_internal(m, addrAR);
+    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEBUG, "Initialized RRSet for " PRI_S, ARDisplayString(m, addrAR));
+    LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEBUG, "RRSet:                " PRI_S, ARDisplayString(m, addrAR->RRSet));
     if (ptrAR) mDNS_Register_internal(m, ptrAR);
 
 #if MDNSRESPONDER_SUPPORTS(APPLE, D2D)
@@ -13171,6 +13215,36 @@ mDNSexport mStatus mDNS_RegisterInterface(mDNS *const m, NetworkInterfaceInfo *s
     return(mStatus_NoError);
 }
 
+mDNSlocal void AdjustAddressRecordSetsEx(mDNS *const m, NetworkInterfaceInfo *removedIntf, mDNSBool forRandHostname)
+{
+    NetworkInterfaceInfo *intf;
+    const AuthRecord *oldAR;
+    AuthRecord *newAR;
+#if MDNSRESPONDER_SUPPORTS(APPLE, RANDOM_AWDL_HOSTNAME)
+    if (mDNSPlatformInterfaceIsAWDL(removedIntf->InterfaceID)) return;
+#endif
+    oldAR = GetInterfaceAddressRecord(removedIntf, forRandHostname);
+    newAR = GetFirstAddressRecordEx(m, forRandHostname);
+    for (intf = m->HostInterfaces; intf; intf = intf->next)
+    {
+        AuthRecord *ar;
+#if MDNSRESPONDER_SUPPORTS(APPLE, RANDOM_AWDL_HOSTNAME)
+        if (mDNSPlatformInterfaceIsAWDL(intf->InterfaceID)) continue;
+#endif
+        ar = GetInterfaceAddressRecord(intf, forRandHostname);
+        if (ar->RRSet == oldAR)
+        {
+            ar->RRSet = newAR ? newAR : ar;
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEBUG, "Changed RRSet for " PRI_S, ARDisplayString(m, ar));
+            LogRedact(MDNS_LOG_CATEGORY_DEFAULT, MDNS_LOG_DEBUG, "New RRSet:        " PRI_S, ARDisplayString(m, ar->RRSet));
+        }
+    }
+}
+#if MDNSRESPONDER_SUPPORTS(APPLE, RANDOM_AWDL_HOSTNAME)
+#define AdjustAddressRecordSetsForRandHostname(M, REMOVED_INTF) AdjustAddressRecordSetsEx(M, REMOVED_INTF, mDNStrue)
+#endif
+#define AdjustAddressRecordSets(M, REMOVED_INTF)                AdjustAddressRecordSetsEx(M, REMOVED_INTF, mDNSfalse)
+
 // Note: mDNS_DeregisterInterface calls mDNS_Deregister_internal which can call a user callback, which may change
 // the record list and/or question list.
 // Any code walking either list must use the CurrentQuestion and/or CurrentRecord mechanism to protect against this.
@@ -13181,9 +13255,7 @@ mDNSexport void mDNS_DeregisterInterface(mDNS *const m, NetworkInterfaceInfo *se
 #endif
     NetworkInterfaceInfo **p = &m->HostInterfaces;
     mDNSBool revalidate = mDNSfalse;
-    NetworkInterfaceInfo *primary;
     NetworkInterfaceInfo *intf;
-    AuthRecord *A;
 
     mDNS_Lock(m);
 
@@ -13291,12 +13363,11 @@ mDNSexport void mDNS_DeregisterInterface(mDNS *const m, NetworkInterfaceInfo *se
 
     // If we still have address records referring to this one, update them.
     // This is safe, because this NetworkInterfaceInfo has already been unlinked from the list,
-    // so the call to FindFirstAdvertisedInterface() won’t accidentally find it.
-    primary = FindFirstAdvertisedInterface(m);
-    A = primary ? &primary->RR_A : mDNSNULL;
-    for (intf = m->HostInterfaces; intf; intf = intf->next)
-        if (intf->RR_A.RRSet == &set->RR_A)
-            intf->RR_A.RRSet = A;
+    // so the call to AdjustAddressRecordSets*() won’t accidentally find it.
+    AdjustAddressRecordSets(m, set);
+#if MDNSRESPONDER_SUPPORTS(APPLE, RANDOM_AWDL_HOSTNAME)
+    AdjustAddressRecordSetsForRandHostname(m, set);
+#endif
 
     // If we were advertising on this interface, deregister those address and reverse-lookup records now
     if (set->Advertise) DeadvertiseInterface(m, set, kDeadvertiseFlag_All);
@@ -14838,6 +14909,10 @@ mDNSexport mStatus uDNS_SetupDNSConfig(mDNS *const m)
         LogInfo("uDNS_SetupDNSConfig: No configuration change");
         return mStatus_NoError;
     }
+#if MDNSRESPONDER_SUPPORTS(APPLE, SUSPICIOUS_REPLY_DEFENSE)
+    // Reset suspicious mode on any DNS configuration change
+    m->NextSuspiciousTimeout = 0;
+#endif
 
     // For now, we just delete the mcast resolvers. We don't deal with cache or
     // questions here. Neither question nor cache point to mcast resolvers. Questions
@@ -14957,6 +15032,9 @@ mDNSexport mStatus uDNS_SetupDNSConfig(mDNS *const m)
 
         q->Suppressed = ShouldSuppressUnicastQuery(q, s);
         q->unansweredQueries = 0;
+#if MDNSRESPONDER_SUPPORTS(APPLE, SUSPICIOUS_REPLY_DEFENSE)
+        q->LastTargetQID = q->TargetQID;
+#endif
         q->TargetQID = mDNS_NewMessageID(m);
         if (!q->Suppressed) ActivateUnicastQuery(m, q, mDNStrue);
     }

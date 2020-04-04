@@ -5477,9 +5477,9 @@ mDNSlocal void SetLocalDomains(void)
     CFRelease(sa);
 }
 
+#if !MDNSRESPONDER_SUPPORTS(APPLE, NO_WAKE_FOR_NET_ACCESS)
 mDNSlocal void GetCurrentPMSetting(const CFStringRef name, mDNSs32 *val)
 {
-    
     CFDictionaryRef dict = SCDynamicStoreCopyValue(NULL, NetworkChangedKey_PowerSettings);
     if (!dict)
     {
@@ -5492,8 +5492,8 @@ mDNSlocal void GetCurrentPMSetting(const CFStringRef name, mDNSs32 *val)
             *val = 0;
         CFRelease(dict);
     }
-    
 }
+#endif
 
 #if APPLE_OSX_mDNSResponder
 
@@ -5998,13 +5998,12 @@ mDNSexport mStatus ActivateLocalProxy(NetworkInterfaceInfo *const intf, mDNSBool
 
 mDNSlocal mDNSu8 SystemWakeForNetworkAccess(void)
 {
+#if MDNSRESPONDER_SUPPORTS(APPLE, NO_WAKE_FOR_NET_ACCESS)
+    LogRedact(MDNS_LOG_CATEGORY_SPS, MDNS_LOG_DEBUG, "SystemWakeForNetworkAccess: compile-time disabled");
+    return ((mDNSu8)mDNS_NoWake);
+#else
     mDNSs32 val = 0;
     mDNSu8  ret = (mDNSu8)mDNS_NoWake;
-
-#if TARGET_OS_IOS
-    LogSPS("SystemWakeForNetworkAccess: Sleep Proxy Client always disabled on TARGET_OS_IOS");
-    return ret;
-#endif
 
     if (DisableSleepProxyClient)
     {
@@ -6025,6 +6024,7 @@ mDNSlocal mDNSu8 SystemWakeForNetworkAccess(void)
 
     LogSPS("SystemWakeForNetworkAccess: Wake On LAN: %d", ret);
     return ret;
+#endif
 }
 
 mDNSlocal mDNSBool SystemSleepOnlyIfWakeOnLAN(void)

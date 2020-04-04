@@ -257,6 +257,8 @@
 		B7473E981EC3C78300D31B9D /* _CNDomainBrowser.m in Sources */ = {isa = PBXBuildFile; fileRef = B7D6CA5E1D107573005E24CF /* _CNDomainBrowser.m */; };
 		B7473E991EC3C86600D31B9D /* ClientCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = FF5852100DD27BD300862BDF /* ClientCommon.c */; };
 		B74A96261DD4EDE60084A8C5 /* Preferences.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B74A96251DD4EDE60084A8C5 /* Preferences.framework */; };
+		B74BF92E2322E97400E35354 /* SuspiciousReplyTest.m in Sources */ = {isa = PBXBuildFile; fileRef = B74BF92D2322E97400E35354 /* SuspiciousReplyTest.m */; };
+		B74BF931232701F600E35354 /* CacheOrderTest.m in Sources */ = {isa = PBXBuildFile; fileRef = B74BF930232701F600E35354 /* CacheOrderTest.m */; };
 		B74F16F4211BA55400BEBE84 /* DNSMessageTest.m in Sources */ = {isa = PBXBuildFile; fileRef = B74F16F3211BA55400BEBE84 /* DNSMessageTest.m */; };
 		B74F2B461E82FEAE0084960E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BDA3F0891C48DB910054FB4B /* Foundation.framework */; };
 		B74F2B471E82FEFE0084960E /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7F869685066EE02400D2A2DC /* Security.framework */; };
@@ -306,6 +308,7 @@
 		B7D6CA7A1D107714005E24CF /* CNDomainBrowserView.m in Sources */ = {isa = PBXBuildFile; fileRef = B7D6CA691D1076C6005E24CF /* CNDomainBrowserView.m */; };
 		B7E06B0D1DBA9DFE00E4580C /* ClientCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = FF5852100DD27BD300862BDF /* ClientCommon.c */; };
 		B7E06B0E1DBA9E9700E4580C /* DomainBrowser.strings in Resources */ = {isa = PBXBuildFile; fileRef = B7016F4F1D5D0D1900107E7C /* DomainBrowser.strings */; };
+		B7E06CE12329B0480021401F /* LocalOnlyWithInterfacesTest.m in Sources */ = {isa = PBXBuildFile; fileRef = B7E06CDF2329AA7B0021401F /* LocalOnlyWithInterfacesTest.m */; };
 		B7EEF7C1212601460093828F /* mDNSMacOSX.c in Sources */ = {isa = PBXBuildFile; fileRef = 6575FBEB022EAF7200000109 /* mDNSMacOSX.c */; };
 		B7EEF7C2212602EC0093828F /* mDNS.c in Sources */ = {isa = PBXBuildFile; fileRef = 6575FBE9022EAF5A00000109 /* mDNS.c */; };
 		B7EEF7C4212603B20093828F /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BD893CE4206C0D980055F9E7 /* SystemConfiguration.framework */; };
@@ -1002,6 +1005,8 @@
 		B7473E8A1EC395C300D31B9D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B7473E8B1EC395C300D31B9D /* script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = script.js; sourceTree = "<group>"; };
 		B74A96251DD4EDE60084A8C5 /* Preferences.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Preferences.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS10.0.Internal.sdk/System/Library/PrivateFrameworks/Preferences.framework; sourceTree = DEVELOPER_DIR; };
+		B74BF92D2322E97400E35354 /* SuspiciousReplyTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SuspiciousReplyTest.m; sourceTree = "<group>"; };
+		B74BF930232701F600E35354 /* CacheOrderTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CacheOrderTest.m; sourceTree = "<group>"; };
 		B74EC1161D47FC7700A1D155 /* BonjourSettings.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BonjourSettings.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		B74EC11B1D47FC7800A1D155 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = ../SettingsBundle/Info.plist; sourceTree = "<group>"; };
 		B74EC1271D494C5800A1D155 /* DomainBrowser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DomainBrowser.h; sourceTree = "<group>"; };
@@ -1074,6 +1079,7 @@
 		B7D6CA681D1076C6005E24CF /* CNDomainBrowserView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CNDomainBrowserView.h; sourceTree = "<group>"; };
 		B7D6CA691D1076C6005E24CF /* CNDomainBrowserView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CNDomainBrowserView.m; sourceTree = "<group>"; };
 		B7D6CA701D1076F3005E24CF /* DomainBrowser.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = DomainBrowser.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		B7E06CDF2329AA7B0021401F /* LocalOnlyWithInterfacesTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LocalOnlyWithInterfacesTest.m; sourceTree = "<group>"; };
 		BD03E88C1AD31278005E8A81 /* SymptomReporter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SymptomReporter.c; sourceTree = "<group>"; };
 		BD11266D21DB1AFE006115E6 /* dnssd_xpc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dnssd_xpc.h; sourceTree = "<group>"; };
 		BD11266E21DB1AFE006115E6 /* dnssd_xpc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = dnssd_xpc.c; sourceTree = "<group>"; };
@@ -1722,6 +1728,23 @@
 			name = "Supporting Files";
 			sourceTree = "<group>";
 		};
+		B74BF92F2322E99700E35354 /* Unit Tests */ = {
+			isa = PBXGroup;
+			children = (
+				B74F16EF2114E49D00BEBE84 /* Info.plist */,
+				B7A86198212B074500E81CC3 /* LocalOnlyTimeoutTest.m */,
+				B7A861962127845700E81CC3 /* CNameRecordTest.m */,
+				B7A8618A21274FA200E81CC3 /* mDNSCoreReceiveTest.m */,
+				B7A8618821274BFC00E81CC3 /* ResourceRecordTest.m */,
+				B74F16F3211BA55400BEBE84 /* DNSMessageTest.m */,
+				D459F0D3222862BA0056AC5B /* HelperFunctionTest.m */,
+				B74BF92D2322E97400E35354 /* SuspiciousReplyTest.m */,
+				B74BF930232701F600E35354 /* CacheOrderTest.m */,
+				B7E06CDF2329AA7B0021401F /* LocalOnlyWithInterfacesTest.m */,
+			);
+			path = "Unit Tests";
+			sourceTree = "<group>";
+		};
 		B74EC11A1D47FC7800A1D155 /* SettingsBundle */ = {
 			isa = PBXGroup;
 			children = (
@@ -1743,16 +1766,10 @@
 		B74F16EC2114E49D00BEBE84 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
-				B74F16EF2114E49D00BEBE84 /* Info.plist */,
 				BD98A796213A3EAE0002EC47 /* mDNSResponder.plist */,
-				B7A86198212B074500E81CC3 /* LocalOnlyTimeoutTest.m */,
-				B7A861962127845700E81CC3 /* CNameRecordTest.m */,
-				B7A8618A21274FA200E81CC3 /* mDNSCoreReceiveTest.m */,
-				B7A8618821274BFC00E81CC3 /* ResourceRecordTest.m */,
-				B74F16F3211BA55400BEBE84 /* DNSMessageTest.m */,
-				D459F0D3222862BA0056AC5B /* HelperFunctionTest.m */,
 				D448F7A6222DA98E0069E1D2 /* BATS Scripts */,
 				37DDE9241BA382280092AC61 /* Unit Test Utilities */,
+				B74BF92F2322E99700E35354 /* Unit Tests */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -3177,7 +3194,9 @@
 			files = (
 				898E98392203633800812DC6 /* dnssd_clientshim.c in Sources */,
 				D459F0D4222862BA0056AC5B /* HelperFunctionTest.m in Sources */,
+				B74BF931232701F600E35354 /* CacheOrderTest.m in Sources */,
 				898E983A2203633800812DC6 /* dso-transport.c in Sources */,
+				B7E06CE12329B0480021401F /* LocalOnlyWithInterfacesTest.m in Sources */,
 				898E983B2203633800812DC6 /* dso.c in Sources */,
 				B7EEF7C1212601460093828F /* mDNSMacOSX.c in Sources */,
 				B7EEF7CC212604A80093828F /* LegacyNATTraversal.c in Sources */,
@@ -3186,6 +3205,7 @@
 				B7EEF7D6212606F50093828F /* uDNSPathEvalulation.c in Sources */,
 				B7EEF7EA212613260093828F /* uds_daemon.c in Sources */,
 				B7A861952127806600E81CC3 /* unittest_common.c in Sources */,
+				B74BF92E2322E97400E35354 /* SuspiciousReplyTest.m in Sources */,
 				B7EEF7E921260E4C0093828F /* CryptoSupport.c in Sources */,
 				B7EEF7D9212607C40093828F /* nsec.c in Sources */,
 				D40123912272B6E3006C9BBE /* mdns_object.m in Sources */,
@@ -4930,6 +4950,7 @@
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -4954,7 +4975,7 @@
 					"$(SDKROOT)/usr/include/libxml2",
 					"${CONFIGURATION_TEMP_DIR}",
 				);
-				INFOPLIST_FILE = Tests/Info.plist;
+				INFOPLIST_FILE = "Tests/Unit Tests/Info.plist";
 				INSTALL_PATH = /AppleInternal/XCTests/com.apple.mDNSResponder/;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				MTL_FAST_MATH = YES;
@@ -5011,6 +5032,7 @@
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -5035,7 +5057,7 @@
 					"$(SDKROOT)/usr/include/libxml2",
 					"${CONFIGURATION_TEMP_DIR}",
 				);
-				INFOPLIST_FILE = Tests/Info.plist;
+				INFOPLIST_FILE = "Tests/Unit Tests/Info.plist";
 				INSTALL_PATH = /AppleInternal/XCTests/com.apple.mDNSResponder/;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				MTL_FAST_MATH = YES;

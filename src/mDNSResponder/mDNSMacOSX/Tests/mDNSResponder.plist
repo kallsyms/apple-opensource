@@ -15,6 +15,25 @@
 	<array>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>GAIPerf Advanced</string>
 			<key>Description</key>
 			<string>Tests correctness of resolving hostnames via DNS using the GAIPerf Advanced test suite.</string>
@@ -38,6 +57,25 @@
 				<string>--format</string>
 				<string>json</string>
 				<string>--skipPathEval</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -75,6 +113,25 @@
 				<string>--format</string>
 				<string>json</string>
 				<string>--flushCache</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -117,6 +174,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>mDNS Discovery 10-100-2</string>
 			<key>Description</key>
 			<string>Tests mDNS discovery and resolution of ten service instances with one 100-byte TXT record, two A records, and two AAAA records.</string>
@@ -150,6 +226,25 @@
 				<string>--format</string>
 				<string>json</string>
 				<string>--flushCache</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -192,6 +287,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>mDNS Discovery 100-500-2</string>
 			<key>Description</key>
 			<string>Tests mDNS discovery and resolution of 100 service instances with one 500-byte TXT record, two A records, and two AAAA records.</string>
@@ -225,6 +339,25 @@
 				<string>--format</string>
 				<string>json</string>
 				<string>--flushCache</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -267,6 +400,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>mDNS Discovery 1-1-1 (No Cache Flush)</string>
 			<key>Description</key>
 			<string>Tests mDNS discovery and resolution of one service instance with one one-byte TXT record, one A record, and one AAAA record. Cache is not flushed beforehand.</string>
@@ -299,6 +451,25 @@
 				<string>--ipv6</string>
 				<string>--format</string>
 				<string>json</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -340,6 +511,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>mDNS Discovery 10-100-2 (No Cache Flush)</string>
 			<key>Description</key>
 			<string>Tests mDNS discovery and resolution of ten service instances with one 100-byte TXT record, two A records, and two AAAA records. Cache is not flushed beforehand.</string>
@@ -372,6 +562,25 @@
 				<string>--ipv6</string>
 				<string>--format</string>
 				<string>json</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -413,6 +622,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>mDNS Discovery 100-500-2 (No Cache Flush)</string>
 			<key>Description</key>
 			<string>Tests mDNS discovery and resolution of 100 service instances with one 500-byte TXT record, two A records, and two AAAA records. Cache is not flushed beforehand.</string>
@@ -445,6 +673,25 @@
 				<string>--ipv6</string>
 				<string>--format</string>
 				<string>json</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -482,6 +729,25 @@
 				<string>--noAdditionals</string>
 				<string>--format</string>
 				<string>json</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -528,6 +794,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>mDNS Discovery w/Packet Drops 100</string>
 			<key>Description</key>
 			<string>Tests mDNS discovery and resolution of 100 service instances with one 100-byte TXT record, two A records, and two AAAA records. The first three responses per service instance are subject to a 0.5 probability of being dropped to test query retries.</string>
@@ -570,6 +855,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>DotLocal Queries</string>
 			<key>Description</key>
 			<string>Tests DNS and mDNS queries for domain names in the local domain.</string>
@@ -590,6 +894,25 @@
 				<string>lo0</string>
 				<string>--format</string>
 				<string>json</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -617,6 +940,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>Probe Conflicts</string>
 			<key>Description</key>
 			<string>Tests various probe conflict scenarios, some of which are expected to result in service instance and record renames.</string>
@@ -637,6 +979,25 @@
 				<string>lo0</string>
 				<string>--format</string>
 				<string>json</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -669,6 +1030,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>State Dump</string>
 			<key>Description</key>
 			<string>1.  Tests whether the state dump can be triggered correctly, and whether the file (or stdout&apos;s output) contains the full state information. 2. Checks whether the number of state dump files has an upper limit to avoid wasting disk space.</string>
@@ -691,6 +1071,25 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
 			<string>DNS Proxy</string>
 			<key>Description</key>
 			<string>1.  Tests the DNS Proxy by doing a DNS UDP query. 2. Tests the DNS proxy by doing a DNS TCP query.</string>
@@ -706,6 +1105,25 @@
 			<array>
 				<string>/bin/sh</string>
 				<string>/AppleInternal/Tests/mDNSResponder/bats_test_proxy.sh</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 		<dict>
@@ -777,6 +1195,47 @@
 				<string>-XCTest</string>
 				<string>Self</string>
 				<string>Tests.xctest</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>Fix Verification #1</string>
+			<key>Description</key>
+			<string>Fix Verification #1</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>45</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/local/bin/dnssdutil</string>
+				<string>verifyFix</string>
+				<string>earlyAWDL</string>
+				<string>--format</string>
+				<string>json</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>mDNSResponder Leaks</string>
+			<key>Description</key>
+			<string>Checks mDNSResponder for memory leaks.</string>
+			<key>AsRoot</key>
+			<true/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>10</integer>
+			<key>IgnoreOutput</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>/usr/bin/leaks</string>
+				<string>mDNSResponder</string>
 			</array>
 		</dict>
 	</array>

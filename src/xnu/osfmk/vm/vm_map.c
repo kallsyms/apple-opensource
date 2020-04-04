@@ -13246,6 +13246,7 @@ protection_failure:
 	*offset = (vaddr - entry->vme_start) + VME_OFFSET(entry);
 	*object = VME_OBJECT(entry);
 	*out_prot = prot;
+	KDBG_FILTERED(MACHDBG_CODE(DBG_MACH_WORKINGSET, VM_MAP_LOOKUP_OBJECT), VM_KERNEL_UNSLIDE_OR_PERM(*object), 0, 0, 0, 0);
 
 	if (fault_info) {
 		fault_info->interruptible = THREAD_UNINT; /* for now... */
@@ -15956,6 +15957,13 @@ RestartCopy:
 		if (!copy) {
 			if (src_entry->used_for_jit == TRUE) {
 				if (same_map) {
+#if __APRR_SUPPORTED__
+					/*
+					 * Disallow re-mapping of any JIT regions on APRR devices.
+					 */
+					result = KERN_PROTECTION_FAILURE;
+					break;
+#endif /* __APRR_SUPPORTED__*/
 				} else {
 #if CONFIG_EMBEDDED
 					/*
@@ -17672,6 +17680,7 @@ vm_map_msync(
 
 			local_map = VME_SUBMAP(entry);
 			local_offset = VME_OFFSET(entry);
+			vm_map_reference(local_map);
 			vm_map_unlock(map);
 			if (vm_map_msync(
 				    local_map,
@@ -17680,6 +17689,7 @@ vm_map_msync(
 				    sync_flags) == KERN_INVALID_ADDRESS) {
 				had_hole = TRUE;
 			}
+			vm_map_deallocate(local_map);
 			continue;
 		}
 		object = VME_OBJECT(entry);

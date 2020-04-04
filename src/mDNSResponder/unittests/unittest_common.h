@@ -37,6 +37,7 @@ extern mStatus  init_mdns_storage(void);
 extern size_t   get_reply_len(char* name, uint16_t rdlen);
 extern mStatus  start_client_request(request_state* req, char *msgbuf, size_t msgsz, uint32_t op, UDPSocket* socket);
 extern void     receive_response(const request_state* req, DNSMessage *msg, size_t msgSize);
+extern void     receive_suspicious_response_ut(const request_state* req, DNSMessage *msg, size_t msgSize, mDNSOpaque16 suspiciousqid, mDNSBool goodLastQID);
 extern void     get_ip(const char *const name, struct sockaddr_storage *result);
 extern void     free_req(request_state* req);
 
@@ -53,6 +54,9 @@ extern mDNSBool mDNSMacOSXCreateEtcHostsEntry_ut(const domainname *domain, const
                                                  const domainname *cname, char *ifname, AuthHash *auth);
 extern void     UpdateEtcHosts_ut(void *context);
 extern mStatus  AddDNSServer_ut(void);
+extern mStatus  AddDNSServerScoped_ut(mDNSInterfaceID interfaceID, ScopeType scoped);
+extern mStatus  force_uDNS_SetupDNSConfig_ut(mDNS *const m);
+extern mStatus  verify_cache_addr_order_for_domain_ut(mDNS *const m, mDNSu8* octet, mDNSu32 count, const domainname *const name);
 
 // HelperFunctionTest
 extern void mDNSDomainLabelFromCFString_ut(CFStringRef cfs, domainlabel *const namelabel);

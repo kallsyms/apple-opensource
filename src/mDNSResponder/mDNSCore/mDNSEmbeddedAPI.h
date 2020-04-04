@@ -2052,6 +2052,9 @@ struct DNSQuestion_struct
     mDNSQuestionCallback *QuestionCallback;
     mDNSQuestionResetHandler ResetHandler;
     void                 *QuestionContext;
+#if MDNSRESPONDER_SUPPORTS(APPLE, SUSPICIOUS_REPLY_DEFENSE)
+    mDNSOpaque16 LastTargetQID;             // Last used QID, to help determine suspicion with valid in-flight replies.
+#endif
 #if MDNSRESPONDER_SUPPORTS(APPLE, METRICS)
     uDNSMetrics metrics;                    // Data used for collecting unicast DNS query metrics.
 #endif
@@ -2538,7 +2541,7 @@ extern const mDNSInterfaceID mDNSInterface_P2P;             // Special value
 extern const mDNSInterfaceID uDNSInterfaceMark;             // Special value
 extern const mDNSInterfaceID mDNSInterface_BLE;             // Special value
 
-#define LocalOnlyOrP2PInterface(INTERFACE)  ((INTERFACE == mDNSInterface_LocalOnly) || (INTERFACE == mDNSInterface_P2P) || (INTERFACE == mDNSInterface_BLE))
+#define LocalOnlyOrP2PInterface(INTERFACE)  (((INTERFACE) == mDNSInterface_LocalOnly) || ((INTERFACE) == mDNSInterface_P2P) || ((INTERFACE) == mDNSInterface_BLE))
 
 extern const mDNSIPPort DiscardPort;
 extern const mDNSIPPort SSHPort;
@@ -3636,13 +3639,13 @@ struct CompileTimeAssertionChecks_mDNS
     char sizecheck_AuthRecord          [(sizeof(AuthRecord)           <=  1168) ? 1 : -1];
     char sizecheck_CacheRecord         [(sizeof(CacheRecord)          <=   232) ? 1 : -1];
     char sizecheck_CacheGroup          [(sizeof(CacheGroup)           <=   232) ? 1 : -1];
-    char sizecheck_DNSQuestion         [(sizeof(DNSQuestion)          <=  1128) ? 1 : -1];
+    char sizecheck_DNSQuestion         [(sizeof(DNSQuestion)          <=  1136) ? 1 : -1];
 
     char sizecheck_ZoneData            [(sizeof(ZoneData)             <=  2000) ? 1 : -1];
     char sizecheck_NATTraversalInfo    [(sizeof(NATTraversalInfo)     <=   200) ? 1 : -1];
     char sizecheck_HostnameInfo        [(sizeof(HostnameInfo)         <=  3050) ? 1 : -1];
     char sizecheck_DNSServer           [(sizeof(DNSServer)            <=   328) ? 1 : -1];
-    char sizecheck_NetworkInterfaceInfo[(sizeof(NetworkInterfaceInfo) <=  8240) ? 1 : -1];
+    char sizecheck_NetworkInterfaceInfo[(sizeof(NetworkInterfaceInfo) <=  8272) ? 1 : -1];
     char sizecheck_ServiceRecordSet    [(sizeof(ServiceRecordSet)     <=  4728) ? 1 : -1];
     char sizecheck_DomainAuthInfo      [(sizeof(DomainAuthInfo)       <=   944) ? 1 : -1];
 #if APPLE_OSX_mDNSResponder

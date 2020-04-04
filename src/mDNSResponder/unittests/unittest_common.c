@@ -117,6 +117,48 @@ mDNSexport void receive_response(const request_state* req, DNSMessage *msg, size
 	mDNSCoreReceive(m, msg, end, &srcaddr, srcport, &primary_v4, dstport, primary_interfaceID);
 }
 
+mDNSexport void receive_suspicious_response_ut(const request_state* req, DNSMessage *msg, size_t msgSize, mDNSOpaque16 suspiciousqid, mDNSBool goodLastQID)
+{
+    mDNS *m = &mDNSStorage;
+    mDNSAddr srcaddr;
+    mDNSIPPort srcport, dstport;
+    const mDNSu8 * end;
+    DNSQuestion *q = (DNSQuestion *)&req->u.queryrecord.op.q;
+    UInt8* data = (UInt8*)msg;
+
+    // Used same values for DNS server as specified during init of unit test
+    srcaddr.type                = mDNSAddrType_IPv4;
+    srcaddr.ip.v4.NotAnInteger    = dns_server_ipv4.NotAnInteger;
+    srcport.NotAnInteger        = client_resp_src_port;
+
+    // Used random value for dstport
+    dstport.NotAnInteger = swap16((mDNSu16)client_resp_dst_port);
+
+    // Set DNS message (that was copied from a WireShark packet)
+    end = (const mDNSu8 *)msg + msgSize;
+
+    // Set socket info that mDNSCoreReceive uses to verify socket context
+    q->LocalSocket->ss.port.NotAnInteger = swap16((mDNSu16)client_resp_dst_port);
+    if (suspiciousqid.NotAnInteger)
+    {
+        q->TargetQID.NotAnInteger = swap16(suspiciousqid.NotAnInteger);
+        if (goodLastQID)
+        {
+            q->LastTargetQID.b[0] = data[0];
+            q->LastTargetQID.b[1] = data[1];
+        }
+        else q->LastTargetQID.NotAnInteger = 0;
+    }
+    else
+    {
+        q->TargetQID.b[0] = data[0];
+        q->TargetQID.b[1] = data[1];
+    }
+
+    // Execute mDNSCoreReceive which copies two DNS records into the cache
+    mDNSCoreReceive(m, msg, end, &srcaddr, srcport, &primary_v4, dstport, primary_interfaceID);
+}
+
 mDNSexport  size_t get_reply_len(char* name, uint16_t rdlen)
 {
 	size_t len = sizeof(DNSServiceFlags);
@@ -156,7 +198,7 @@ mDNSexport void get_ip(const char *const name, struct sockaddr_storage *result)
 }
 
 // The AddDNSServer_ut function adds a dns server to mDNSResponder's list.
-mDNSexport mStatus AddDNSServer_ut(void)
+mDNSexport mStatus AddDNSServerScoped_ut(mDNSInterfaceID interfaceID, ScopeType scoped)
 {
     mDNS *m = &mDNSStorage;
     m->timenow = 0;
@@ -165,7 +207,6 @@ mDNSexport mStatus AddDNSServer_ut(void)
     mDNSAddr    addr;
     mDNSIPPort  port;
     mDNSs32     serviceID      = 0;
-    mDNSu32     scoped         = 0;
     mDNSu32     timeout        = dns_server_timeout;
     mDNSBool    cellIntf       = 0;
     mDNSBool    isExpensive    = 0;
@@ -179,9 +220,48 @@ mDNSexport mStatus AddDNSServer_ut(void)
     addr.type                  = mDNSAddrType_IPv4;
     addr.ip.v4.NotAnInteger    = dns_server_ipv4.NotAnInteger;
     port.NotAnInteger          = client_resp_src_port;
-    mDNS_AddDNSServer(m, &d, primary_interfaceID, serviceID, &addr, port, scoped, timeout,
+    mDNS_AddDNSServer(m, &d, interfaceID, serviceID, &addr, port, scoped, timeout,
                       cellIntf, isExpensive, isConstrained, isCLAT46, resGroupID,
                       reqA, reqAAAA, reqDO);
     mDNS_Unlock(m);
     return mStatus_NoError;
+}
+
+mDNSexport mStatus AddDNSServer_ut(void)
+{
+    return AddDNSServerScoped_ut(primary_interfaceID, kScopeNone);
+}
+
+mDNSexport mStatus  force_uDNS_SetupDNSConfig_ut(mDNS *const m)
+{
+    m->p->LastConfigGeneration = 0;
+    return uDNS_SetupDNSConfig(m);
+}
+
+mDNSexport mStatus verify_cache_addr_order_for_domain_ut(mDNS *const m, mDNSu8* octet, mDNSu32 count, const domainname *const name)
+{
+    mStatus result = mStatus_NoError;
+    const CacheGroup *cg = CacheGroupForName(m, DomainNameHashValue(name), name);
+    if (cg)
+    {
+        mDNSu32 i;
+        CacheRecord **rp = (CacheRecord **)&cg->members;
+        for (i = 0 ; *rp && i < count ; i++ )
+        {
+            if ((*rp)->resrec.rdata->u.ipv4.b[3] != octet[i])
+            {
+                LogInfo ("Octet %d compare failed %d != %d", i, (*rp)->resrec.rdata->u.ipv4.b[3], octet[i]);
+                break;
+            }
+            rp = &(*rp)->next;
+        }
+        if (i != count) result = mStatus_Invalid;
+    }
+    else
+    {
+        LogInfo ("Cache group not found");
+        result = mStatus_Invalid;
+    }
+
+    return result;
 }

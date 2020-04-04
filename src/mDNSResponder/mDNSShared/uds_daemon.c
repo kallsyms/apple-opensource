@@ -541,10 +541,6 @@ mDNSlocal AuthRecord *read_rr_from_ipc_msg(request_state *request, int GetTTL, i
         LogMsg("ERROR: Bad resource record flags (must be one of either kDNSServiceFlagsShared, kDNSServiceFlagsUnique or kDNSServiceFlagsKnownUnique)");
         return NULL;
     }
-
-    rr = (AuthRecord *) callocL("AuthRecord/read_rr_from_ipc_msg", sizeof(AuthRecord) - sizeof(RDataBody) + storage_size);
-    if (!rr) FatalError("ERROR: calloc");
-
     InterfaceID = mDNSPlatformInterfaceIDfromInterfaceIndex(&mDNSStorage, interfaceIndex);
 
     // The registration is scoped to a specific interface index, but the interface is not currently on our list.
@@ -561,6 +557,9 @@ mDNSlocal AuthRecord *read_rr_from_ipc_msg(request_state *request, int GetTTL, i
         return NULL;
 #endif
     }
+    rr = (AuthRecord *) callocL("AuthRecord/read_rr_from_ipc_msg", sizeof(AuthRecord) - sizeof(RDataBody) + storage_size);
+    if (!rr) FatalError("ERROR: calloc");
+
     if (InterfaceID == mDNSInterface_LocalOnly)
         artype = AuthRecordLocalOnly;
     else if (InterfaceID == mDNSInterface_P2P || InterfaceID == mDNSInterface_BLE)

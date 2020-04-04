@@ -103,6 +103,21 @@
     #endif
 #endif
 
+// Feature: No system wake for network access.
+// Radar:   <rdar://problem/28079659&55038229>
+// Enabled: Yes, but only for iOS and watchOS, which shouldn't act as sleep-proxy clients.
+
+#if !defined(MDNSRESPONDER_SUPPORTS_APPLE_NO_WAKE_FOR_NET_ACCESS)
+    #if (!defined(TARGET_OS_IOS) || !defined(TARGET_OS_WATCH))
+        #error "Expected TARGET_OS_IOS and TARGET_OS_WATCH to be defined."
+    #endif
+    #if (TARGET_OS_IOS || TARGET_OS_WATCH)
+        #define MDNSRESPONDER_SUPPORTS_APPLE_NO_WAKE_FOR_NET_ACCESS 1
+    #else
+        #define MDNSRESPONDER_SUPPORTS_APPLE_NO_WAKE_FOR_NET_ACCESS 0
+    #endif
+#endif
+
 // Feature: Support for having finer granularity of log redaction, by using os_log based-log routine.
 // Radar:   <rdar://problem/42814956>
 // Enabled: Yes.

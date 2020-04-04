@@ -1973,7 +1973,7 @@ static CLIOption		kXPCSendOpts[] =
 };
 #endif	// TARGET_OS_DARWIN
 
-#if ( MDNSRESPONDER_PROJECT )
+#if( MDNSRESPONDER_PROJECT )
 //===========================================================================================================================
 //	InterfaceMonitor
 //===========================================================================================================================
@@ -2002,6 +2002,7 @@ static CLIOption		kDNSProxyOpts[] =
 	StringOption(      'o', "outputInterface", &gDNSProxy_OutputInterface, "name or index", "Interface to forward queries over. Use '0' for primary interface. (default: 0)", false ),
 	CLI_OPTION_END()
 };
+
 #endif	// MDNSRESPONDER_PROJECT
 
 //===========================================================================================================================
@@ -2070,7 +2071,7 @@ static CLIOption		kGlobalOpts[] =
 	Command( "dnsconfig",			NULL,					kDNSConfigOpts,			"Add/remove a supplemental resolver entry to/from the system's DNS configuration.", true ),
 	Command( "xpcsend",				XPCSendCmd,				kXPCSendOpts,			"Sends a message to an XPC service.", true ),
 #endif
-#if ( MDNSRESPONDER_PROJECT )
+#if( MDNSRESPONDER_PROJECT )
 	Command( "interfaceMonitor",	InterfaceMonitorCmd,	kInterfaceMonitorOpts,	"mDNSResponder's interface monitor.", true ),
 	Command( "dnsproxy",			DNSProxyCmd,			kDNSProxyOpts,			"Enables mDNSResponder's DNS proxy.", true ),
 #endif
@@ -14520,6 +14521,7 @@ static Boolean expensiveConstrainedEndsWith( const char *str, const char *suffix
 //===========================================================================================================================
 //    ExpensiveConstrainedTestCmd
 //===========================================================================================================================
+
 static void ExpensiveConstrainedTestCmd( void )
 {
     OSStatus                        err;
@@ -15356,7 +15358,7 @@ static Boolean expensiveConstrainedEndsWith( const char *str, const char *suffix
 }
 
 //===========================================================================================================================
-//    RegistrationTestCmd
+//	RegistrationTestCmd
 //===========================================================================================================================
 
 typedef struct RegistrationSubtest		RegistrationSubtest;

@@ -1827,7 +1827,7 @@ mDNSexport mDNSBool LocalOnlyRecordAnswersQuestion(AuthRecord *const ar, const D
     if (rr->InterfaceID &&
         q->InterfaceID != mDNSInterface_LocalOnly &&
         ((q->InterfaceID && rr->InterfaceID != q->InterfaceID) ||
-        (!q->InterfaceID && rr->InterfaceID != mDNSInterface_LocalOnly))) return(mDNSfalse);
+        (!q->InterfaceID && !LocalOnlyOrP2PInterface(rr->InterfaceID)))) return(mDNSfalse);
 
     // Entries in /etc/hosts are added as LocalOnly resource records. The LocalOnly resource records
     // may have a scope e.g., fe80::1%en0. The question may be scoped or not: the InterfaceID may be set
