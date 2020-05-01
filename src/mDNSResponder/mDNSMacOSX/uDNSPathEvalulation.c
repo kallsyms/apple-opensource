@@ -155,7 +155,7 @@ mDNSexport void mDNSPlatformGetDNSRoutePolicy(DNSQuestion *q, mDNSBool *isBlocke
             }
         }
         
-        if (isUUIDSet && path && (nw_path_get_status(path) == nw_path_status_unsatisfied) && (nw_path_get_reason(path) == nw_path_reason_policy_drop))
+        if (isUUIDSet && path && (nw_path_get_status(path) == nw_path_status_unsatisfied) && (nw_path_get_reason(path) != nw_path_reason_no_route))
             *isBlocked = mDNStrue;
         else
             *isBlocked = mDNSfalse;

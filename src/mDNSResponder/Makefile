@@ -17,7 +17,7 @@
 
 include $(MAKEFILEPATH)/pb_makefiles/platform.make
 
-MVERS = "mDNSResponder-1096.40.7"
+MVERS = "mDNSResponder-1096.60.2"
 
 VER =
 ifneq ($(strip $(GCC_VERSION)),)

@@ -60,5 +60,6 @@ extern mStatus  verify_cache_addr_order_for_domain_ut(mDNS *const m, mDNSu8* oct
 
 // HelperFunctionTest
 extern void mDNSDomainLabelFromCFString_ut(CFStringRef cfs, domainlabel *const namelabel);
+mDNSexport mDNSu32 IndexForInterfaceByName_ut(const char *ifname);
 
 #endif /* UNITTEST_COMMON_H */

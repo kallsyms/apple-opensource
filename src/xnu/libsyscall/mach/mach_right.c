@@ -79,6 +79,8 @@ mach_right_recv_destruct(mach_right_recv_t r, mach_right_send_t *s,
 
 	if (s) {
 		if (r.mrr_name != s->mrs_name) {
+			_os_set_crash_log_cause_and_message(s->mrs_name,
+			    "api misuse: bad send right");
 			__builtin_trap();
 		}
 

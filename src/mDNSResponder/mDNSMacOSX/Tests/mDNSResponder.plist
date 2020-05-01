@@ -1172,33 +1172,6 @@
 		</dict>
 		<dict>
 			<key>TestName</key>
-			<string>XCTests</string>
-			<key>Description</key>
-			<string>mDNSResponder XCTests</string>
-			<key>WorkingDirectory</key>
-			<string>/AppleInternal/XCTests/com.apple.mDNSResponder/</string>
-			<key>AsRoot</key>
-			<false/>
-			<key>RequiresWiFi</key>
-			<true/>
-			<key>Timeout</key>
-			<integer>20</integer>
-			<key>ShowSubtestResults</key>
-			<true/>
-			<key>Command</key>
-			<array>
-				<string>BATS_XCTEST_CMD</string>
-				<string>-NSTreatUnknownArgumentsAsOpen</string>
-				<string>NO</string>
-				<string>-ApplePersistenceIgnoreState</string>
-				<string>YES</string>
-				<string>-XCTest</string>
-				<string>Self</string>
-				<string>Tests.xctest</string>
-			</array>
-		</dict>
-		<dict>
-			<key>TestName</key>
 			<string>Fix Verification #1</string>
 			<key>Description</key>
 			<string>Fix Verification #1</string>
@@ -1236,6 +1209,55 @@
 			<array>
 				<string>/usr/bin/leaks</string>
 				<string>mDNSResponder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>XCTests</string>
+			<key>Description</key>
+			<string>mDNSResponder XCTests</string>
+			<key>WorkingDirectory</key>
+			<string>/AppleInternal/XCTests/com.apple.mDNSResponder/</string>
+			<key>AsRoot</key>
+			<false/>
+			<key>RequiresWiFi</key>
+			<true/>
+			<key>Timeout</key>
+			<integer>20</integer>
+			<key>ShowSubtestResults</key>
+			<true/>
+			<key>Command</key>
+			<array>
+				<string>BATS_XCTEST_CMD</string>
+				<string>-NSTreatUnknownArgumentsAsOpen</string>
+				<string>NO</string>
+				<string>-ApplePersistenceIgnoreState</string>
+				<string>YES</string>
+				<string>-XCTest</string>
+				<string>Self</string>
+				<string>Tests.xctest</string>
+			</array>
+		</dict>
+		<dict>
+			<key>TestName</key>
+			<string>PathEvaluationTest</string>
+			<key>Description</key>
+			<string>PathEvaluationTest from Tests.xctest</string>
+			<key>AsRoot</key>
+			<false/>
+			<key>RequiresWiFi</key>
+			<false/>
+			<key>Timeout</key>
+			<integer>5</integer>
+			<key>IgnoreOutput</key>
+			<false/>
+			<key>Command</key>
+			<array>
+				<string>/usr/local/bin/dnssdutil</string>
+				<string>test</string>
+				<string>xctest</string>
+				<string>-c</string>
+				<string>PathEvaluationTest</string>
 			</array>
 		</dict>
 	</array>

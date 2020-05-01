@@ -44,6 +44,7 @@
 #if( MDNSRESPONDER_PROJECT )
 	#include <dns_services.h>
 	#include "mdns_private.h"
+    #include "TestUtils.h"
 #endif
 
 //===========================================================================================================================
@@ -1777,6 +1778,18 @@ static CLIOption        kExpensiveConstrainedTestOpts[] =
     CLI_OPTION_END()
 };
 
+#if( MDNSRESPONDER_PROJECT )
+static void XCTestCmd( void );
+
+static const char *     gXCTest_Classname        = NULL;
+
+static CLIOption        kXCTestOpts[] =
+{
+    StringOption(      'c', "class", &gXCTest_Classname, "classname", "The classname of the XCTest to run (from /AppleInternal/XCTests/com.apple.mDNSResponder/Tests.xctest)", true ),
+    CLI_OPTION_END()
+};
+#endif
+
 static CLIOption		kTestOpts[] =
 {
 	Command( "gaiperf",        GAIPerfCmd,           kGAIPerfOpts,            "Runs DNSServiceGetAddrInfo() performance tests.", false ),
@@ -1785,7 +1798,10 @@ static CLIOption		kTestOpts[] =
 	Command( "probeconflicts", ProbeConflictTestCmd, kProbeConflictTestOpts,  "Tests various probing conflict scenarios.", false ),
 	Command( "registration",   RegistrationTestCmd,  kRegistrationTestOpts,   "Tests service registrations.", false ),
     Command( "expensive_constrained_updates", ExpensiveConstrainedTestCmd, kExpensiveConstrainedTestOpts, "Tests if the mDNSResponder can handle expensive and constrained property change correctly", false),
-	CLI_OPTION_END()
+#if( MDNSRESPONDER_PROJECT )
+    Command( "xctest",         XCTestCmd,            kXCTestOpts,              "Run a XCTest from /AppleInternal/XCTests/com.apple.mDNSResponder/Tests.xctest.", true ),
+#endif
+    CLI_OPTION_END()
 };
 
 //===========================================================================================================================
@@ -18188,6 +18204,21 @@ static void	_DNSProxyCmdSignalHandler( void *inContext )
 	FPrintF( stdout, "---\n" );
 	FPrintF( stdout, "End time:         %{du:time}\n", &now );
 	exit( 0 );
+}
+
+//===========================================================================================================================
+//    XCTestCmd
+//===========================================================================================================================
+
+static void    XCTestCmd( void )
+{
+    int result = 0;
+    setenv(DNSSDUTIL_XCTEST, DNSSDUTIL_XCTEST, 0);
+    if(!TestUtilsRunXCTestNamed(gXCTest_Classname)) {
+        result = 1;
+    }
+    unsetenv(DNSSDUTIL_XCTEST);
+    exit( result );
 }
 
 #endif	// MDNSRESPONDER_PROJECT

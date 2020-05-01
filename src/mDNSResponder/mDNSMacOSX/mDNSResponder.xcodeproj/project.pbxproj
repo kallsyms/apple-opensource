@@ -276,6 +276,8 @@
 		B7706AAF1DBA9C1800593FD5 /* CNDomainBrowserPathUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = B799209E1DA6BA8E00C6E02B /* CNDomainBrowserPathUtils.m */; };
 		B778EE4D1D51113800C814A2 /* HostnameController.m in Sources */ = {isa = PBXBuildFile; fileRef = B778EE4B1D51113800C814A2 /* HostnameController.m */; };
 		B778EE501D51287100C814A2 /* BonjourSettingsController.m in Sources */ = {isa = PBXBuildFile; fileRef = B778EE4F1D51287100C814A2 /* BonjourSettingsController.m */; };
+		B77CAFCE234EADE5006706B4 /* PathEvaluationTest.m in Sources */ = {isa = PBXBuildFile; fileRef = B77CAFCD234EADE5006706B4 /* PathEvaluationTest.m */; };
+		B77CAFD0234EAE72006706B4 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B77CAFCF234EAE72006706B4 /* NetworkExtension.framework */; };
 		B78A9C30223941A900BFB0C6 /* DNSServiceDiscoveryPref.xib in Resources */ = {isa = PBXBuildFile; fileRef = B78A9C2E223941A900BFB0C6 /* DNSServiceDiscoveryPref.xib */; };
 		B79568351D53F693005E3BED /* DomainBrowser.h in Headers */ = {isa = PBXBuildFile; fileRef = B74EC12B1D494C7200A1D155 /* DomainBrowser.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		B79568361D53F69B005E3BED /* CNDomainBrowserView.h in Headers */ = {isa = PBXBuildFile; fileRef = B7D6CA681D1076C6005E24CF /* CNDomainBrowserView.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -332,6 +334,8 @@
 		B7EEF7EA212613260093828F /* uds_daemon.c in Sources */ = {isa = PBXBuildFile; fileRef = F525E72804AA167501F1CF4D /* uds_daemon.c */; };
 		B7EEF7EC212613D10093828F /* dnsproxy.c in Sources */ = {isa = PBXBuildFile; fileRef = 218E8E4F156D8C0300720DA0 /* dnsproxy.c */; };
 		B7EEF7ED212613D50093828F /* DNSProxySupport.c in Sources */ = {isa = PBXBuildFile; fileRef = 21DED43415702C0F0060B6B9 /* DNSProxySupport.c */; };
+		B7F1FEDE234F89C50081159C /* TestUtils.h in Headers */ = {isa = PBXBuildFile; fileRef = B7F1FEDC234F89C50081159C /* TestUtils.h */; };
+		B7F1FEDF234F89C50081159C /* TestUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = B7F1FEDD234F89C50081159C /* TestUtils.m */; };
 		BD03E88D1AD31278005E8A81 /* SymptomReporter.c in Sources */ = {isa = PBXBuildFile; fileRef = BD03E88C1AD31278005E8A81 /* SymptomReporter.c */; };
 		BD11267121DB1B25006115E6 /* dnssd_server.h in Headers */ = {isa = PBXBuildFile; fileRef = BD11267021DB1AFE006115E6 /* dnssd_server.h */; };
 		BD11267221DB1B29006115E6 /* dnssd_xpc.h in Headers */ = {isa = PBXBuildFile; fileRef = BD11266D21DB1AFE006115E6 /* dnssd_xpc.h */; };
@@ -1029,6 +1033,8 @@
 		B778EE4B1D51113800C814A2 /* HostnameController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = HostnameController.m; path = ../SettingsBundle/HostnameController.m; sourceTree = "<group>"; };
 		B778EE4E1D51287100C814A2 /* BonjourSettingsController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BonjourSettingsController.h; path = ../SettingsBundle/BonjourSettingsController.h; sourceTree = "<group>"; };
 		B778EE4F1D51287100C814A2 /* BonjourSettingsController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = BonjourSettingsController.m; path = ../SettingsBundle/BonjourSettingsController.m; sourceTree = "<group>"; };
+		B77CAFCD234EADE5006706B4 /* PathEvaluationTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PathEvaluationTest.m; sourceTree = "<group>"; };
+		B77CAFCF234EAE72006706B4 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		B78A9C2F223941A900BFB0C6 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/DNSServiceDiscoveryPref.xib; sourceTree = "<group>"; };
 		B78A9C322239485E00BFB0C6 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B799209D1DA6BA8E00C6E02B /* CNDomainBrowserPathUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CNDomainBrowserPathUtils.h; sourceTree = "<group>"; };
@@ -1080,6 +1086,9 @@
 		B7D6CA691D1076C6005E24CF /* CNDomainBrowserView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CNDomainBrowserView.m; sourceTree = "<group>"; };
 		B7D6CA701D1076F3005E24CF /* DomainBrowser.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = DomainBrowser.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7E06CDF2329AA7B0021401F /* LocalOnlyWithInterfacesTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LocalOnlyWithInterfacesTest.m; sourceTree = "<group>"; };
+		B7F1FEDC234F89C50081159C /* TestUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestUtils.h; sourceTree = "<group>"; };
+		B7F1FEDD234F89C50081159C /* TestUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestUtils.m; sourceTree = "<group>"; };
+		B7F1FEEA234FAF0F0081159C /* dnssdutil-entitlements.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "dnssdutil-entitlements.plist"; sourceTree = "<group>"; };
 		BD03E88C1AD31278005E8A81 /* SymptomReporter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SymptomReporter.c; sourceTree = "<group>"; };
 		BD11266D21DB1AFE006115E6 /* dnssd_xpc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dnssd_xpc.h; sourceTree = "<group>"; };
 		BD11266E21DB1AFE006115E6 /* dnssd_xpc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = dnssd_xpc.c; sourceTree = "<group>"; };
@@ -1304,6 +1313,7 @@
 				B7A861A2212B408D00E81CC3 /* Security.framework in Frameworks */,
 				B7EEF7C4212603B20093828F /* SystemConfiguration.framework in Frameworks */,
 				B7A861A9212B411600E81CC3 /* Network.framework in Frameworks */,
+				B77CAFD0234EAE72006706B4 /* NetworkExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1741,6 +1751,7 @@
 				B74BF92D2322E97400E35354 /* SuspiciousReplyTest.m */,
 				B74BF930232701F600E35354 /* CacheOrderTest.m */,
 				B7E06CDF2329AA7B0021401F /* LocalOnlyWithInterfacesTest.m */,
+				B77CAFCD234EADE5006706B4 /* PathEvaluationTest.m */,
 			);
 			path = "Unit Tests";
 			sourceTree = "<group>";
@@ -1904,8 +1915,11 @@
 		BD97754A221D643500F68FFC /* dnssdutil */ = {
 			isa = PBXGroup;
 			children = (
+				B7F1FEEA234FAF0F0081159C /* dnssdutil-entitlements.plist */,
 				BD97754D221D64BF00F68FFC /* DNSMessage.c */,
 				BD97754E221D64BF00F68FFC /* DNSMessage.h */,
+				B7F1FEDC234F89C50081159C /* TestUtils.h */,
+				B7F1FEDD234F89C50081159C /* TestUtils.m */,
 				BD97754B221D643500F68FFC /* dnssdutil.c */,
 			);
 			name = dnssdutil;
@@ -1915,6 +1929,7 @@
 		BD9BA7561EAF929C00658CCF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				B77CAFCF234EAE72006706B4 /* NetworkExtension.framework */,
 				BDA82B8922BF8A7000A31CBE /* libdns_services.tbd */,
 				D448F7AD222DCC0A0069E1D2 /* CoreFoundation.framework */,
 				D448F7AB222DCB5B0069E1D2 /* libarchive.tbd */,
@@ -2122,6 +2137,7 @@
 			files = (
 				BD977550221D64BF00F68FFC /* DNSMessage.h in Headers */,
 				D4A9F60521FA797F0079D0C6 /* dns_sd_private.h in Headers */,
+				B7F1FEDE234F89C50081159C /* TestUtils.h in Headers */,
 				BD2A15B9225ED30C00BEA50A /* mdns_private.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -3223,6 +3239,7 @@
 				D40123922272B7A7006C9BBE /* mdns.c in Sources */,
 				B7EEF7CA2126046A0093828F /* uDNS.c in Sources */,
 				D4F2BB2822CD21CB00234A38 /* posix_utilities.c in Sources */,
+				B77CAFCE234EADE5006706B4 /* PathEvaluationTest.m in Sources */,
 				B7EEF7D82126076F0093828F /* dnssec.c in Sources */,
 				B7EEF7E021260A1F0093828F /* helper-stubs.c in Sources */,
 				B79FA14B211CE8CA00B7861E /* DNSCommon.c in Sources */,
@@ -3276,6 +3293,7 @@
 				BD97754F221D64BF00F68FFC /* DNSMessage.c in Sources */,
 				BD2A15BA225ED31C00BEA50A /* mdns.c in Sources */,
 				BD2A15BB225ED33C00BEA50A /* mdns_object.m in Sources */,
+				B7F1FEDF234F89C50081159C /* TestUtils.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4977,7 +4995,7 @@
 				);
 				INFOPLIST_FILE = "Tests/Unit Tests/Info.plist";
 				INSTALL_PATH = /AppleInternal/XCTests/com.apple.mDNSResponder/;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks /AppleInternal/Developer/Library/Frameworks";
 				MTL_FAST_MATH = YES;
 				OTHER_CFLAGS = (
 					"-DUSE_SYSTEMCONFIGURATION_PRIVATE_HEADERS",
@@ -4990,6 +5008,8 @@
 					WebFilterDNS,
 					"-weak_framework",
 					DeviceToDeviceManager,
+					"-weak_framework",
+					XCTest,
 				);
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"-weak_framework",
@@ -5059,7 +5079,7 @@
 				);
 				INFOPLIST_FILE = "Tests/Unit Tests/Info.plist";
 				INSTALL_PATH = /AppleInternal/XCTests/com.apple.mDNSResponder/;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks /AppleInternal/Developer/Library/Frameworks";
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = (
@@ -5072,6 +5092,8 @@
 					WebFilterDNS,
 					"-weak_framework",
 					DeviceToDeviceManager,
+					"-weak_framework",
+					XCTest,
 				);
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"-weak_framework",
@@ -5490,6 +5512,7 @@
 				HEADER_SEARCH_PATHS = "$(SDKROOT)${SYSTEM_LIBRARY_DIR}/Frameworks/System.framework/PrivateHeaders";
 				INSTALL_PATH = /usr/local/bin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYSTEM_FRAMEWORK_SEARCH_PATHS = "$(inherited) $(SDKROOT)/System/Library/PrivateFrameworks $(PLATFORM_DIR)/Developer/Library/Frameworks $(PLATFORM_DIR)/Developer/AppleInternal/Library/Frameworks";
 				WARNING_CFLAGS = (
 					"-Wall",
 					"-Warc-repeated-use-of-weak",
@@ -5584,6 +5607,7 @@
 				HEADER_SEARCH_PATHS = "$(SDKROOT)${SYSTEM_LIBRARY_DIR}/Frameworks/System.framework/PrivateHeaders";
 				INSTALL_PATH = /usr/local/bin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYSTEM_FRAMEWORK_SEARCH_PATHS = "$(inherited) $(SDKROOT)/System/Library/PrivateFrameworks $(PLATFORM_DIR)/Developer/Library/Frameworks $(PLATFORM_DIR)/Developer/AppleInternal/Library/Frameworks";
 				WARNING_CFLAGS = (
 					"-Wall",
 					"-Warc-repeated-use-of-weak",

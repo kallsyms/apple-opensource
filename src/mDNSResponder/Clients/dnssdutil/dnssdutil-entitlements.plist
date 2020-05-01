@@ -16,5 +16,9 @@
 	<array>
 		<string>preferences.plist</string>
 	</array>
+	<key>com.apple.private.nehelper.privileged</key>
+	<true/>
+	<key>com.apple.networkd_privileged</key>
+	<true/>
 </dict>
 </plist>
