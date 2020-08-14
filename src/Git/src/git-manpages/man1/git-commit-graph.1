@@ -1,0 +1,212 @@
+'\" t
+.\"     Title: git-commit-graph
+.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 02/24/2019
+.\"    Manual: Git Manual
+.\"    Source: Git 2.21.0
+.\"  Language: English
+.\"
+.TH "GIT\-COMMIT\-GRAPH" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+git-commit-graph \- Write and verify Git commit\-graph files
+.SH "SYNOPSIS"
+.sp
+.nf
+\fIgit commit\-graph read\fR [\-\-object\-dir <dir>]
+\fIgit commit\-graph verify\fR [\-\-object\-dir <dir>]
+\fIgit commit\-graph write\fR <options> [\-\-object\-dir <dir>]
+.fi
+.sp
+.SH "DESCRIPTION"
+.sp
+Manage the serialized commit\-graph file\&.
+.SH "OPTIONS"
+.PP
+\-\-object\-dir
+.RS 4
+Use given directory for the location of packfiles and commit\-graph file\&. This parameter exists to specify the location of an alternate that only has the objects directory, not a full
+\fB\&.git\fR
+directory\&. The commit\-graph file is expected to be at
+\fB<dir>/info/commit\-graph\fR
+and the packfiles are expected to be in
+\fB<dir>/pack\fR\&.
+.RE
+.SH "COMMANDS"
+.PP
+\fIwrite\fR
+.RS 4
+Write a commit\-graph file based on the commits found in packfiles\&.
+.sp
+With the
+\fB\-\-stdin\-packs\fR
+option, generate the new commit graph by walking objects only in the specified pack\-indexes\&. (Cannot be combined with
+\fB\-\-stdin\-commits\fR
+or
+\fB\-\-reachable\fR\&.)
+.sp
+With the
+\fB\-\-stdin\-commits\fR
+option, generate the new commit graph by walking commits starting at the commits specified in stdin as a list of OIDs in hex, one OID per line\&. (Cannot be combined with
+\fB\-\-stdin\-packs\fR
+or
+\fB\-\-reachable\fR\&.)
+.sp
+With the
+\fB\-\-reachable\fR
+option, generate the new commit graph by walking commits starting at all refs\&. (Cannot be combined with
+\fB\-\-stdin\-commits\fR
+or
+\fB\-\-stdin\-packs\fR\&.)
+.sp
+With the
+\fB\-\-append\fR
+option, include all commits that are present in the existing commit\-graph file\&.
+.RE
+.PP
+\fIread\fR
+.RS 4
+Read the commit\-graph file and output basic details about it\&. Used for debugging purposes\&.
+.RE
+.PP
+\fIverify\fR
+.RS 4
+Read the commit\-graph file and verify its contents against the object database\&. Used to check for corrupted data\&.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Write a commit\-graph file for the packed commits in your local
+\fB\&.git\fR
+directory\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+$ git commit\-graph write
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Write a commit\-graph file, extending the current commit\-graph file using commits in
+\fB<pack\-index>\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+$ echo <pack\-index> | git commit\-graph write \-\-stdin\-packs
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Write a commit\-graph file containing all reachable commits\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+$ git show\-ref \-s | git commit\-graph write \-\-stdin\-commits
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Write a commit\-graph file containing all commits in the current commit\-graph file along with those reachable from
+\fBHEAD\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+$ git rev\-parse HEAD | git commit\-graph write \-\-stdin\-commits \-\-append
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Read basic information from the commit\-graph file\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+$ git commit\-graph read
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.RE
+.SH "GIT"
+.sp
+Part of the \fBgit\fR(1) suite

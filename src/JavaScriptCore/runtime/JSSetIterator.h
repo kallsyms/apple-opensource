@@ -32,6 +32,8 @@
 namespace JSC {
 
 // Now, it is only used for serialization.
+// FIXME: We should use JSInternalFieldObjectImpl to implement real JSSetIterator used in JSC.
+// Currently, JSC is using final objects to implement SetIterator.
 class JSSetIterator final : public JSCell {
     typedef HashMapBucket<HashMapBucketDataKey> HashMapBucketType;
 public:
@@ -39,9 +41,15 @@ public:
 
     DECLARE_EXPORT_INFO;
 
+    template<typename CellType, SubspaceAccess mode>
+    static IsoSubspace* subspaceFor(VM& vm)
+    {
+        return vm.setIteratorSpace<mode>();
+    }
+
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
     static JSSetIterator* create(VM& vm, Structure* structure, JSSet* iteratedObject, IterationKind kind)
@@ -51,12 +59,12 @@ public:
         return instance;
     }
 
-    ALWAYS_INLINE HashMapBucketType* advanceIter(ExecState* exec)
+    ALWAYS_INLINE HashMapBucketType* advanceIter(JSGlobalObject* globalObject)
     {
         HashMapBucketType* prev = m_iter.get();
         if (!prev)
             return nullptr;
-        VM& vm = exec->vm();
+        VM& vm = getVM(globalObject);
         HashMapBucketType* bucket = m_iter->next();
         while (bucket && bucket->deleted())
             bucket = bucket->next();
@@ -68,16 +76,16 @@ public:
         return bucket;
     }
 
-    bool next(ExecState* exec, JSValue& value)
+    bool next(JSGlobalObject* globalObject, JSValue& value)
     {
-        HashMapBucketType* bucket = advanceIter(exec);
+        HashMapBucketType* bucket = advanceIter(globalObject);
         if (!bucket)
             return false;
 
         if (m_kind == IterateValue || m_kind == IterateKey)
             value = bucket->key();
         else
-            value = createPair(exec, bucket->key(), bucket->key());
+            value = createPair(globalObject, bucket->key(), bucket->key());
         return true;
     }
 
@@ -97,7 +105,7 @@ private:
     }
 
     JS_EXPORT_PRIVATE void finishCreation(VM&, JSSet*);
-    JS_EXPORT_PRIVATE JSValue createPair(CallFrame*, JSValue, JSValue);
+    JS_EXPORT_PRIVATE JSValue createPair(JSGlobalObject*, JSValue, JSValue);
     static void visitChildren(JSCell*, SlotVisitor&);
 
     WriteBarrier<JSSet> m_set;

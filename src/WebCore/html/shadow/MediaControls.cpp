@@ -405,18 +405,24 @@ void MediaControls::updateTextTrackDisplay()
 
     m_textDisplayContainer->updateDisplay();
 }
-    
+
 void MediaControls::textTrackPreferencesChanged()
 {
     closedCaptionTracksChanged();
     if (m_textDisplayContainer)
-        m_textDisplayContainer->updateSizes(true);
+        m_textDisplayContainer->updateSizes(MediaControlTextTrackContainerElement::ForceUpdate::Yes);
 }
 
 void MediaControls::clearTextDisplayContainer()
 {
     if (m_textDisplayContainer)
         m_textDisplayContainer->removeChildren();
+}
+
+void MediaControls::updateTextTrackRepresentationImageIfNeeded()
+{
+    if (m_textDisplayContainer)
+        m_textDisplayContainer->updateTextTrackRepresentationImageIfNeeded();
 }
 
 #endif

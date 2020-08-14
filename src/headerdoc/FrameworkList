@@ -1,0 +1,271 @@
+
+#############
+# Scratch projects:
+#############
+#### /Users/dg/Aperture SDK/Headers	Aperture_SDK
+#### /Users/dg/headerdoc-techpubs/ExampleHeaders/bugsamples/jstest	javascript_DTD_translator_testing
+#### /Users/dg/headerdoc-techpubs/testbed2	testbed2
+#### /Volumes/DropBoxes/DIJON/ManualBaroloHeaders/SceneKit_headers	scenekit
+#### /Users/dg/headerdoc-techpubs/testbed	testbed
+#### /Users/dg/Desktop/jstest	jstest
+#### /Users/dg/Desktop/jstest2	jstest2
+#### /Users/dg/Downloads/IM 2010-12-18	IM
+#### /Users/dg/Desktop/CoreBluetooth.framework	corebluetooth
+
+
+
+#############
+# Stuff that used to be producted through HeaderDoc and no longer is:
+#############
+### /Volumes/DropBoxes/DIJON/OtherHeaders/CoreBluetooth.framework	corebluetooth
+### /Volumes/DropBoxes/DIJON/ManualBaroloHeaders/CoreMedia	CoreMedia
+### /Volumes/DropBoxes/DIJON/ZinHeaders/CoreMIDI.framework	CACoreMIDIRef
+### /Volumes/DropBoxes/DIJON/ZinHeaders/CoreMIDIServer.framework	CACoreMIDIServerRef
+### /Volumes/DropBoxes/DIJON/ZinHeaders/libdispatch	libdispatch_api
+### /Volumes/DropBoxes/DIJON/ZinHeaders/AccessibilityFmwk	accessibility
+### /Volumes/DropBoxes/DIJON/ZinHeaders/KPI	kpi_reference
+
+
+
+#############
+# Retired docs that no longer need to be produced:
+#############
+### /Volumes/DropBoxes/DIJON/ZinHeaders/MessageFmwk	message_framework
+### /Volumes/DropBoxes/DIJON/BaroloHeaders/XgridFoundationFmwk	xgridfoundation_fw
+
+
+
+#############
+# Dubious
+#############
+###### /Volumes/DropBoxes/DIJON/ManualZinHeaders/NSXPC	NSXPC
+###### /Volumes/DropBoxes/DIJON/ManualBaroloHeaders/xpc	XPCServices
+###### /Volumes/DropBoxes/DIJON/ManualBaroloHeaders/IOSurface	IOSurface
+
+#### /Users/dg/security_transforms	sectransforms
+## /Volumes/DropBoxes/DIJON/ZinHeaders/DirectoryServicesFmwk	directory_services
+## /Volumes/DropBoxes/DIJON/ZinHeaders/SystemConfigurationFmwk	sysconfig_fw
+## /Volumes/DropBoxes/DIJON/ZinHeaders/IdentityServices	IdentityServices
+# /Volumes/DropBoxes/DIJON/ZinHeaders/AudioToolbox.framework	CAAudioToolboxRef
+# /Volumes/DropBoxes/DIJON/ZinHeaders/CoreAudio.framework	CACoreAudioReference
+## /usr/include/DNSServiceDiscovery/	dns_sd_mach
+# /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/libdispatch	libdispatch_api
+## /Volumes/DropBoxes/DIJON/LeopardHeaders/KernelFmwk	kernel_fw_leo
+## /Volumes/DropBoxes/DIJON/LeopardHeaders/IOKitFmwk	iokit_fw_leo
+## # /usr/include	misc_headers
+## /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/JavaScriptCoreFmwk	javascriptcore_fw
+#### /Volumes/DropBoxes/DIJON/LeopardHeaders/KernelFmwk	kernel_fw_leo
+#### /Volumes/DropBoxes/DIJON/LeopardHeaders/IOKitFmwk	iokit_fw_leo
+
+
+
+#############
+# Produce these for every release:
+#############
+/Volumes/DropBoxes/DIJON/CabHeaders/AccessibilityFmwk	accessibility
+
+### Temporarily disabled because nothing changed in Cab.
+### /Volumes/DropBoxes/DIJON/ManualCabHeaders/SecurityTransforms	sectransforms
+
+/Volumes/DropBoxes/DIJON/CabHeaders/ServiceManagement_fw	ServiceManagement_fw
+/Volumes/DropBoxes/DIJON/CabHeaders/libkern	libkern
+
+### Temporarily disabled because nothing changed in Cab.
+### /Volumes/DropBoxes/DIJON/CabHeaders/CoreWLAN.framework	corewlan_fw
+/Volumes/DropBoxes/DIJON/CabHeaders/libcache	libcache_api
+
+### Gone in recent Xcode builds.
+### /Volumes/DropBoxes/DIJON/CabHeaders/CPlusTestFmwk	cplustestreference
+
+/Volumes/DropBoxes/DIJON/CabHeaders/DiscRecordingFmwk	discrecording
+/Volumes/DropBoxes/DIJON/CabHeaders/DiscRecordingUIFmwk	discrecording_ui
+/Volumes/DropBoxes/DIJON/CabHeaders/DiskArbitrationFmwk	diskarb
+
+### Removed because there's no HeaderDoc markup.
+### /Volumes/DropBoxes/DIJON/CabHeaders/FSEventsAPI	fsevents_api
+
+/Volumes/DropBoxes/DIJON/CabHeaders/FWAUserLibFmwk	fwauserlib_fw
+/Volumes/DropBoxes/DIJON/CabHeaders/ForceFeedbackFmwk	force_feedback
+/Volumes/DropBoxes/DIJON/CabHeaders/IOBluetoothFmwk	bluetooth_fw
+/Volumes/DropBoxes/DIJON/CabHeaders/IOBluetoothUIFmwk	bluetooth_ui
+/Volumes/DropBoxes/DIJON/CabHeaders/IOKitFmwk	iokit_fw
+/Volumes/DropBoxes/DIJON/CabHeaders/KernelFmwk	kernel_fw
+/Volumes/DropBoxes/DIJON/CabHeaders/LatentSemanticMappingFmwk	lsm_fw
+
+### No more future submissions; deprecated in OS X v10.9.
+### /Volumes/DropBoxes/DIJON/CabHeaders/PubSubFmwk	pubsub_fw
+/Volumes/DropBoxes/DIJON/CabHeaders/notify	darwin_notify
+/Volumes/DropBoxes/DIJON/CabHeaders/dns_sd.h	dns_service_discovery
+
+### Pulled because these frameworks are deprecated.
+### /Volumes/DropBoxes/DIJON/CabHeaders/image_capture_dev	image_capture_dev
+### /Volumes/DropBoxes/DIJON/CabHeaders/image_capture_app	image_capture_app
+/Volumes/DropBoxes/DIJON/CabHeaders/JavaScriptCoreFmwk	javascriptcore_fw
+
+/Volumes/DropBoxes/DIJON/ManualCabHeaders/xpc	XPCServices
+
+### Pulled because this is identical to Zin
+### /Volumes/DropBoxes/DIJON/ManualCabHeaders/IOSurface	IOSurface
+
+
+
+#############
+# Zin
+#############
+### /Volumes/DropBoxes/DIJON/ZinHeaders/AccessibilityFmwk	accessibility
+### /Volumes/DropBoxes/DIJON/ManualZinHeaders/SecurityTransforms	sectransforms
+### /Volumes/DropBoxes/DIJON/ZinHeaders/ServiceManagement_fw	ServiceManagement_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/libkern	libkern
+### /Volumes/DropBoxes/DIJON/ZinHeaders/CoreWLAN.framework	corewlan_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/libcache	libcache_api
+### /Volumes/DropBoxes/DIJON/ZinHeaders/CPlusTestFmwk	cplustestreference
+### /Volumes/DropBoxes/DIJON/ZinHeaders/DiscRecordingFmwk	discrecording
+### /Volumes/DropBoxes/DIJON/ZinHeaders/DiscRecordingUIFmwk	discrecording_ui
+### /Volumes/DropBoxes/DIJON/ZinHeaders/DiskArbitrationFmwk	diskarb
+### /Volumes/DropBoxes/DIJON/ZinHeaders/FSEventsAPI	fsevents_api
+### /Volumes/DropBoxes/DIJON/ZinHeaders/FWAUserLibFmwk	fwauserlib_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/ForceFeedbackFmwk	force_feedback
+### /Volumes/DropBoxes/DIJON/ZinHeaders/IOBluetoothFmwk	bluetooth_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/IOBluetoothUIFmwk	bluetooth_ui
+### /Volumes/DropBoxes/DIJON/ZinHeaders/IOKitFmwk	iokit_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/KernelFmwk	kernel_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/LatentSemanticMappingFmwk	lsm_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/PubSubFmwk	pubsub_fw
+### /Volumes/DropBoxes/DIJON/ZinHeaders/notify	darwin_notify
+### /Volumes/DropBoxes/DIJON/ZinHeaders/dns_sd.h	dns_service_discovery
+### /Volumes/DropBoxes/DIJON/ZinHeaders/image_capture_dev	image_capture_dev
+### /Volumes/DropBoxes/DIJON/ZinHeaders/image_capture_app	image_capture_app
+### /Volumes/DropBoxes/DIJON/ZinHeaders/JavaScriptCoreFmwk	javascriptcore_fw
+
+
+
+
+
+### Barolo
+### /Volumes/DropBoxes/DIJON/BaroloHeaders/xpc	XPCServices
+
+### Snow Leopard
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/ServiceManagement_fw	ServiceManagement_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/libkern	libkern
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/XgridFoundationFmwk	xgridfoundation_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/CoreWLAN.framework	corewlan_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/libcache	libcache_api
+### # /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/libdispatch	libdispatch_api
+### # /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/AccessibilityFmwk	accessibility
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/CPlusTestFmwk	cplustestreference
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/DirectoryServicesFmwk	directory_services
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/DiscRecordingFmwk	discrecording
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/DiscRecordingUIFmwk	discrecording_ui
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/DiskArbitrationFmwk	diskarb
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/FSEventsAPI	fsevents_api
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/FWAUserLibFmwk	fwauserlib_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/ForceFeedbackFmwk	force_feedback
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/IOBluetoothFmwk	bluetooth_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/IOBluetoothUIFmwk	bluetooth_ui
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/IOKitFmwk	iokit_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/KernelFmwk	kernel_fw
+### ## /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/KPI	kpi_reference
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/LatentSemanticMappingFmwk	lsm_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/MessageFmwk	message_framework
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/PubSubFmwk	pubsub_fw
+### ## /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/SystemConfigurationFmwk	sysconfig_fw
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/notify	darwin_notify
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/dns_sd.h	dns_service_discovery
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/image_capture_dev	image_capture_dev
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/image_capture_app	image_capture_app
+### ## /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/IdentityServices	IdentityServices
+### /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/JavaScriptCoreFmwk	javascriptcore_fw
+### # /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/AudioToolbox.framework	CAAudioToolboxRef
+### # /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/CoreAudio.framework	CACoreAudioReference
+### # /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/CoreMIDI.framework	CACoreMIDIRef
+### # /Volumes/DropBoxes/DIJON/SnowLeopardHeaders/CoreMIDIServer.framework	CACoreMIDIServerRef
+### ## /usr/include/DNSServiceDiscovery/	dns_sd_mach
+
+### Leopard
+
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/AccessibilityFmwk	accessibility
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/CPlusTestFmwk	cplustestreference
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/DirectoryServicesFmwk	directory_services
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/DiscRecordingFmwk	discrecording
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/DiscRecordingUIFmwk	discrecording_ui
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/DiskArbitrationFmwk	diskarb
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/FSEventsFmwk	fsevents_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/FWAUserLibFmwk	fwauserlib_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/ForceFeedbackFmwk	force_feedback
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/IOBluetoothFmwk	bluetooth_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/IOBluetoothUIFmwk	bluetooth_ui
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/IOKitFmwk	iokit_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/KernelFmwk	kernel_fw
+### ## /Volumes/DropBoxes/DIJON/LeopardHeaders/KPI	kpi_reference
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/LatentSemanticMappingFmwk	lsm_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/MessageFmwk	message_framework
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/PubSubFmwk	pubsub_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/SystemConfigurationFmwk	sysconfig_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/notify	darwin_notify
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/dns_sd.h	dns_service_discovery
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/image_capture_dev	image_capture_dev
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/image_capture_app	image_capture_app
+### ## /Volumes/DropBoxes/DIJON/LeopardHeaders/IdentityServices	IdentityServices
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/JavaScriptCoreFmwk	javascriptcore_fw
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/AudioToolbox.framework	CAAudioToolboxRef
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/CoreAudio.framework	CACoreAudioReference
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/CoreMIDI.framework	CACoreMIDIRef
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/CoreMIDIServer.framework	CACoreMIDIServerRef
+### /usr/include/DNSServiceDiscovery/	DNSServiceDiscovery
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/cache.h	libcache_api
+### /Volumes/DropBoxes/DIJON/LeopardHeaders/libdispatch	libdispatch_api
+
+
+### Junk
+#/System/Library/Frameworks/Kernel.framework/Headers/IOKit	kernel_iokit
+#/System/Library/Frameworks/Kernel.framework/Headers/libkern	libkern
+#/System/Library/Frameworks/IOKit.framework/Versions/Current/Headers	iokit_fw
+#/System/Library/Frameworks/Security.framework/Headers/	SecurityFramework
+#/System/Library/Frameworks/SystemConfiguration.framework/Headers/	SystemConfigurationFramework
+#/System/Library/Frameworks/ForceFeedback.framework/Headers/	ForceFeedbackFramework
+#/usr/include/DNSServiceDiscovery/	DNSServiceDiscovery
+# /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/KernellibkernFmwkTiger	libkern
+# /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/AccessibilityUniversalAccess	accessibility_ua
+# /Users/dg/WebKit/WebCore/kdom	jsdom
+
+### Tiger
+## /usr/include/notify.h	DropBoxes/DIJONNotify
+## /System/Library/Frameworks/Message.framework/Headers/	message_framework
+## /System/Library/Frameworks/DirectoryService.framework/Headers	directory_services
+## /System/Library/Frameworks/DiskArbitration.framework/Headers	diskarb
+## /KPI_CACHE	kpi_reference
+## /DNSSD	dns_service_discovery
+## /CPlusTestInfo/Headers	cplustestreference
+
+## /Volumes/DropBoxes/DIJON/DiscRecordingTiger/DiscRecording	discrecording
+## /Volumes/DropBoxes/DIJON/DiscRecordingTiger/DiscRecordingUI	discrecording_ui
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/AccessibilityFmwkTiger	accessibility
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/IOBluetoothFmwkTiger	bluetooth_fw-tiger
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/IOBluetoothUIFmwkTiger	bluetooth_ui
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/ForceFeedbackFmwkTiger	force_feedback
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/SysConfigFmwkTiger	sysconfig_fw
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/FWAUserLib	fwauserlib
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/IOKitFmwkTiger	iokit_fw
+## /Volumes/DropBoxes/DIJON/RecentEdits/DatabaseSources/KernelFrameworkTiger	kernel_fw
+##
+## /usr/include	misc_headers
+
+## # /usr/include	misc_headers
+
+## /Users/dg/headerdoc-techpubs/FxPlug	fxplug_api
+
+## /Users/dg/headerdoc-techpubs/javascriptcore_fw	javascriptcore_fw
+
+
+### CoreAudio (Tiger)
+## /System/Library/Frameworks/AudioToolbox.framework	CAAudioToolboxRef
+## /System/Library/Frameworks/CoreAudio.framework	CACoreAudioReference
+## /System/Library/Frameworks/CoreMIDI.framework	CACoreMIDIRef
+## /System/Library/Frameworks/CoreMIDIServer.framework	CACoreMIDIServerRef
+
+## /Users/dg/headerdoc-techpubs/Exampleheaders/perm	permtest
+## /Volumes/dg/perm	permtest
+## /Volumes/DropBoxes/DIJON/perm_test	permtest
+
+
+# /Users/dg/stockheaders/AccessibilityFmwkTiger	accessibility_test

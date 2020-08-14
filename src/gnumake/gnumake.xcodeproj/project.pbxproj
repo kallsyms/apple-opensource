@@ -1,0 +1,373 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		FC90BDDE149FE41D009C78FA /* Install Files */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = FC90BDDF149FE41D009C78FA /* Build configuration list for PBXAggregateTarget "Install Files" */;
+			buildPhases = (
+				FC90BDE3149FE42E009C78FA /* Install Files */,
+			);
+			dependencies = (
+				FC90BDE2149FE42A009C78FA /* PBXTargetDependency */,
+			);
+			name = "Install Files";
+			productName = make;
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		FC90BD86149FDA31009C78FA /* fnmatch.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD7D149FDA31009C78FA /* fnmatch.c */; };
+		FC90BD87149FDA31009C78FA /* glob.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD7F149FDA31009C78FA /* glob.c */; };
+		FC90BDA7149FDAC1009C78FA /* ar.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD88149FDAC1009C78FA /* ar.c */; };
+		FC90BDA8149FDAC1009C78FA /* arscan.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD89149FDAC1009C78FA /* arscan.c */; };
+		FC90BDA9149FDAC1009C78FA /* commands.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD8A149FDAC1009C78FA /* commands.c */; };
+		FC90BDAA149FDAC1009C78FA /* default.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD8C149FDAC1009C78FA /* default.c */; };
+		FC90BDAB149FDAC1009C78FA /* dir.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD8D149FDAC1009C78FA /* dir.c */; };
+		FC90BDAC149FDAC1009C78FA /* expand.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD8E149FDAC1009C78FA /* expand.c */; };
+		FC90BDAD149FDAC1009C78FA /* file.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD8F149FDAC1009C78FA /* file.c */; };
+		FC90BDAE149FDAC1009C78FA /* function.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD90149FDAC1009C78FA /* function.c */; };
+		FC90BDAF149FDAC1009C78FA /* getopt.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD91149FDAC1009C78FA /* getopt.c */; };
+		FC90BDB0149FDAC1009C78FA /* getopt1.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD93149FDAC1009C78FA /* getopt1.c */; };
+		FC90BDB1149FDAC1009C78FA /* hash.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD94149FDAC1009C78FA /* hash.c */; };
+		FC90BDB2149FDAC1009C78FA /* implicit.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD96149FDAC1009C78FA /* implicit.c */; };
+		FC90BDB3149FDAC1009C78FA /* job.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD97149FDAC1009C78FA /* job.c */; };
+		FC90BDB4149FDAC1009C78FA /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD98149FDAC1009C78FA /* main.c */; };
+		FC90BDB5149FDAC1009C78FA /* misc.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD9B149FDAC1009C78FA /* misc.c */; };
+		FC90BDB6149FDAC1009C78FA /* read.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD9C149FDAC1009C78FA /* read.c */; };
+		FC90BDB7149FDAC1009C78FA /* remake.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD9D149FDAC1009C78FA /* remake.c */; };
+		FC90BDB8149FDAC1009C78FA /* remote-stub.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD9E149FDAC1009C78FA /* remote-stub.c */; };
+		FC90BDB9149FDAC1009C78FA /* rule.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BD9F149FDAC1009C78FA /* rule.c */; };
+		FC90BDBA149FDAC1009C78FA /* signame.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BDA1149FDAC1009C78FA /* signame.c */; };
+		FC90BDBB149FDAC1009C78FA /* strcache.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BDA2149FDAC1009C78FA /* strcache.c */; };
+		FC90BDBC149FDAC1009C78FA /* variable.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BDA3149FDAC1009C78FA /* variable.c */; };
+		FC90BDBD149FDAC1009C78FA /* version.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BDA5149FDAC1009C78FA /* version.c */; };
+		FC90BDBE149FDAC1009C78FA /* vpath.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BDA6149FDAC1009C78FA /* vpath.c */; };
+		FC90BDC6149FE031009C78FA /* next.c in Sources */ = {isa = PBXBuildFile; fileRef = FC90BDC5149FE031009C78FA /* next.c */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FC90BDE1149FE42A009C78FA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FC90BD5E149FD967009C78FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FC90BD66149FD967009C78FA;
+			remoteInfo = gnumake;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		FC90BD67149FD967009C78FA /* gnumake */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = gnumake; sourceTree = BUILT_PRODUCTS_DIR; };
+		FC90BD7D149FDA31009C78FA /* fnmatch.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fnmatch.c; sourceTree = "<group>"; };
+		FC90BD7E149FDA31009C78FA /* fnmatch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fnmatch.h; sourceTree = "<group>"; };
+		FC90BD7F149FDA31009C78FA /* glob.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = glob.c; sourceTree = "<group>"; };
+		FC90BD80149FDA31009C78FA /* glob.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = glob.h; sourceTree = "<group>"; };
+		FC90BD88149FDAC1009C78FA /* ar.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ar.c; sourceTree = "<group>"; };
+		FC90BD89149FDAC1009C78FA /* arscan.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = arscan.c; sourceTree = "<group>"; };
+		FC90BD8A149FDAC1009C78FA /* commands.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = commands.c; sourceTree = "<group>"; };
+		FC90BD8B149FDAC1009C78FA /* commands.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = commands.h; sourceTree = "<group>"; };
+		FC90BD8C149FDAC1009C78FA /* default.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = default.c; sourceTree = "<group>"; };
+		FC90BD8D149FDAC1009C78FA /* dir.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = dir.c; sourceTree = "<group>"; };
+		FC90BD8E149FDAC1009C78FA /* expand.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = expand.c; sourceTree = "<group>"; };
+		FC90BD8F149FDAC1009C78FA /* file.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = file.c; sourceTree = "<group>"; };
+		FC90BD90149FDAC1009C78FA /* function.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = function.c; sourceTree = "<group>"; };
+		FC90BD91149FDAC1009C78FA /* getopt.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = getopt.c; sourceTree = "<group>"; };
+		FC90BD92149FDAC1009C78FA /* getopt.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = getopt.h; sourceTree = "<group>"; };
+		FC90BD93149FDAC1009C78FA /* getopt1.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = getopt1.c; sourceTree = "<group>"; };
+		FC90BD94149FDAC1009C78FA /* hash.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = hash.c; sourceTree = "<group>"; };
+		FC90BD95149FDAC1009C78FA /* hash.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hash.h; sourceTree = "<group>"; };
+		FC90BD96149FDAC1009C78FA /* implicit.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = implicit.c; sourceTree = "<group>"; };
+		FC90BD97149FDAC1009C78FA /* job.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = job.c; sourceTree = "<group>"; };
+		FC90BD98149FDAC1009C78FA /* main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		FC90BD99149FDAC1009C78FA /* make.1 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.man; path = make.1; sourceTree = "<group>"; };
+		FC90BD9A149FDAC1009C78FA /* make.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = make.h; sourceTree = "<group>"; };
+		FC90BD9B149FDAC1009C78FA /* misc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = misc.c; sourceTree = "<group>"; };
+		FC90BD9C149FDAC1009C78FA /* read.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = read.c; sourceTree = "<group>"; };
+		FC90BD9D149FDAC1009C78FA /* remake.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = remake.c; sourceTree = "<group>"; };
+		FC90BD9E149FDAC1009C78FA /* remote-stub.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "remote-stub.c"; sourceTree = "<group>"; };
+		FC90BD9F149FDAC1009C78FA /* rule.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = rule.c; sourceTree = "<group>"; };
+		FC90BDA0149FDAC1009C78FA /* rule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = rule.h; sourceTree = "<group>"; };
+		FC90BDA1149FDAC1009C78FA /* signame.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = signame.c; sourceTree = "<group>"; };
+		FC90BDA2149FDAC1009C78FA /* strcache.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = strcache.c; sourceTree = "<group>"; };
+		FC90BDA3149FDAC1009C78FA /* variable.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = variable.c; sourceTree = "<group>"; };
+		FC90BDA4149FDAC1009C78FA /* variable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = variable.h; sourceTree = "<group>"; };
+		FC90BDA5149FDAC1009C78FA /* version.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = version.c; sourceTree = "<group>"; };
+		FC90BDA6149FDAC1009C78FA /* vpath.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = vpath.c; sourceTree = "<group>"; };
+		FC90BDC5149FE031009C78FA /* next.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = next.c; sourceTree = "<group>"; };
+		FC90BDCB149FE18A009C78FA /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
+		FC90BDCC149FE18A009C78FA /* COPYING */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = COPYING; sourceTree = "<group>"; };
+		FC90BDCD149FE18A009C78FA /* filedef.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = filedef.h; sourceTree = "<group>"; };
+		FC90BDCE149FE18A009C78FA /* gnumake.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = gnumake.plist; sourceTree = "<group>"; };
+		FC90BDCF149FE18A009C78FA /* job.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = job.h; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FC90BD64149FD967009C78FA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		FC90BD5C149FD967009C78FA = {
+			isa = PBXGroup;
+			children = (
+				FC90BDCC149FE18A009C78FA /* COPYING */,
+				FC90BDCE149FE18A009C78FA /* gnumake.plist */,
+				FC90BDBF149FDACE009C78FA /* make */,
+				FC90BD79149FDA31009C78FA /* glob */,
+				FC90BD68149FD968009C78FA /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FC90BD68149FD968009C78FA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				FC90BD67149FD967009C78FA /* gnumake */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FC90BD79149FDA31009C78FA /* glob */ = {
+			isa = PBXGroup;
+			children = (
+				FC90BD7D149FDA31009C78FA /* fnmatch.c */,
+				FC90BD7E149FDA31009C78FA /* fnmatch.h */,
+				FC90BD7F149FDA31009C78FA /* glob.c */,
+				FC90BD80149FDA31009C78FA /* glob.h */,
+			);
+			path = glob;
+			sourceTree = "<group>";
+		};
+		FC90BDBF149FDACE009C78FA /* make */ = {
+			isa = PBXGroup;
+			children = (
+				FC90BDC5149FE031009C78FA /* next.c */,
+				FC90BD88149FDAC1009C78FA /* ar.c */,
+				FC90BD89149FDAC1009C78FA /* arscan.c */,
+				FC90BD8A149FDAC1009C78FA /* commands.c */,
+				FC90BD8B149FDAC1009C78FA /* commands.h */,
+				FC90BDCB149FE18A009C78FA /* config.h */,
+				FC90BD8C149FDAC1009C78FA /* default.c */,
+				FC90BD8D149FDAC1009C78FA /* dir.c */,
+				FC90BD8E149FDAC1009C78FA /* expand.c */,
+				FC90BD8F149FDAC1009C78FA /* file.c */,
+				FC90BDCD149FE18A009C78FA /* filedef.h */,
+				FC90BD90149FDAC1009C78FA /* function.c */,
+				FC90BD91149FDAC1009C78FA /* getopt.c */,
+				FC90BD92149FDAC1009C78FA /* getopt.h */,
+				FC90BD93149FDAC1009C78FA /* getopt1.c */,
+				FC90BD94149FDAC1009C78FA /* hash.c */,
+				FC90BD95149FDAC1009C78FA /* hash.h */,
+				FC90BD96149FDAC1009C78FA /* implicit.c */,
+				FC90BD97149FDAC1009C78FA /* job.c */,
+				FC90BDCF149FE18A009C78FA /* job.h */,
+				FC90BD98149FDAC1009C78FA /* main.c */,
+				FC90BD99149FDAC1009C78FA /* make.1 */,
+				FC90BD9A149FDAC1009C78FA /* make.h */,
+				FC90BD9B149FDAC1009C78FA /* misc.c */,
+				FC90BD9C149FDAC1009C78FA /* read.c */,
+				FC90BD9D149FDAC1009C78FA /* remake.c */,
+				FC90BD9E149FDAC1009C78FA /* remote-stub.c */,
+				FC90BD9F149FDAC1009C78FA /* rule.c */,
+				FC90BDA0149FDAC1009C78FA /* rule.h */,
+				FC90BDA1149FDAC1009C78FA /* signame.c */,
+				FC90BDA2149FDAC1009C78FA /* strcache.c */,
+				FC90BDA3149FDAC1009C78FA /* variable.c */,
+				FC90BDA4149FDAC1009C78FA /* variable.h */,
+				FC90BDA5149FDAC1009C78FA /* version.c */,
+				FC90BDA6149FDAC1009C78FA /* vpath.c */,
+			);
+			name = make;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		FC90BD66149FD967009C78FA /* gnumake */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FC90BD71149FD968009C78FA /* Build configuration list for PBXNativeTarget "gnumake" */;
+			buildPhases = (
+				FC90BD63149FD967009C78FA /* Sources */,
+				FC90BD64149FD967009C78FA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = gnumake;
+			productName = gnumake;
+			productReference = FC90BD67149FD967009C78FA /* gnumake */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FC90BD5E149FD967009C78FA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0420;
+				ORGANIZATIONNAME = "Apple Inc.";
+			};
+			buildConfigurationList = FC90BD61149FD967009C78FA /* Build configuration list for PBXProject "gnumake" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = FC90BD5C149FD967009C78FA;
+			productRefGroup = FC90BD68149FD968009C78FA /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FC90BDDE149FE41D009C78FA /* Install Files */,
+				FC90BD66149FD967009C78FA /* gnumake */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FC90BDE3149FE42E009C78FA /* Install Files */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 8;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Install Files";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+			shellPath = /bin/sh;
+			shellScript = ". \"$PROJECT_DIR\"/xcodescripts/install-files.sh";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FC90BD63149FD967009C78FA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FC90BD86149FDA31009C78FA /* fnmatch.c in Sources */,
+				FC90BD87149FDA31009C78FA /* glob.c in Sources */,
+				FC90BDA7149FDAC1009C78FA /* ar.c in Sources */,
+				FC90BDA8149FDAC1009C78FA /* arscan.c in Sources */,
+				FC90BDA9149FDAC1009C78FA /* commands.c in Sources */,
+				FC90BDAA149FDAC1009C78FA /* default.c in Sources */,
+				FC90BDAB149FDAC1009C78FA /* dir.c in Sources */,
+				FC90BDAC149FDAC1009C78FA /* expand.c in Sources */,
+				FC90BDAD149FDAC1009C78FA /* file.c in Sources */,
+				FC90BDAE149FDAC1009C78FA /* function.c in Sources */,
+				FC90BDAF149FDAC1009C78FA /* getopt.c in Sources */,
+				FC90BDB0149FDAC1009C78FA /* getopt1.c in Sources */,
+				FC90BDB1149FDAC1009C78FA /* hash.c in Sources */,
+				FC90BDB2149FDAC1009C78FA /* implicit.c in Sources */,
+				FC90BDB3149FDAC1009C78FA /* job.c in Sources */,
+				FC90BDB4149FDAC1009C78FA /* main.c in Sources */,
+				FC90BDB5149FDAC1009C78FA /* misc.c in Sources */,
+				FC90BDB6149FDAC1009C78FA /* read.c in Sources */,
+				FC90BDB7149FDAC1009C78FA /* remake.c in Sources */,
+				FC90BDB8149FDAC1009C78FA /* remote-stub.c in Sources */,
+				FC90BDB9149FDAC1009C78FA /* rule.c in Sources */,
+				FC90BDBA149FDAC1009C78FA /* signame.c in Sources */,
+				FC90BDBB149FDAC1009C78FA /* strcache.c in Sources */,
+				FC90BDBC149FDAC1009C78FA /* variable.c in Sources */,
+				FC90BDBD149FDAC1009C78FA /* version.c in Sources */,
+				FC90BDBE149FDAC1009C78FA /* vpath.c in Sources */,
+				FC90BDC6149FE031009C78FA /* next.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FC90BDE2149FE42A009C78FA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FC90BD66149FD967009C78FA /* gnumake */;
+			targetProxy = FC90BDE1149FE42A009C78FA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		FC90BD70149FD968009C78FA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COPY_PHASE_STRIP = YES;
+				CURRENT_PROJECT_VERSION = "$(RC_ProjectSourceVersion)";
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					HAVE_CONFIG_H,
+					USE_POSIX_SPAWN,
+					"INCLUDEDIR=\\\"/usr/include\\\"",
+					"LIBDIR=\\\"/usr/lib\\\"",
+					"LOCALEDIR=\\\"/usr/share/locale\\\"",
+				);
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(PROJECT_DIR)",
+					"$(PROJECT_DIR)/glob",
+				);
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		FC90BD73149FD968009C78FA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INSTALL_PATH = "$(DEVELOPER_DIR)/usr/bin";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		FC90BDE0149FE41D009C78FA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FC90BD61149FD967009C78FA /* Build configuration list for PBXProject "gnumake" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FC90BD70149FD968009C78FA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FC90BD71149FD968009C78FA /* Build configuration list for PBXNativeTarget "gnumake" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FC90BD73149FD968009C78FA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FC90BDDF149FE41D009C78FA /* Build configuration list for PBXAggregateTarget "Install Files" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FC90BDE0149FE41D009C78FA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = FC90BD5E149FD967009C78FA /* Project object */;
+}

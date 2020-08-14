@@ -2543,7 +2543,7 @@ pmap_pages_reclaim(
 				    && ((*tte_p & ARM_TTE_TYPE_MASK) == ARM_TTE_TYPE_TABLE)) {
 					pte_p = (pt_entry_t *) ttetokv(*tte_p);
 					bpte = &pte_p[pte_index(pmap, pt_attr, va)];
-					epte = bpte + PAGE_SIZE / sizeof(pt_entry_t);
+					epte = bpte + pt_attr_leaf_size(pt_attr) / sizeof(pt_entry_t);
 					/*
 					 * Use PMAP_OPTIONS_REMOVE to clear any
 					 * "compressed" markers and update the
@@ -3923,7 +3923,7 @@ __unused pte_to_xprr_perm(pt_entry_t pte)
 	case APRR_USER_RW_INDEX:  return XPRR_USER_RW_PERM;
 	case APRR_PPL_RX_INDEX:   return XPRR_PPL_RX_PERM;
 	case APRR_KERN_RX_INDEX:  return XPRR_KERN_RX_PERM;
-	case APRR_PPL_RO_INDEX:   return XPRR_PPL_RO_PERM;
+	case APRR_USER_XO_INDEX:  return XPRR_USER_XO_PERM;
 	case APRR_KERN_RO_INDEX:  return XPRR_KERN_RO_PERM;
 	case APRR_KERN0_RX_INDEX: return XPRR_KERN0_RO_PERM;
 	case APRR_KERN0_RO_INDEX: return XPRR_KERN0_RO_PERM;
@@ -3951,7 +3951,7 @@ xprr_perm_to_aprr_index(uint64_t perm)
 	case XPRR_USER_RW_PERM:  return APRR_USER_RW_INDEX;
 	case XPRR_PPL_RX_PERM:   return APRR_PPL_RX_INDEX;
 	case XPRR_KERN_RX_PERM:  return APRR_KERN_RX_INDEX;
-	case XPRR_PPL_RO_PERM:   return APRR_PPL_RO_INDEX;
+	case XPRR_USER_XO_PERM:  return APRR_USER_XO_INDEX;
 	case XPRR_KERN_RO_PERM:  return APRR_KERN_RO_INDEX;
 	case XPRR_KERN0_RX_PERM: return APRR_KERN0_RO_INDEX;
 	case XPRR_KERN0_RO_PERM: return APRR_KERN0_RO_INDEX;
@@ -4643,8 +4643,18 @@ pmap_static_allocations_done(void)
 	monitor_start_pa = BootArgs->topOfKernelData;
 	monitor_end_pa = BootArgs->topOfKernelData + BOOTSTRAP_TABLE_SIZE;
 
-	/* The bootstrap page tables are mapped RO at boostrap. */
-	pa_set_range_xprr_perm(monitor_start_pa, monitor_end_pa, XPRR_KERN_RO_PERM, XPRR_PPL_RO_PERM);
+	/*
+	 * The bootstrap page tables are mapped RO at boostrap.
+	 *
+	 * Note that this function call requests switching XPRR permissions from
+	 * XPRR_KERN_RO_PERM to XPRR_KERN_RO_PERM. Whilst this may seem redundant,
+	 * pa_set_range_xprr_perm() does other things too, such as calling
+	 * pa_set_range_monitor() on the requested address range and performing a number
+	 * of integrity checks on the PTEs. We should still
+	 * call this function for all PPL-owned memory, regardless of whether
+	 * permissions are required to be changed or not.
+	 */
+	pa_set_range_xprr_perm(monitor_start_pa, monitor_end_pa, XPRR_KERN_RO_PERM, XPRR_KERN_RO_PERM);
 
 	monitor_start_pa = BootArgs->topOfKernelData + BOOTSTRAP_TABLE_SIZE;
 	monitor_end_pa = avail_start;
@@ -4652,10 +4662,20 @@ pmap_static_allocations_done(void)
 	/* The other bootstrap allocations are mapped RW at bootstrap. */
 	pa_set_range_xprr_perm(monitor_start_pa, monitor_end_pa, XPRR_KERN_RW_PERM, XPRR_PPL_RW_PERM);
 
-	/* The RO page tables are mapped RW at bootstrap. */
+	/*
+	 * The RO page tables are mapped RW at bootstrap and remain RW after the call
+	 * to pa_set_range_xprr_perm(). We do this, as opposed to using XPRR_PPL_RW_PERM,
+	 * to work around a functional issue on H11 devices where CTRR shifts the APRR
+	 * lookup table index to USER_XO before APRR is applied, hence causing the hardware
+	 * to believe we are dealing with an user XO page upon performing a translation.
+	 *
+	 * Note that this workaround does not pose a security risk, because the RO
+	 * page tables still remain read-only, due to KTRR/CTRR, and further protecting
+	 * them would be unnecessary.
+	 */
 	monitor_start_pa = kvtophys((vm_offset_t)&ropagetable_begin);
 	monitor_end_pa = monitor_start_pa + ((vm_offset_t)&ropagetable_end - (vm_offset_t)&ropagetable_begin);
-	pa_set_range_xprr_perm(monitor_start_pa, monitor_end_pa, XPRR_KERN_RW_PERM, XPRR_PPL_RW_PERM);
+	pa_set_range_xprr_perm(monitor_start_pa, monitor_end_pa, XPRR_KERN_RW_PERM, XPRR_KERN_RW_PERM);
 
 	monitor_start_pa = kvtophys(segPPLDATAB);
 	monitor_end_pa = monitor_start_pa + segSizePPLDATA;
@@ -4701,14 +4721,14 @@ pmap_static_allocations_done(void)
 		monitor_start_pa = kvtophys(segPPLDATACONSTB);
 		monitor_end_pa = monitor_start_pa + segSizePPLDATACONST;
 
-		pa_set_range_xprr_perm(monitor_start_pa, monitor_end_pa, XPRR_KERN_RO_PERM, XPRR_PPL_RO_PERM);
+		pa_set_range_xprr_perm(monitor_start_pa, monitor_end_pa, XPRR_KERN_RO_PERM, XPRR_KERN_RO_PERM);
 	}
 
 	/*
 	 * Mark the original physical aperture mapping for the PPL stack pages RO as an additional security
 	 * precaution.  The real RW mappings are at a different location with guard pages.
 	 */
-	pa_set_range_xprr_perm(pmap_stacks_start_pa, pmap_stacks_end_pa, XPRR_PPL_RW_PERM, XPRR_PPL_RO_PERM);
+	pa_set_range_xprr_perm(pmap_stacks_start_pa, pmap_stacks_end_pa, XPRR_PPL_RW_PERM, XPRR_KERN_RO_PERM);
 }
 
 
@@ -5150,6 +5170,11 @@ pmap_create_options_internal(
 	if ((p = pmap_alloc_pmap()) == PMAP_NULL) {
 		return PMAP_NULL;
 	}
+
+	if (ledger) {
+		pmap_ledger_validate(ledger);
+		pmap_ledger_retain(ledger);
+	}
 #else
 	/*
 	 *	Allocate a pmap struct from the pmap_zone.  Then allocate
@@ -5159,6 +5184,8 @@ pmap_create_options_internal(
 		return PMAP_NULL;
 	}
 #endif
+
+	p->ledger = ledger;
 
 	if (flags & PMAP_CREATE_64BIT) {
 		p->min = MACH_VM_MIN_ADDRESS;
@@ -5192,14 +5219,6 @@ pmap_create_options_internal(
 	}
 
 
-#if XNU_MONITOR
-	if (ledger) {
-		pmap_ledger_validate(ledger);
-		pmap_ledger_retain(ledger);
-	}
-#endif /* XNU_MONITOR */
-
-	p->ledger = ledger;
 
 	PMAP_LOCK_INIT(p);
 	memset((void *) &p->stats, 0, sizeof(p->stats));
@@ -6144,6 +6163,13 @@ pmap_remove_range_options(
 	uint64_t        num_compressed, num_alt_compressed;
 
 	PMAP_ASSERT_LOCKED(pmap);
+
+	const pt_attr_t * const pt_attr = pmap_get_pt_attr(pmap);
+	uint64_t pmap_page_size = pt_attr_leaf_size(pt_attr);
+
+	if (__improbable((uintptr_t)epte > (((uintptr_t)bpte + pmap_page_size) & ~(pmap_page_size - 1)))) {
+		panic("%s: PTE range [%p, %p) in pmap %p crosses page table boundary", __func__, bpte, epte, pmap);
+	}
 
 	num_removed = 0;
 	num_unwired = 0;
@@ -7095,8 +7121,8 @@ pmap_protect_options_internal(
 	boolean_t        should_have_removed = FALSE;
 	bool             need_strong_sync = false;
 
-	if (__improbable(end < start)) {
-		panic("%s called with bogus range: %p, %p", __func__, (void*)start, (void*)end);
+	if (__improbable((end < start) || (end > ((start + pt_attr_twig_size(pt_attr)) & ~pt_attr_twig_offmask(pt_attr))))) {
+		panic("%s: invalid address range %p, %p", __func__, (void*)start, (void*)end);
 	}
 
 #if DEVELOPMENT || DEBUG
@@ -7294,13 +7320,14 @@ pmap_protect_options_internal(
 			pte_set_was_writeable(tmplate, false);
 
 #if __APRR_SUPPORTED__
-			if (__improbable(is_pte_xprr_protected(spte) && (pte_to_xprr_perm(spte) != XPRR_USER_JIT_PERM))) {
+			if (__improbable(is_pte_xprr_protected(spte) && (pte_to_xprr_perm(spte) != XPRR_USER_JIT_PERM)
+			    && (pte_to_xprr_perm(spte) != XPRR_USER_XO_PERM))) {
 				/* Only test for PPL protection here,  User-JIT mappings may be mutated by this function. */
 				panic("%s: modifying a PPL mapping pte_p=%p pmap=%p prot=%d options=%u, pte=0x%llx, tmplate=0x%llx",
 				    __func__, pte_p, pmap, prot, options, (uint64_t)spte, (uint64_t)tmplate);
 			}
 
-			if (__improbable(is_pte_xprr_protected(tmplate))) {
+			if (__improbable(is_pte_xprr_protected(tmplate) && (pte_to_xprr_perm(tmplate) != XPRR_USER_XO_PERM))) {
 				panic("%s: creating an xPRR mapping pte_p=%p pmap=%p prot=%d options=%u, pte=0x%llx, tmplate=0x%llx",
 				    __func__, pte_p, pmap, prot, options, (uint64_t)spte, (uint64_t)tmplate);
 			}
@@ -8087,12 +8114,11 @@ Pmap_enter_loop:
 #if XNU_MONITOR
 		if (!pmap_ppl_disable && (wimg_bits & PP_ATTR_MONITOR)) {
 			uint64_t xprr_perm = pte_to_xprr_perm(pte);
-			pte &= ~ARM_PTE_XPRR_MASK;
 			switch (xprr_perm) {
 			case XPRR_KERN_RO_PERM:
-				pte |= xprr_perm_to_pte(XPRR_PPL_RO_PERM);
 				break;
 			case XPRR_KERN_RW_PERM:
+				pte &= ~ARM_PTE_XPRR_MASK;
 				pte |= xprr_perm_to_pte(XPRR_PPL_RW_PERM);
 				break;
 			default:

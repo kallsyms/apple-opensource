@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OpenSourceProject</key>
+	<string>libgit2</string>
+	<key>OpenSourceVersion</key>
+	<string>0.27.7</string>
+	<key>OpenSourceWebsiteURL</key>
+	<string>http://libgit2.github.com</string>
+	<key>OpenSourceURL</key>
+	<string>https://github.com/libgit2/libgit2/archive/v0.27.7.tar.gz</string>
+	<key>OpenSourceSHA1</key>
+	<string>1898564266b4672ac3a1e98e9ce5a57bd1cd48c0</string>
+	<key>OpenSourceImportDate</key>
+	<string>2018-11-15</string>
+	<key>OpenSourceLicense</key>
+	<string>GPL</string>
+</dict>
+</plist>

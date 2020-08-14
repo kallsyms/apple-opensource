@@ -1,0 +1,46 @@
+--- configure.orig	2018-12-10 13:16:03.000000000 -0800
++++ configure	2018-12-10 13:17:00.000000000 -0800
+@@ -24507,8 +24507,8 @@ $as_echo_n "checking perl version... " >
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PERL_VERSION" >&5
+ $as_echo "$PERL_VERSION" >&6; }
+     if test "$PERL_VERSION" -ge "5008000"; then
+-      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts`"
+-      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts`"
++      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts | sed 's:-arch i386::'`"
++      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts | sed 's:-arch i386::'`"
+       SWIG_PL_LINK="`
+   input_flags="$SWIG_PL_LINK"
+   output_flags=""
+@@ -25016,8 +25016,8 @@ $as_echo_n "checking perl version... " >
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PERL_VERSION" >&5
+ $as_echo "$PERL_VERSION" >&6; }
+     if test "$PERL_VERSION" -ge "5008000"; then
+-      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts`"
+-      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts`"
++      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts | sed 's:-arch i386::'`"
++      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts | sed 's:-arch i386::'`"
+       SWIG_PL_LINK="`
+   input_flags="$SWIG_PL_LINK"
+   output_flags=""
+@@ -25525,8 +25525,8 @@ $as_echo_n "checking perl version... " >
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PERL_VERSION" >&5
+ $as_echo "$PERL_VERSION" >&6; }
+     if test "$PERL_VERSION" -ge "5008000"; then
+-      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts`"
+-      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts`"
++      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts | sed 's:-arch i386::'`"
++      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts | sed 's:-arch i386::'`"
+       SWIG_PL_LINK="`
+   input_flags="$SWIG_PL_LINK"
+   output_flags=""
+@@ -26037,8 +26037,8 @@ $as_echo_n "checking perl version... " >
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PERL_VERSION" >&5
+ $as_echo "$PERL_VERSION" >&6; }
+     if test "$PERL_VERSION" -ge "5008000"; then
+-      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts`"
+-      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts`"
++      SWIG_PL_INCLUDES="\$(SWIG_INCLUDES) `$PERL -MExtUtils::Embed -e ccopts | sed 's:-arch i386::'`"
++      SWIG_PL_LINK="`$PERL -MExtUtils::Embed -e ldopts | sed 's:-arch i386::'`"
+       SWIG_PL_LINK="`
+   input_flags="$SWIG_PL_LINK"
+   output_flags=""

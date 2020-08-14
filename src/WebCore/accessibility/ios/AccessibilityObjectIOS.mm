@@ -47,7 +47,7 @@ bool AccessibilityObject::fileUploadButtonReturnsValueInTitle() const
     return false;
 }
 
-void AccessibilityObject::overrideAttachmentParent(AccessibilityObject*)
+void AccessibilityObject::overrideAttachmentParent(AXCoreObject*)
 {
 }
     
@@ -77,7 +77,7 @@ AccessibilityObjectInclusion AccessibilityObject::accessibilityPlatformIncludesO
 
 bool AccessibilityObject::hasTouchEventListener() const
 {
-    for (auto* node = this->node(); node; node = node->parentNode()) {
+    for (auto* node = this->node(); node; node = node->parentInComposedTree()) {
         if (node->hasEventListeners(eventNames().touchstartEvent) || node->hasEventListeners(eventNames().touchendEvent))
             return true;
     }

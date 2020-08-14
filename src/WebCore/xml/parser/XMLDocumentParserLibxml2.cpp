@@ -39,11 +39,14 @@
 #include "HTMLEntityParser.h"
 #include "HTMLHtmlElement.h"
 #include "HTMLTemplateElement.h"
+#include "HTTPParsers.h"
 #include "InlineClassicScript.h"
+#include "MIMETypeRegistry.h"
 #include "PendingScript.h"
 #include "ProcessingInstruction.h"
 #include "ResourceError.h"
 #include "ResourceResponse.h"
+#include "SVGElement.h"
 #include "ScriptElement.h"
 #include "ScriptSourceCode.h"
 #include "Settings.h"
@@ -92,7 +95,7 @@ class PendingCallbacks {
 public:
     void appendStartElementNSCallback(const xmlChar* xmlLocalName, const xmlChar* xmlPrefix, const xmlChar* xmlURI, int numNamespaces, const xmlChar** namespaces, int numAttributes, int numDefaulted, const xmlChar** attributes)
     {
-        auto callback = std::make_unique<PendingStartElementNSCallback>();
+        auto callback = makeUnique<PendingStartElementNSCallback>();
 
         callback->xmlLocalName = xmlStrdup(xmlLocalName);
         callback->xmlPrefix = xmlStrdup(xmlPrefix);
@@ -122,12 +125,12 @@ public:
 
     void appendEndElementNSCallback()
     {
-        m_callbacks.append(std::make_unique<PendingEndElementNSCallback>());
+        m_callbacks.append(makeUnique<PendingEndElementNSCallback>());
     }
 
     void appendCharactersCallback(const xmlChar* s, int len)
     {
-        auto callback = std::make_unique<PendingCharactersCallback>();
+        auto callback = makeUnique<PendingCharactersCallback>();
 
         callback->s = xmlStrndup(s, len);
         callback->len = len;
@@ -137,7 +140,7 @@ public:
 
     void appendProcessingInstructionCallback(const xmlChar* target, const xmlChar* data)
     {
-        auto callback = std::make_unique<PendingProcessingInstructionCallback>();
+        auto callback = makeUnique<PendingProcessingInstructionCallback>();
 
         callback->target = xmlStrdup(target);
         callback->data = xmlStrdup(data);
@@ -147,7 +150,7 @@ public:
 
     void appendCDATABlockCallback(const xmlChar* s, int len)
     {
-        auto callback = std::make_unique<PendingCDATABlockCallback>();
+        auto callback = makeUnique<PendingCDATABlockCallback>();
 
         callback->s = xmlStrndup(s, len);
         callback->len = len;
@@ -157,7 +160,7 @@ public:
 
     void appendCommentCallback(const xmlChar* s)
     {
-        auto callback = std::make_unique<PendingCommentCallback>();
+        auto callback = makeUnique<PendingCommentCallback>();
 
         callback->s = xmlStrdup(s);
 
@@ -166,7 +169,7 @@ public:
 
     void appendInternalSubsetCallback(const xmlChar* name, const xmlChar* externalID, const xmlChar* systemID)
     {
-        auto callback = std::make_unique<PendingInternalSubsetCallback>();
+        auto callback = makeUnique<PendingInternalSubsetCallback>();
 
         callback->name = xmlStrdup(name);
         callback->externalID = xmlStrdup(externalID);
@@ -177,7 +180,7 @@ public:
 
     void appendErrorCallback(XMLErrors::ErrorType type, const xmlChar* message, OrdinalNumber lineNumber, OrdinalNumber columnNumber)
     {
-        auto callback = std::make_unique<PendingErrorCallback>();
+        auto callback = makeUnique<PendingErrorCallback>();
 
         callback->message = xmlStrdup(message);
         callback->type = type;
@@ -197,6 +200,7 @@ public:
 
 private:
     struct PendingCallback {
+        WTF_MAKE_STRUCT_FAST_ALLOCATED;
         virtual ~PendingCallback() = default;
         virtual void call(XMLDocumentParser* parser) = 0;
     };
@@ -373,6 +377,19 @@ private:
     unsigned m_currentOffset;
 };
 
+static bool externalEntityMimeTypeAllowedByNosniff(const ResourceResponse& response)
+{
+    ContentTypeOptionsDisposition contentTypeOption = parseContentTypeOptionsHeader(response.httpHeaderField(HTTPHeaderName::XContentTypeOptions));
+    if (contentTypeOption != ContentTypeOptionsNosniff) {
+        // Allow any MIME type without 'X-Content-Type-Options: nosniff' HTTP header.
+        return true;
+    }
+    String mimeType = extractMIMETypeFromMediaType(response.httpHeaderField(HTTPHeaderName::ContentType));
+    if (MIMETypeRegistry::isXMLMIMEType(mimeType) || MIMETypeRegistry::isXMLEntityMIMEType(mimeType))
+        return true;
+    return false;
+}
+
 static inline void setAttributes(Element* element, Vector<Attribute>& attributeVector, ParserContentPolicy parserContentPolicy)
 {
     if (!scriptingContentIsAllowed(parserContentPolicy))
@@ -453,6 +470,11 @@ static void* openFunc(const char* uri)
             options.mode = FetchOptions::Mode::SameOrigin;
             options.credentials = FetchOptions::Credentials::Include;
             cachedResourceLoader->frame()->loader().loadResourceSynchronously(url, ClientCredentialPolicy::MayAskClientForCredentials, options, { }, error, response, data);
+            if (!externalEntityMimeTypeAllowedByNosniff(response)) {
+                data = nullptr;
+                if (Page* page = cachedResourceLoader->document()->page())
+                    page->console().addMessage(MessageSource::Security, MessageLevel::Error, makeString("Did not parse external entity resource at '", url.stringCenterEllipsizedToLength(), "' because non XML External Entity MIME types are not allowed when 'X-Content-Type-Options: nosniff' is given."));
+            }
         }
     }
 
@@ -564,50 +586,22 @@ bool XMLDocumentParser::supportsXMLVersion(const String& version)
 XMLDocumentParser::XMLDocumentParser(Document& document, FrameView* frameView)
     : ScriptableDocumentParser(document)
     , m_view(frameView)
-    , m_pendingCallbacks(std::make_unique<PendingCallbacks>())
+    , m_pendingCallbacks(makeUnique<PendingCallbacks>())
     , m_currentNode(&document)
     , m_scriptStartPosition(TextPosition::belowRangePosition())
 {
 }
 
-XMLDocumentParser::XMLDocumentParser(DocumentFragment& fragment, Element* parentElement, ParserContentPolicy parserContentPolicy)
+XMLDocumentParser::XMLDocumentParser(DocumentFragment& fragment, HashMap<AtomString, AtomString>&& prefixToNamespaceMap, const AtomString& defaultNamespaceURI, ParserContentPolicy parserContentPolicy)
     : ScriptableDocumentParser(fragment.document(), parserContentPolicy)
-    , m_pendingCallbacks(std::make_unique<PendingCallbacks>())
+    , m_pendingCallbacks(makeUnique<PendingCallbacks>())
     , m_currentNode(&fragment)
     , m_scriptStartPosition(TextPosition::belowRangePosition())
     , m_parsingFragment(true)
+    , m_prefixToNamespaceMap(WTFMove(prefixToNamespaceMap))
+    , m_defaultNamespaceURI(defaultNamespaceURI)
 {
     fragment.ref();
-
-    // Add namespaces based on the parent node
-    Vector<Element*> elemStack;
-    while (parentElement) {
-        elemStack.append(parentElement);
-
-        ContainerNode* node = parentElement->parentNode();
-        if (!is<Element>(node))
-            break;
-        parentElement = downcast<Element>(node);
-    }
-
-    if (elemStack.isEmpty())
-        return;
-
-    // FIXME: Share code with isDefaultNamespace() per http://www.whatwg.org/specs/web-apps/current-work/multipage/the-xhtml-syntax.html#parsing-xhtml-fragments
-    for (; !elemStack.isEmpty(); elemStack.removeLast()) {
-        Element* element = elemStack.last();
-        if (element->hasAttributes()) {
-            for (const Attribute& attribute : element->attributesIterator()) {
-                if (attribute.localName() == xmlnsAtom())
-                    m_defaultNamespaceURI = attribute.value();
-                else if (attribute.prefix() == xmlnsAtom())
-                    m_prefixToNamespaceMap.set(attribute.localName(), attribute.value());
-            }
-        }
-    }
-
-    if (m_defaultNamespaceURI.isNull())
-        m_defaultNamespaceURI = parentElement->namespaceURI();
 }
 
 XMLParserContext::~XMLParserContext()
@@ -768,6 +762,8 @@ void XMLDocumentParser::startElementNs(const xmlChar* xmlLocalName, const xmlCha
     if (m_parsingFragment && uri.isNull()) {
         if (!prefix.isNull())
             uri = m_prefixToNamespaceMap.get(prefix);
+        else if (is<SVGElement>(m_currentNode) || localName == SVGNames::svgTag->localName())
+            uri = SVGNames::svgNamespaceURI;
         else
             uri = m_defaultNamespaceURI;
     }
@@ -1328,7 +1324,7 @@ void XMLDocumentParser::doEnd()
         xmlTreeViewer.transformDocumentToTreeView();
     } else if (m_sawXSLTransform) {
         xmlDocPtr doc = xmlDocPtrForString(document()->cachedResourceLoader(), m_originalSourceForTransform.toString(), document()->url().string());
-        document()->setTransformSource(std::make_unique<TransformSource>(doc));
+        document()->setTransformSource(makeUnique<TransformSource>(doc));
 
         document()->setParsing(false); // Make the document think it's done, so it will apply XSL stylesheets.
         document()->applyPendingXSLTransformsNowIfScheduled();

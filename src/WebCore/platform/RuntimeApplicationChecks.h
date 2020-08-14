@@ -41,9 +41,7 @@ inline bool isInWebProcess() { return true; }
 #if PLATFORM(COCOA)
 
 bool isInWebProcess();
-
-WEBCORE_EXPORT void setApplicationSDKVersion(uint32_t);
-WEBCORE_EXPORT uint32_t applicationSDKVersion();
+bool isInNetworkProcess();
 
 WEBCORE_EXPORT void setApplicationBundleIdentifier(const String&);
 String applicationBundleIdentifier();
@@ -86,7 +84,6 @@ WEBCORE_EXPORT bool isWebBookmarksD();
 WEBCORE_EXPORT bool isDumpRenderTree();
 bool isMobileStore();
 bool isSpringBoard();
-WEBCORE_EXPORT bool isWebApp();
 WEBCORE_EXPORT bool isWebProcess();
 WEBCORE_EXPORT bool isIBooks();
 bool isIBooksStorytime();
@@ -103,6 +100,10 @@ WEBCORE_EXPORT bool isDataActivation();
 } // IOSApplication
 
 #endif // PLATFORM(IOS_FAMILY)
+
+#else
+
+inline bool isInNetworkProcess() { return false; }
 
 #endif // PLATFORM(COCOA)
 

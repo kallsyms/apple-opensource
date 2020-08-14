@@ -37,7 +37,7 @@
 
 ALLOW_UNUSED_PARAMETERS_BEGIN
 
-#include <webrtc/api/mediastreaminterface.h>
+#include <webrtc/api/media_stream_interface.h>
 
 ALLOW_UNUSED_PARAMETERS_END
 
@@ -57,8 +57,6 @@ public:
     {
         stop();
     }
-
-    void setSourceTrack(rtc::scoped_refptr<webrtc::VideoTrackInterface>&&);
 
 protected:
     RealtimeIncomingVideoSource(rtc::scoped_refptr<webrtc::VideoTrackInterface>&&, String&&);

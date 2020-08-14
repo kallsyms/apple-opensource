@@ -37,6 +37,7 @@
 #import "WebProcessPool.h"
 #import <sys/sysctl.h>
 #import <wtf/NeverDestroyed.h>
+#import <wtf/Scope.h>
 #import <wtf/spi/darwin/SandboxSPI.h>
 
 namespace WebKit {
@@ -76,7 +77,7 @@ RefPtr<ObjCObjectGraph> WebProcessProxy::transformHandlesToObjects(ObjCObjectGra
         RetainPtr<id> transformObject(id object) const override
         {
             if (auto* handle = dynamic_objc_cast<WKBrowsingContextHandle>(object)) {
-                if (auto* webPageProxy = m_webProcessProxy.webPage(handle.pageID)) {
+                if (auto* webPageProxy = m_webProcessProxy.webPage(handle.pageProxyID)) {
                     ALLOW_DEPRECATED_DECLARATIONS_BEGIN
                     return [WKBrowsingContextController _browsingContextControllerForPageRef:toAPI(webPageProxy)];
                     ALLOW_DEPRECATED_DECLARATIONS_END
@@ -186,25 +187,6 @@ void WebProcessProxy::releaseHighPerformanceGPU()
 {
     LOG(WebGL, "WebProcessProxy::releaseHighPerformanceGPU()");
     HighPerformanceGPUManager::singleton().removeProcessRequiringHighPerformance(this);
-}
-#endif
-
-#if PLATFORM(IOS_FAMILY)
-void WebProcessProxy::processWasUnexpectedlyUnsuspended()
-{
-    if (m_throttler.shouldBeRunnable()) {
-        // The process becoming unsuspended was not unexpected; it likely was notified of its running state
-        // before receiving a processDidResume() message from the UIProcess.
-        return;
-    }
-
-    // The WebProcess was awakened by something other than the UIProcess. Take out an assertion for a
-    // limited duration to allow whatever task needs to be accomplished time to complete.
-    RELEASE_LOG(ProcessSuspension, "%p - WebProcessProxy::processWasUnexpectedlyUnsuspended()", this);
-    auto backgroundActivityTimeoutHandler = [activityToken = m_throttler.backgroundActivityToken(), weakThis = makeWeakPtr(this)] {
-        RELEASE_LOG(ProcessSuspension, "%p - WebProcessProxy::processWasUnexpectedlyUnsuspended() - lambda, background activity timed out", weakThis.get());
-    };
-    m_unexpectedActivityTimer = std::make_unique<WebCore::DeferrableOneShotTimer>(WTFMove(backgroundActivityTimeoutHandler), unexpectedActivityDuration);
 }
 #endif
 

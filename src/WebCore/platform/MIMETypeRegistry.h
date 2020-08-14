@@ -31,6 +31,20 @@
 
 namespace WebCore {
 
+struct MIMETypeRegistryThreadGlobalData {
+    WTF_MAKE_NONCOPYABLE(MIMETypeRegistryThreadGlobalData);
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    MIMETypeRegistryThreadGlobalData(HashSet<String, ASCIICaseInsensitiveHash>&& supportedImageMIMETypesForEncoding)
+        : m_supportedImageMIMETypesForEncoding(supportedImageMIMETypesForEncoding)
+    { }
+
+    const HashSet<String, ASCIICaseInsensitiveHash>& supportedImageMIMETypesForEncoding() const { return m_supportedImageMIMETypesForEncoding; }
+
+private:
+    HashSet<String, ASCIICaseInsensitiveHash> m_supportedImageMIMETypesForEncoding;
+};
+
 class MIMETypeRegistry {
 public:
     WEBCORE_EXPORT static String getMIMETypeForExtension(const String& extension);
@@ -42,6 +56,8 @@ public:
     static Vector<String> getMediaMIMETypesForExtension(const String& extension);
 
     static String getMIMETypeForPath(const String& path);
+
+    static std::unique_ptr<MIMETypeRegistryThreadGlobalData> createMIMETypeRegistryThreadGlobalData();
 
     // Check to see if a MIME type is suitable for being loaded inline as an
     // image (e.g., <img> tags).
@@ -99,6 +115,9 @@ public:
     // Check to see if a MIME type is one where an XML document should be created
     // rather than an HTML document.
     WEBCORE_EXPORT static bool isXMLMIMEType(const String& mimeType);
+
+    // Check to see if a MIME type is for an XML external entity resource.
+    WEBCORE_EXPORT static bool isXMLEntityMIMEType(StringView mimeType);
 
     // Used in page load algorithm to decide whether to display as a text
     // document in a frame. Not a good idea to use elsewhere, because that code

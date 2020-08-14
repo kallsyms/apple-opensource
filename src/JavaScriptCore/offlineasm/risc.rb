@@ -1,4 +1,4 @@
-# Copyright (C) 2011-2018 Apple Inc. All rights reserved.
+# Copyright (C) 2011-2020 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -362,7 +362,7 @@ class Immediate
     end
 end
 
-def riscLowerMalformedImmediates(list, validImmediates)
+def riscLowerMalformedImmediates(list, validImmediates, validLogicalImmediates)
     newList = []
     list.each {
         | node |
@@ -395,6 +395,8 @@ def riscLowerMalformedImmediates(list, validImmediates)
                 else
                     newList << node.riscLowerMalformedImmediatesRecurse(newList, validImmediates)
                 end
+            when "ori", "orh", "orp", "oris", "xori", "xorp", "andi", "andp"
+                newList << node.riscLowerMalformedImmediatesRecurse(newList, validLogicalImmediates)
             else
                 newList << node.riscLowerMalformedImmediatesRecurse(newList, validImmediates)
             end
@@ -465,6 +467,11 @@ def riscLowerMisplacedAddresses(list)
                 newList << Instruction.new(node.codeOrigin,
                                            node.opcode,
                                            riscAsRegisters(newList, postInstructions, node.operands, "i"),
+                                           annotation)
+            when "orh"
+                newList << Instruction.new(node.codeOrigin,
+                                           node.opcode,
+                                           riscAsRegisters(newList, postInstructions, node.operands, "h"),
                                            annotation)
             when "addp", "andp", "lshiftp", "mulp", "negp", "orp", "rshiftp", "urshiftp",
                 "subp", "xorp", /^bp/, /^btp/, /^cp/

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018 Apple Inc. All rights reserved.
+ * Copyright (C) 2017-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -177,12 +177,32 @@ T compileAndRun(Generator&& generator, Arguments... arguments)
     return invoke<T>(compile(WTFMove(generator)), arguments...);
 }
 
+void emitFunctionPrologue(CCallHelpers& jit)
+{
+    jit.emitFunctionPrologue();
+#if CPU(ARM_THUMB2)
+    // MacroAssemblerARMv7 uses r6 as a temporary register, which is a
+    // callee-saved register, see 5.1.1 of the Procedure Call Standard for
+    // the ARM Architecture.
+    // http://infocenter.arm.com/help/topic/com.arm.doc.ihi0042f/IHI0042F_aapcs.pdf
+    jit.push(ARMRegisters::r6);
+#endif
+}
+
+void emitFunctionEpilogue(CCallHelpers& jit)
+{
+#if CPU(ARM_THUMB2)
+    jit.pop(ARMRegisters::r6);
+#endif
+    jit.emitFunctionEpilogue();
+}
+
 void testSimple()
 {
     CHECK_EQ(compileAndRun<int>([] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.move(CCallHelpers::TrustedImm32(42), GPRInfo::returnValueGPR);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     }), 42);
 }
@@ -190,11 +210,11 @@ void testSimple()
 void testGetEffectiveAddress(size_t pointer, ptrdiff_t length, int32_t offset, CCallHelpers::Scale scale)
 {
     CHECK_EQ(compileAndRun<size_t>([=] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.move(CCallHelpers::TrustedImmPtr(bitwise_cast<void*>(pointer)), GPRInfo::regT0);
         jit.move(CCallHelpers::TrustedImmPtr(bitwise_cast<void*>(length)), GPRInfo::regT1);
         jit.getEffectiveAddress(CCallHelpers::BaseIndex(GPRInfo::regT0, GPRInfo::regT1, scale, offset), GPRInfo::returnValueGPR);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     }), pointer + offset + (static_cast<size_t>(1) << static_cast<int>(scale)) * length);
 }
@@ -210,7 +230,7 @@ void testBranchTruncateDoubleToInt32(double val, int32_t expected)
     const bool isBigEndian = false;
 #endif
     CHECK_EQ(compileAndRun<int>([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.subPtr(CCallHelpers::TrustedImm32(stackAlignmentBytes()), MacroAssembler::stackPointerRegister);
         if (isBigEndian) {
             jit.store32(CCallHelpers::TrustedImm32(valAsUInt >> 32),
@@ -232,7 +252,7 @@ void testBranchTruncateDoubleToInt32(double val, int32_t expected)
 
         done.link(&jit);
         jit.addPtr(CCallHelpers::TrustedImm32(stackAlignmentBytes()), MacroAssembler::stackPointerRegister);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     }), expected);
 }
@@ -293,25 +313,180 @@ static Vector<int32_t> int32Operands()
     };
 }
 
+#if CPU(X86_64)
+static Vector<int64_t> int64Operands()
+{
+    return Vector<int64_t> {
+        0,
+        1,
+        -1,
+        2,
+        -2,
+        42,
+        -42,
+        64,
+        std::numeric_limits<int32_t>::max(),
+        std::numeric_limits<int32_t>::min(),
+        std::numeric_limits<int64_t>::max(),
+        std::numeric_limits<int64_t>::min(),
+    };
+}
+#endif
+
+#if CPU(X86_64)
+void testBranchTestBit32RegReg()
+{
+    for (auto value : int32Operands()) {
+        auto test = compile([=] (CCallHelpers& jit) {
+            emitFunctionPrologue(jit);
+
+            auto branch = jit.branchTestBit32(MacroAssembler::NonZero, GPRInfo::argumentGPR0, GPRInfo::argumentGPR1);
+            jit.move(CCallHelpers::TrustedImm32(0), GPRInfo::returnValueGPR);
+            auto done = jit.jump();
+            branch.link(&jit);
+            jit.move(CCallHelpers::TrustedImm32(1), GPRInfo::returnValueGPR);
+            done.link(&jit);
+
+            emitFunctionEpilogue(jit);
+            jit.ret();
+        });
+
+        for (auto value2 : int32Operands())
+            CHECK_EQ(invoke<int>(test, value, value2), (value>>(value2%32))&1);
+    }
+}
+
+void testBranchTestBit32RegImm()
+{
+    for (auto value : int32Operands()) {
+        auto test = compile([=] (CCallHelpers& jit) {
+            emitFunctionPrologue(jit);
+
+            auto branch = jit.branchTestBit32(MacroAssembler::NonZero, GPRInfo::argumentGPR0, CCallHelpers::TrustedImm32(value));
+            jit.move(CCallHelpers::TrustedImm32(0), GPRInfo::returnValueGPR);
+            auto done = jit.jump();
+            branch.link(&jit);
+            jit.move(CCallHelpers::TrustedImm32(1), GPRInfo::returnValueGPR);
+            done.link(&jit);
+
+            emitFunctionEpilogue(jit);
+            jit.ret();
+        });
+
+        for (auto value2 : int32Operands())
+            CHECK_EQ(invoke<int>(test, value2), (value2>>(value%32))&1);
+    }
+}
+
+void testBranchTestBit32AddrImm()
+{
+    for (auto value : int32Operands()) {
+        auto test = compile([=] (CCallHelpers& jit) {
+            emitFunctionPrologue(jit);
+
+            auto branch = jit.branchTestBit32(MacroAssembler::NonZero, MacroAssembler::Address(GPRInfo::argumentGPR0, 0), CCallHelpers::TrustedImm32(value));
+            jit.move(CCallHelpers::TrustedImm32(0), GPRInfo::returnValueGPR);
+            auto done = jit.jump();
+            branch.link(&jit);
+            jit.move(CCallHelpers::TrustedImm32(1), GPRInfo::returnValueGPR);
+            done.link(&jit);
+
+            emitFunctionEpilogue(jit);
+            jit.ret();
+        });
+
+        for (auto value2 : int32Operands())
+            CHECK_EQ(invoke<int>(test, &value2), (value2>>(value%32))&1);
+    }
+}
+
+void testBranchTestBit64RegReg()
+{
+    for (auto value : int64Operands()) {
+        auto test = compile([=] (CCallHelpers& jit) {
+            emitFunctionPrologue(jit);
+
+            auto branch = jit.branchTestBit64(MacroAssembler::NonZero, GPRInfo::argumentGPR0, GPRInfo::argumentGPR1);
+            jit.move(CCallHelpers::TrustedImm64(0), GPRInfo::returnValueGPR);
+            auto done = jit.jump();
+            branch.link(&jit);
+            jit.move(CCallHelpers::TrustedImm64(1), GPRInfo::returnValueGPR);
+            done.link(&jit);
+
+            emitFunctionEpilogue(jit);
+            jit.ret();
+        });
+
+        for (auto value2 : int64Operands())
+            CHECK_EQ(invoke<long int>(test, value, value2), (value>>(value2%64))&1);
+    }
+}
+
+void testBranchTestBit64RegImm()
+{
+    for (auto value : int64Operands()) {
+        auto test = compile([=] (CCallHelpers& jit) {
+            emitFunctionPrologue(jit);
+
+            auto branch = jit.branchTestBit64(MacroAssembler::NonZero, GPRInfo::argumentGPR0, CCallHelpers::TrustedImm32(value));
+            jit.move(CCallHelpers::TrustedImm64(0), GPRInfo::returnValueGPR);
+            auto done = jit.jump();
+            branch.link(&jit);
+            jit.move(CCallHelpers::TrustedImm64(1), GPRInfo::returnValueGPR);
+            done.link(&jit);
+
+            emitFunctionEpilogue(jit);
+            jit.ret();
+        });
+
+        for (auto value2 : int64Operands())
+            CHECK_EQ(invoke<long int>(test, value2), (value2>>(value%64))&1);
+    }
+}
+
+void testBranchTestBit64AddrImm()
+{
+    for (auto value : int64Operands()) {
+        auto test = compile([=] (CCallHelpers& jit) {
+            emitFunctionPrologue(jit);
+
+            auto branch = jit.branchTestBit64(MacroAssembler::NonZero, MacroAssembler::Address(GPRInfo::argumentGPR0, 0), CCallHelpers::TrustedImm32(value));
+            jit.move(CCallHelpers::TrustedImm64(0), GPRInfo::returnValueGPR);
+            auto done = jit.jump();
+            branch.link(&jit);
+            jit.move(CCallHelpers::TrustedImm64(1), GPRInfo::returnValueGPR);
+            done.link(&jit);
+
+            emitFunctionEpilogue(jit);
+            jit.ret();
+        });
+
+        for (auto value2 : int64Operands())
+            CHECK_EQ(invoke<long int>(test, &value2), (value2>>(value%64))&1);
+    }
+}
+
+#endif
+
 void testCompareDouble(MacroAssembler::DoubleCondition condition)
 {
     double arg1 = 0;
     double arg2 = 0;
 
     auto compareDouble = compile([&, condition] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
         jit.move(CCallHelpers::TrustedImm32(-1), GPRInfo::returnValueGPR);
         jit.compareDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, GPRInfo::returnValueGPR);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
     auto compareDoubleGeneric = compile([&, condition] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
@@ -320,17 +495,120 @@ void testCompareDouble(MacroAssembler::DoubleCondition condition)
         jit.move(CCallHelpers::TrustedImm32(0), GPRInfo::returnValueGPR);
         jump.link(&jit);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
+
+    auto expectedResult = [&, condition] (double a, double b) -> int {
+        auto isUnordered = [] (double x) {
+            return x != x;
+        };
+        switch (condition) {
+        case MacroAssembler::DoubleEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a == b);
+        case MacroAssembler::DoubleNotEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a != b);
+        case MacroAssembler::DoubleGreaterThan:
+            return !isUnordered(a) && !isUnordered(b) && (a > b);
+        case MacroAssembler::DoubleGreaterThanOrEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a >= b);
+        case MacroAssembler::DoubleLessThan:
+            return !isUnordered(a) && !isUnordered(b) && (a < b);
+        case MacroAssembler::DoubleLessThanOrEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a <= b);
+        case MacroAssembler::DoubleEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a == b);
+        case MacroAssembler::DoubleNotEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a != b);
+        case MacroAssembler::DoubleGreaterThanOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a > b);
+        case MacroAssembler::DoubleGreaterThanOrEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a >= b);
+        case MacroAssembler::DoubleLessThanOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a < b);
+        case MacroAssembler::DoubleLessThanOrEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a <= b);
+        } // switch
+        RELEASE_ASSERT_NOT_REACHED();
+    };
 
     auto operands = doubleOperands();
     for (auto a : operands) {
         for (auto b : operands) {
             arg1 = a;
             arg2 = b;
-            CHECK_EQ(invoke<int>(compareDouble), invoke<int>(compareDoubleGeneric));
+            CHECK_EQ(invoke<int>(compareDouble), expectedResult(a, b));
+            CHECK_EQ(invoke<int>(compareDoubleGeneric), expectedResult(a, b));
         }
+    }
+}
+
+void testCompareDoubleSameArg(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+
+    auto compareDouble = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.move(CCallHelpers::TrustedImm32(-1), GPRInfo::returnValueGPR);
+        jit.compareDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0, GPRInfo::returnValueGPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    auto compareDoubleGeneric = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.move(CCallHelpers::TrustedImm32(1), GPRInfo::returnValueGPR);
+        auto jump = jit.branchDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0);
+        jit.move(CCallHelpers::TrustedImm32(0), GPRInfo::returnValueGPR);
+        jump.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    auto expectedResult = [&, condition] (double a) -> int {
+        auto isUnordered = [] (double x) {
+            return x != x;
+        };
+        switch (condition) {
+        case MacroAssembler::DoubleEqual:
+            return !isUnordered(a) && (a == a);
+        case MacroAssembler::DoubleNotEqual:
+            return !isUnordered(a) && (a != a);
+        case MacroAssembler::DoubleGreaterThan:
+            return !isUnordered(a) && (a > a);
+        case MacroAssembler::DoubleGreaterThanOrEqual:
+            return !isUnordered(a) && (a >= a);
+        case MacroAssembler::DoubleLessThan:
+            return !isUnordered(a) && (a < a);
+        case MacroAssembler::DoubleLessThanOrEqual:
+            return !isUnordered(a) && (a <= a);
+        case MacroAssembler::DoubleEqualOrUnordered:
+            return isUnordered(a) || (a == a);
+        case MacroAssembler::DoubleNotEqualOrUnordered:
+            return isUnordered(a) || (a != a);
+        case MacroAssembler::DoubleGreaterThanOrUnordered:
+            return isUnordered(a) || (a > a);
+        case MacroAssembler::DoubleGreaterThanOrEqualOrUnordered:
+            return isUnordered(a) || (a >= a);
+        case MacroAssembler::DoubleLessThanOrUnordered:
+            return isUnordered(a) || (a < a);
+        case MacroAssembler::DoubleLessThanOrEqualOrUnordered:
+            return isUnordered(a) || (a <= a);
+        } // switch
+        RELEASE_ASSERT_NOT_REACHED();
+    };
+
+    auto operands = doubleOperands();
+    for (auto a : operands) {
+        arg1 = a;
+        CHECK_EQ(invoke<int>(compareDouble), expectedResult(a));
+        CHECK_EQ(invoke<int>(compareDoubleGeneric), expectedResult(a));
     }
 }
 
@@ -338,11 +616,11 @@ void testMul32WithImmediates()
 {
     for (auto immediate : int32Operands()) {
         auto mul = compile([=] (CCallHelpers& jit) {
-            jit.emitFunctionPrologue();
+            emitFunctionPrologue(jit);
 
             jit.mul32(CCallHelpers::TrustedImm32(immediate), GPRInfo::argumentGPR0, GPRInfo::returnValueGPR);
 
-            jit.emitFunctionEpilogue();
+            emitFunctionEpilogue(jit);
             jit.ret();
         });
 
@@ -356,11 +634,11 @@ void testMul32SignExtend()
 {
     for (auto value : int32Operands()) {
         auto mul = compile([=] (CCallHelpers& jit) {
-            jit.emitFunctionPrologue();
+            emitFunctionPrologue(jit);
 
             jit.multiplySignExtend32(GPRInfo::argumentGPR0, GPRInfo::argumentGPR1, GPRInfo::returnValueGPR);
 
-            jit.emitFunctionEpilogue();
+            emitFunctionEpilogue(jit);
             jit.ret();
         });
 
@@ -377,19 +655,19 @@ void testCompareFloat(MacroAssembler::DoubleCondition condition)
     float arg2 = 0;
 
     auto compareFloat = compile([&, condition] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
         jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
         jit.move(CCallHelpers::TrustedImm32(-1), GPRInfo::returnValueGPR);
         jit.compareFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, GPRInfo::returnValueGPR);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
     auto compareFloatGeneric = compile([&, condition] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
         jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
@@ -398,7 +676,7 @@ void testCompareFloat(MacroAssembler::DoubleCondition condition)
         jit.move(CCallHelpers::TrustedImm32(0), GPRInfo::returnValueGPR);
         jump.link(&jit);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
@@ -411,14 +689,777 @@ void testCompareFloat(MacroAssembler::DoubleCondition condition)
         }
     }
 }
-#endif
+#endif // CPU(X86) || CPU(X86_64) || CPU(ARM64)
+
+#if CPU(X86_64) || CPU(ARM64)
+
+template<typename T, typename SelectionType>
+void testMoveConditionallyFloatingPoint(MacroAssembler::DoubleCondition condition, const MacroAssemblerCodeRef<JSEntryPtrTag>& testCode, T& arg1, T& arg2, const Vector<T> operands, SelectionType selectionA, SelectionType selectionB)
+{
+    auto expectedResult = [&, condition] (T a, T b) -> SelectionType {
+        auto isUnordered = [] (double x) {
+            return x != x;
+        };
+        switch (condition) {
+        case MacroAssembler::DoubleEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a == b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleNotEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a != b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThan:
+            return !isUnordered(a) && !isUnordered(b) && (a > b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThanOrEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a >= b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThan:
+            return !isUnordered(a) && !isUnordered(b) && (a < b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThanOrEqual:
+            return !isUnordered(a) && !isUnordered(b) && (a <= b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a == b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleNotEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a != b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThanOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a > b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThanOrEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a >= b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThanOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a < b) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThanOrEqualOrUnordered:
+            return isUnordered(a) || isUnordered(b) || (a <= b) ? selectionA : selectionB;
+        } // switch
+        RELEASE_ASSERT_NOT_REACHED();
+    };
+
+    for (auto a : operands) {
+        for (auto b : operands) {
+            arg1 = a;
+            arg2 = b;
+            CHECK_EQ(invoke<SelectionType>(testCode), expectedResult(a, b));
+        }
+    }
+}
+
+void testMoveConditionallyDouble2(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        RELEASE_ASSERT(destGPR != selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), destGPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, destGPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyDouble3(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+    unsigned corruptedSelectionA = 0xbbad000a;
+    unsigned corruptedSelectionB = 0xbbad000b;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        GPRReg selectionBGPR = GPRInfo::argumentGPR3;
+        RELEASE_ASSERT(destGPR != selectionAGPR);
+        RELEASE_ASSERT(destGPR != selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(-1), destGPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, selectionBGPR, destGPR);
+
+        auto aIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionAGPR, CCallHelpers::TrustedImm32(selectionA));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionA), destGPR);
+        aIsUnchanged.link(&jit);
+
+        auto bIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionBGPR, CCallHelpers::TrustedImm32(selectionB));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionB), destGPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyDouble3DestSameAsThenCase(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+    unsigned corruptedSelectionB = 0xbbad000b;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = destGPR;
+        GPRReg selectionBGPR = GPRInfo::argumentGPR3;
+        RELEASE_ASSERT(destGPR == selectionAGPR);
+        RELEASE_ASSERT(destGPR != selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, selectionBGPR, destGPR);
+
+        auto bIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionBGPR, CCallHelpers::TrustedImm32(selectionB));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionB), destGPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyDouble3DestSameAsElseCase(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+    unsigned corruptedSelectionA = 0xbbad000a;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        GPRReg selectionBGPR = destGPR;
+        RELEASE_ASSERT(destGPR != selectionAGPR);
+        RELEASE_ASSERT(destGPR == selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, selectionBGPR, destGPR);
+
+        auto aIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionAGPR, CCallHelpers::TrustedImm32(selectionA));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionA), destGPR);
+        aIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyFloat2(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    float arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        RELEASE_ASSERT(destGPR != selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), GPRInfo::returnValueGPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, destGPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyFloat3(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    float arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+    unsigned corruptedSelectionA = 0xbbad000a;
+    unsigned corruptedSelectionB = 0xbbad000b;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        GPRReg selectionBGPR = GPRInfo::argumentGPR3;
+        RELEASE_ASSERT(destGPR != selectionAGPR);
+        RELEASE_ASSERT(destGPR != selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(-1), destGPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, selectionBGPR, destGPR);
+
+        auto aIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionAGPR, CCallHelpers::TrustedImm32(selectionA));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionA), destGPR);
+        aIsUnchanged.link(&jit);
+
+        auto bIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionBGPR, CCallHelpers::TrustedImm32(selectionB));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionB), destGPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyFloat3DestSameAsThenCase(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    float arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+    unsigned corruptedSelectionB = 0xbbad000b;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = destGPR;
+        GPRReg selectionBGPR = GPRInfo::argumentGPR3;
+        RELEASE_ASSERT(destGPR == selectionAGPR);
+        RELEASE_ASSERT(destGPR != selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, selectionBGPR, destGPR);
+
+        auto bIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionBGPR, CCallHelpers::TrustedImm32(selectionB));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionB), destGPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyFloat3DestSameAsElseCase(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    float arg2 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+    unsigned corruptedSelectionA = 0xbbad000a;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg destGPR = GPRInfo::returnValueGPR;
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        GPRReg selectionBGPR = destGPR;
+        RELEASE_ASSERT(destGPR != selectionAGPR);
+        RELEASE_ASSERT(destGPR == selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT1);
+        jit.moveConditionallyFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1, selectionAGPR, selectionBGPR, destGPR);
+
+        auto aIsUnchanged = jit.branch32(CCallHelpers::Equal, selectionAGPR, CCallHelpers::TrustedImm32(selectionA));
+        jit.move(CCallHelpers::TrustedImm32(corruptedSelectionA), destGPR);
+        aIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyDouble(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double arg2 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+    double corruptedSelectionA = 55555;
+    double corruptedSelectionB = 66666;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        FPRReg destFPR = FPRInfo::returnValueFPR;
+        FPRReg selectionAFPR = FPRInfo::fpRegT1;
+        FPRReg selectionBFPR = FPRInfo::fpRegT2;
+        FPRReg arg1FPR = FPRInfo::fpRegT3;
+        FPRReg arg2FPR = FPRInfo::fpRegT4;
+
+        RELEASE_ASSERT(destFPR != selectionAFPR);
+        RELEASE_ASSERT(destFPR != selectionBFPR);
+        RELEASE_ASSERT(destFPR != arg1FPR);
+        RELEASE_ASSERT(destFPR != arg2FPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), arg1FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), arg2FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), selectionAFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), selectionBFPR);
+        jit.moveDoubleConditionallyDouble(condition, arg1FPR, arg2FPR, selectionAFPR, selectionBFPR, destFPR);
+
+        FPRReg tempFPR = FPRInfo::fpRegT5;
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), tempFPR);
+        auto aIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionAFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionA), destFPR);
+        aIsUnchanged.link(&jit);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), tempFPR);
+        auto bIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionBFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionB), destFPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyDoubleDestSameAsThenCase(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double arg2 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+    double corruptedSelectionB = 66666;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        FPRReg destFPR = FPRInfo::returnValueFPR;
+        FPRReg selectionAFPR = destFPR;
+        FPRReg selectionBFPR = FPRInfo::fpRegT2;
+        FPRReg arg1FPR = FPRInfo::fpRegT3;
+        FPRReg arg2FPR = FPRInfo::fpRegT4;
+
+        RELEASE_ASSERT(destFPR == selectionAFPR);
+        RELEASE_ASSERT(destFPR != selectionBFPR);
+        RELEASE_ASSERT(destFPR != arg1FPR);
+        RELEASE_ASSERT(destFPR != arg2FPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), arg1FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), arg2FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), selectionAFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), selectionBFPR);
+        jit.moveDoubleConditionallyDouble(condition, arg1FPR, arg2FPR, selectionAFPR, selectionBFPR, destFPR);
+
+        FPRReg tempFPR = FPRInfo::fpRegT5;
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), tempFPR);
+        auto bIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionBFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionB), destFPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyDoubleDestSameAsElseCase(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double arg2 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+    double corruptedSelectionA = 55555;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        FPRReg destFPR = FPRInfo::returnValueFPR;
+        FPRReg selectionAFPR = FPRInfo::fpRegT1;
+        FPRReg selectionBFPR = destFPR;
+        FPRReg arg1FPR = FPRInfo::fpRegT3;
+        FPRReg arg2FPR = FPRInfo::fpRegT4;
+
+        RELEASE_ASSERT(destFPR != selectionAFPR);
+        RELEASE_ASSERT(destFPR == selectionBFPR);
+        RELEASE_ASSERT(destFPR != arg1FPR);
+        RELEASE_ASSERT(destFPR != arg2FPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), arg1FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), arg2FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), selectionAFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), selectionBFPR);
+        jit.moveDoubleConditionallyDouble(condition, arg1FPR, arg2FPR, selectionAFPR, selectionBFPR, destFPR);
+
+        FPRReg tempFPR = FPRInfo::fpRegT5;
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), tempFPR);
+        auto aIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionAFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionA), destFPR);
+        aIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyFloat(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    float arg2 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+    double corruptedSelectionA = 55555;
+    double corruptedSelectionB = 66666;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        FPRReg destFPR = FPRInfo::returnValueFPR;
+        FPRReg selectionAFPR = FPRInfo::fpRegT1;
+        FPRReg selectionBFPR = FPRInfo::fpRegT2;
+        FPRReg arg1FPR = FPRInfo::fpRegT3;
+        FPRReg arg2FPR = FPRInfo::fpRegT4;
+
+        RELEASE_ASSERT(destFPR != selectionAFPR);
+        RELEASE_ASSERT(destFPR != selectionBFPR);
+        RELEASE_ASSERT(destFPR != arg1FPR);
+        RELEASE_ASSERT(destFPR != arg2FPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), arg1FPR);
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), arg2FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), selectionAFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), selectionBFPR);
+        jit.moveDoubleConditionallyFloat(condition, arg1FPR, arg2FPR, selectionAFPR, selectionBFPR, destFPR);
+
+        FPRReg tempFPR = FPRInfo::fpRegT5;
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), tempFPR);
+        auto aIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionAFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionA), destFPR);
+        aIsUnchanged.link(&jit);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), tempFPR);
+        auto bIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionBFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionB), destFPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyFloatDestSameAsThenCase(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    float arg2 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+    double corruptedSelectionB = 66666;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        FPRReg destFPR = FPRInfo::returnValueFPR;
+        FPRReg selectionAFPR = destFPR;
+        FPRReg selectionBFPR = FPRInfo::fpRegT2;
+        FPRReg arg1FPR = FPRInfo::fpRegT3;
+        FPRReg arg2FPR = FPRInfo::fpRegT4;
+
+        RELEASE_ASSERT(destFPR == selectionAFPR);
+        RELEASE_ASSERT(destFPR != selectionBFPR);
+        RELEASE_ASSERT(destFPR != arg1FPR);
+        RELEASE_ASSERT(destFPR != arg2FPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), arg1FPR);
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), arg2FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), selectionAFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), selectionBFPR);
+        jit.moveDoubleConditionallyFloat(condition, arg1FPR, arg2FPR, selectionAFPR, selectionBFPR, destFPR);
+
+        FPRReg tempFPR = FPRInfo::fpRegT5;
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), tempFPR);
+        auto bIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionBFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionB), destFPR);
+        bIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyFloatDestSameAsElseCase(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    float arg2 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+    double corruptedSelectionA = 55555;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        FPRReg destFPR = FPRInfo::returnValueFPR;
+        FPRReg selectionAFPR = FPRInfo::fpRegT1;
+        FPRReg selectionBFPR = destFPR;
+        FPRReg arg1FPR = FPRInfo::fpRegT3;
+        FPRReg arg2FPR = FPRInfo::fpRegT4;
+
+        RELEASE_ASSERT(destFPR != selectionAFPR);
+        RELEASE_ASSERT(destFPR == selectionBFPR);
+        RELEASE_ASSERT(destFPR != arg1FPR);
+        RELEASE_ASSERT(destFPR != arg2FPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), arg1FPR);
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg2), arg2FPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), selectionAFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), selectionBFPR);
+        jit.moveDoubleConditionallyFloat(condition, arg1FPR, arg2FPR, selectionAFPR, selectionBFPR, destFPR);
+
+        FPRReg tempFPR = FPRInfo::fpRegT5;
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), tempFPR);
+        auto aIsUnchanged = jit.branchDouble(CCallHelpers::DoubleEqual, selectionAFPR, tempFPR);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&corruptedSelectionA), destFPR);
+        aIsUnchanged.link(&jit);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPoint(condition, testCode, arg1, arg2, floatOperands(), selectionA, selectionB);
+}
+
+template<typename T, typename SelectionType>
+void testMoveConditionallyFloatingPointSameArg(MacroAssembler::DoubleCondition condition, const MacroAssemblerCodeRef<JSEntryPtrTag>& testCode, T& arg1, const Vector<T> operands, SelectionType selectionA, SelectionType selectionB)
+{
+    auto expectedResult = [&, condition] (T a) -> SelectionType {
+        auto isUnordered = [] (double x) {
+            return x != x;
+        };
+        switch (condition) {
+        case MacroAssembler::DoubleEqual:
+            return !isUnordered(a) && (a == a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleNotEqual:
+            return !isUnordered(a) && (a != a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThan:
+            return !isUnordered(a) && (a > a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThanOrEqual:
+            return !isUnordered(a) && (a >= a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThan:
+            return !isUnordered(a) && (a < a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThanOrEqual:
+            return !isUnordered(a) && (a <= a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleEqualOrUnordered:
+            return isUnordered(a) || (a == a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleNotEqualOrUnordered:
+            return isUnordered(a) || (a != a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThanOrUnordered:
+            return isUnordered(a) || (a > a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleGreaterThanOrEqualOrUnordered:
+            return isUnordered(a) || (a >= a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThanOrUnordered:
+            return isUnordered(a) || (a < a) ? selectionA : selectionB;
+        case MacroAssembler::DoubleLessThanOrEqualOrUnordered:
+            return isUnordered(a) || (a <= a) ? selectionA : selectionB;
+        } // switch
+        RELEASE_ASSERT_NOT_REACHED();
+    };
+
+    for (auto a : operands) {
+        arg1 = a;
+        CHECK_EQ(invoke<SelectionType>(testCode), expectedResult(a));
+    }
+}
+
+void testMoveConditionallyDouble2SameArg(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        RELEASE_ASSERT(GPRInfo::returnValueGPR != selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), GPRInfo::returnValueGPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.moveConditionallyDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0, selectionAGPR, GPRInfo::returnValueGPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPointSameArg(condition, testCode, arg1, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyDouble3SameArg(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        GPRReg selectionBGPR = GPRInfo::argumentGPR3;
+        RELEASE_ASSERT(GPRInfo::returnValueGPR != selectionAGPR);
+        RELEASE_ASSERT(GPRInfo::returnValueGPR != selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(-1), GPRInfo::returnValueGPR);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.moveConditionallyDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0, selectionAGPR, selectionBGPR, GPRInfo::returnValueGPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPointSameArg(condition, testCode, arg1, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyFloat2SameArg(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        RELEASE_ASSERT(GPRInfo::returnValueGPR != selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), GPRInfo::returnValueGPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.moveConditionallyFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0, selectionAGPR, GPRInfo::returnValueGPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPointSameArg(condition, testCode, arg1, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveConditionallyFloat3SameArg(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    unsigned selectionA = 42;
+    unsigned selectionB = 17;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        GPRReg selectionAGPR = GPRInfo::argumentGPR2;
+        GPRReg selectionBGPR = GPRInfo::argumentGPR3;
+        RELEASE_ASSERT(GPRInfo::returnValueGPR != selectionAGPR);
+        RELEASE_ASSERT(GPRInfo::returnValueGPR != selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionA), selectionAGPR);
+        jit.move(CCallHelpers::TrustedImm32(selectionB), selectionBGPR);
+        jit.move(CCallHelpers::TrustedImm32(-1), GPRInfo::returnValueGPR);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.moveConditionallyFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0, selectionAGPR, selectionBGPR, GPRInfo::returnValueGPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPointSameArg(condition, testCode, arg1, floatOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyDoubleSameArg(MacroAssembler::DoubleCondition condition)
+{
+    double arg1 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), FPRInfo::fpRegT2);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), FPRInfo::fpRegT3);
+        jit.moveDoubleConditionallyDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0, FPRInfo::fpRegT2, FPRInfo::fpRegT3, FPRInfo::returnValueFPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPointSameArg(condition, testCode, arg1, doubleOperands(), selectionA, selectionB);
+}
+
+void testMoveDoubleConditionallyFloatSameArg(MacroAssembler::DoubleCondition condition)
+{
+    float arg1 = 0;
+    double selectionA = 42.0;
+    double selectionB = 17.0;
+
+    auto testCode = compile([&, condition] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+
+        jit.loadFloat(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT0);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionA), FPRInfo::fpRegT2);
+        jit.loadDouble(CCallHelpers::TrustedImmPtr(&selectionB), FPRInfo::fpRegT3);
+        jit.moveDoubleConditionallyFloat(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT0, FPRInfo::fpRegT2, FPRInfo::fpRegT3, FPRInfo::returnValueFPR);
+
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+
+    testMoveConditionallyFloatingPointSameArg(condition, testCode, arg1, floatOperands(), selectionA, selectionB);
+}
+
+#endif // CPU(X86_64) || CPU(ARM64)
 
 #if ENABLE(MASM_PROBE)
 void testProbeReadsArgumentRegisters()
 {
     bool probeWasCalled = false;
     compileAndRun<void>([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         jit.pushPair(GPRInfo::argumentGPR0, GPRInfo::argumentGPR1);
         jit.pushPair(GPRInfo::argumentGPR2, GPRInfo::argumentGPR3);
@@ -454,7 +1495,7 @@ void testProbeReadsArgumentRegisters()
         jit.popPair(GPRInfo::argumentGPR2, GPRInfo::argumentGPR3);
         jit.popPair(GPRInfo::argumentGPR0, GPRInfo::argumentGPR1);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
     CHECK_EQ(probeWasCalled, true);
@@ -467,7 +1508,7 @@ void testProbeWritesArgumentRegisters()
     // that our writes did take effect.
     unsigned probeCallCount = 0;
     compileAndRun<void>([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         jit.pushPair(GPRInfo::argumentGPR0, GPRInfo::argumentGPR1);
         jit.pushPair(GPRInfo::argumentGPR2, GPRInfo::argumentGPR3);
@@ -516,7 +1557,7 @@ void testProbeWritesArgumentRegisters()
         jit.popPair(GPRInfo::argumentGPR2, GPRInfo::argumentGPR3);
         jit.popPair(GPRInfo::argumentGPR0, GPRInfo::argumentGPR1);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
     CHECK_EQ(probeCallCount, 2);
@@ -544,7 +1585,7 @@ void testProbePreservesGPRS()
     CPUState originalState;
 
     compileAndRun<void>([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         // Write expected values into the registers (except for sp, fp, and pc).
         jit.probe([&] (Probe::Context& context) {
@@ -618,7 +1659,7 @@ void testProbePreservesGPRS()
                 CHECK_EQ(cpu.fpr<uint64_t>(id), originalState.fpr<uint64_t>(id));
         });
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
     CHECK_EQ(probeCallCount, 5);
@@ -646,7 +1687,7 @@ void testProbeModifiesStackPointer(WTF::Function<void*(Probe::Context&)> compute
 #endif
 
     compileAndRun<void>([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         // Preserve original stack pointer and modify the sp, and
         // write expected values into other registers (except for fp, and pc).
@@ -736,7 +1777,7 @@ void testProbeModifiesStackPointer(WTF::Function<void*(Probe::Context&)> compute
             CHECK_EQ(cpu.sp(), originalSP);
         });
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
     CHECK_EQ(probeCallCount, 4);
@@ -786,12 +1827,12 @@ void testProbeModifiesProgramCounter()
             continuationWasReached = true;
         });
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
     compileAndRun<void>([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         // Write expected values into the registers.
         jit.probe([&] (Probe::Context& context) {
@@ -828,7 +1869,7 @@ void testProbeModifiesStackValues()
 #endif
 
     compileAndRun<void>([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
 
         // Write expected values into the registers.
         jit.probe([&] (Probe::Context& context) {
@@ -921,7 +1962,7 @@ void testProbeModifiesStackValues()
             cpu.sp() = originalSP;
         });
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
@@ -929,34 +1970,69 @@ void testProbeModifiesStackValues()
 }
 #endif // ENABLE(MASM_PROBE)
 
+void testOrImmMem()
+{
+    // FIXME: this does not test that the or does not touch beyond its width.
+    // I am not sure how to do such a test without a lot of complexity (running multiple threads, with a race on the high bits of the memory location).
+    uint64_t memoryLocation = 0x12341234;
+    auto or32 = compile([&] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+        jit.or32(CCallHelpers::TrustedImm32(42), CCallHelpers::AbsoluteAddress(&memoryLocation));
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+    invoke<void>(or32);
+    CHECK_EQ(memoryLocation, 0x12341234 | 42);
+
+    memoryLocation = 0x12341234;
+    auto or16 = compile([&] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+        jit.or16(CCallHelpers::TrustedImm32(42), CCallHelpers::AbsoluteAddress(&memoryLocation));
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+    invoke<void>(or16);
+    CHECK_EQ(memoryLocation, 0x12341234 | 42);
+
+    memoryLocation = 0x12341234;
+    auto or16InvalidLogicalImmInARM64 = compile([&] (CCallHelpers& jit) {
+        emitFunctionPrologue(jit);
+        jit.or16(CCallHelpers::TrustedImm32(0), CCallHelpers::AbsoluteAddress(&memoryLocation));
+        emitFunctionEpilogue(jit);
+        jit.ret();
+    });
+    invoke<void>(or16InvalidLogicalImmInARM64);
+    CHECK_EQ(memoryLocation, 0x12341234);
+}
+
 void testByteSwap()
 {
 #if CPU(X86_64) || CPU(ARM64)
     auto byteSwap16 = compile([] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.move(GPRInfo::argumentGPR0, GPRInfo::returnValueGPR);
         jit.byteSwap16(GPRInfo::returnValueGPR);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
     CHECK_EQ(invoke<uint64_t>(byteSwap16, 0xaabbccddee001122), static_cast<uint64_t>(0x2211));
     CHECK_EQ(invoke<uint64_t>(byteSwap16, 0xaabbccddee00ffaa), static_cast<uint64_t>(0xaaff));
 
     auto byteSwap32 = compile([] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.move(GPRInfo::argumentGPR0, GPRInfo::returnValueGPR);
         jit.byteSwap32(GPRInfo::returnValueGPR);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
     CHECK_EQ(invoke<uint64_t>(byteSwap32, 0xaabbccddee001122), static_cast<uint64_t>(0x221100ee));
     CHECK_EQ(invoke<uint64_t>(byteSwap32, 0xaabbccddee00ffaa), static_cast<uint64_t>(0xaaff00ee));
 
     auto byteSwap64 = compile([] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.move(GPRInfo::argumentGPR0, GPRInfo::returnValueGPR);
         jit.byteSwap64(GPRInfo::returnValueGPR);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
     CHECK_EQ(invoke<uint64_t>(byteSwap64, 0xaabbccddee001122), static_cast<uint64_t>(0x221100eeddccbbaa));
@@ -975,7 +2051,7 @@ void testMoveDoubleConditionally32()
     CHECK_EQ(static_cast<double>(static_cast<float>(chosenDouble)) == chosenDouble, false);
 
     auto sel = compile([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&zero), FPRInfo::returnValueFPR);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT1);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT2);
@@ -983,7 +2059,7 @@ void testMoveDoubleConditionally32()
         jit.move(MacroAssembler::TrustedImm32(-1), GPRInfo::regT0);
         jit.moveDoubleConditionally32(MacroAssembler::Equal, GPRInfo::regT0, GPRInfo::regT0, FPRInfo::fpRegT1, FPRInfo::fpRegT2, FPRInfo::returnValueFPR);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
@@ -1009,7 +2085,7 @@ void testMoveDoubleConditionally64()
     CHECK_EQ(static_cast<double>(static_cast<float>(chosenDouble)) == chosenDouble, false);
 
     auto sel = compile([&] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&zero), FPRInfo::returnValueFPR);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg1), FPRInfo::fpRegT1);
         jit.loadDouble(CCallHelpers::TrustedImmPtr(&arg2), FPRInfo::fpRegT2);
@@ -1017,7 +2093,7 @@ void testMoveDoubleConditionally64()
         jit.move(MacroAssembler::TrustedImm64(-1), GPRInfo::regT0);
         jit.moveDoubleConditionally64(MacroAssembler::Equal, GPRInfo::regT0, GPRInfo::regT0, FPRInfo::fpRegT1, FPRInfo::fpRegT2, FPRInfo::returnValueFPR);
 
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
@@ -1035,18 +2111,22 @@ void testMoveDoubleConditionally64()
 static void testCagePreservesPACFailureBit()
 {
 #if GIGACAGE_ENABLED
-    ASSERT(!Gigacage::isDisablingPrimitiveGigacageDisabled());
+    // Placate ASan builds and any environments that disables the Gigacage.
+    if (!Gigacage::shouldBeEnabled())
+        return;
+
+    RELEASE_ASSERT(!Gigacage::isDisablingPrimitiveGigacageForbidden());
     auto cage = compile([] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.cageConditionally(Gigacage::Primitive, GPRInfo::argumentGPR0, GPRInfo::argumentGPR1, GPRInfo::argumentGPR2);
         jit.move(GPRInfo::argumentGPR0, GPRInfo::returnValueGPR);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
     void* ptr = Gigacage::tryMalloc(Gigacage::Primitive, 1);
     void* taggedPtr = tagArrayPtr(ptr, 1);
-    ASSERT(hasOneBitSet(Gigacage::size(Gigacage::Primitive) << 2));
+    RELEASE_ASSERT(hasOneBitSet(Gigacage::size(Gigacage::Primitive) << 2));
     void* notCagedPtr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr) + (Gigacage::size(Gigacage::Primitive) << 2));
     CHECK_NOT_EQ(Gigacage::caged(Gigacage::Primitive, notCagedPtr), notCagedPtr);
     void* taggedNotCagedPtr = tagArrayPtr(notCagedPtr, 1);
@@ -1061,10 +2141,10 @@ static void testCagePreservesPACFailureBit()
     CHECK_EQ(invoke<void*>(cage, taggedPtr, 1), ptr);
 
     auto cageWithoutAuthentication = compile([] (CCallHelpers& jit) {
-        jit.emitFunctionPrologue();
+        emitFunctionPrologue(jit);
         jit.cageWithoutUntagging(Gigacage::Primitive, GPRInfo::argumentGPR0);
         jit.move(GPRInfo::argumentGPR0, GPRInfo::returnValueGPR);
-        jit.emitFunctionEpilogue();
+        emitFunctionEpilogue(jit);
         jit.ret();
     });
 
@@ -1123,37 +2203,68 @@ void run(const char* filter)
     // reset to check a conversion result
     RUN(testBranchTruncateDoubleToInt32(123, 123));
 
-    RUN(testCompareDouble(MacroAssembler::DoubleEqual));
-    RUN(testCompareDouble(MacroAssembler::DoubleNotEqual));
-    RUN(testCompareDouble(MacroAssembler::DoubleGreaterThan));
-    RUN(testCompareDouble(MacroAssembler::DoubleGreaterThanOrEqual));
-    RUN(testCompareDouble(MacroAssembler::DoubleLessThan));
-    RUN(testCompareDouble(MacroAssembler::DoubleLessThanOrEqual));
-    RUN(testCompareDouble(MacroAssembler::DoubleEqualOrUnordered));
-    RUN(testCompareDouble(MacroAssembler::DoubleNotEqualOrUnordered));
-    RUN(testCompareDouble(MacroAssembler::DoubleGreaterThanOrUnordered));
-    RUN(testCompareDouble(MacroAssembler::DoubleGreaterThanOrEqualOrUnordered));
-    RUN(testCompareDouble(MacroAssembler::DoubleLessThanOrUnordered));
-    RUN(testCompareDouble(MacroAssembler::DoubleLessThanOrEqualOrUnordered));
+#define FOR_EACH_DOUBLE_CONDITION_RUN(__test) \
+    do { \
+        RUN(__test(MacroAssembler::DoubleEqual)); \
+        RUN(__test(MacroAssembler::DoubleNotEqual)); \
+        RUN(__test(MacroAssembler::DoubleGreaterThan)); \
+        RUN(__test(MacroAssembler::DoubleGreaterThanOrEqual)); \
+        RUN(__test(MacroAssembler::DoubleLessThan)); \
+        RUN(__test(MacroAssembler::DoubleLessThanOrEqual)); \
+        RUN(__test(MacroAssembler::DoubleEqualOrUnordered)); \
+        RUN(__test(MacroAssembler::DoubleNotEqualOrUnordered)); \
+        RUN(__test(MacroAssembler::DoubleGreaterThanOrUnordered)); \
+        RUN(__test(MacroAssembler::DoubleGreaterThanOrEqualOrUnordered)); \
+        RUN(__test(MacroAssembler::DoubleLessThanOrUnordered)); \
+        RUN(__test(MacroAssembler::DoubleLessThanOrEqualOrUnordered)); \
+    } while (false)
+
+    FOR_EACH_DOUBLE_CONDITION_RUN(testCompareDouble);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testCompareDoubleSameArg);
+
     RUN(testMul32WithImmediates());
+
+#if CPU(X86_64)
+    RUN(testBranchTestBit32RegReg());
+    RUN(testBranchTestBit32RegImm());
+    RUN(testBranchTestBit32AddrImm());
+    RUN(testBranchTestBit64RegReg());
+    RUN(testBranchTestBit64RegImm());
+    RUN(testBranchTestBit64AddrImm());
+#endif
 
 #if CPU(ARM64)
     RUN(testMul32SignExtend());
 #endif
 
 #if CPU(X86) || CPU(X86_64) || CPU(ARM64)
-    RUN(testCompareFloat(MacroAssembler::DoubleEqual));
-    RUN(testCompareFloat(MacroAssembler::DoubleNotEqual));
-    RUN(testCompareFloat(MacroAssembler::DoubleGreaterThan));
-    RUN(testCompareFloat(MacroAssembler::DoubleGreaterThanOrEqual));
-    RUN(testCompareFloat(MacroAssembler::DoubleLessThan));
-    RUN(testCompareFloat(MacroAssembler::DoubleLessThanOrEqual));
-    RUN(testCompareFloat(MacroAssembler::DoubleEqualOrUnordered));
-    RUN(testCompareFloat(MacroAssembler::DoubleNotEqualOrUnordered));
-    RUN(testCompareFloat(MacroAssembler::DoubleGreaterThanOrUnordered));
-    RUN(testCompareFloat(MacroAssembler::DoubleGreaterThanOrEqualOrUnordered));
-    RUN(testCompareFloat(MacroAssembler::DoubleLessThanOrUnordered));
-    RUN(testCompareFloat(MacroAssembler::DoubleLessThanOrEqualOrUnordered));
+    FOR_EACH_DOUBLE_CONDITION_RUN(testCompareFloat);
+#endif
+
+#if CPU(X86_64) || CPU(ARM64)
+    // Comparing 2 different registers.
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyDouble2);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyDouble3);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyDouble3DestSameAsThenCase);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyDouble3DestSameAsElseCase);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyFloat2);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyFloat3);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyFloat3DestSameAsThenCase);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyFloat3DestSameAsElseCase);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyDouble);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyDoubleDestSameAsThenCase);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyDoubleDestSameAsElseCase);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyFloat);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyFloatDestSameAsThenCase);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyFloatDestSameAsElseCase);
+
+    // Comparing the same register against itself.
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyDouble2SameArg);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyDouble3SameArg);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyFloat2SameArg);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveConditionallyFloat3SameArg);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyDoubleSameArg);
+    FOR_EACH_DOUBLE_CONDITION_RUN(testMoveDoubleConditionallyFloatSameArg);
 #endif
 
 #if ENABLE(MASM_PROBE)
@@ -1171,6 +2282,8 @@ void run(const char* filter)
     RUN(testMoveDoubleConditionally64());
 
     RUN(testCagePreservesPACFailureBit());
+
+    RUN(testOrImmMem());
 
     if (tasks.isEmpty())
         usage();

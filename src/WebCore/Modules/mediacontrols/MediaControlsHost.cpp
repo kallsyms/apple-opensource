@@ -165,6 +165,12 @@ void MediaControlsHost::updateTextTrackContainer()
         m_textTrackContainer->updateDisplay();
 }
 
+void MediaControlsHost::updateTextTrackRepresentationImageIfNeeded()
+{
+    if (m_textTrackContainer)
+        m_textTrackContainer->updateTextTrackRepresentationImageIfNeeded();
+}
+
 void MediaControlsHost::enteredFullscreen()
 {
     if (m_textTrackContainer)
@@ -177,10 +183,10 @@ void MediaControlsHost::exitedFullscreen()
         m_textTrackContainer->exitedFullscreen();
 }
 
-void MediaControlsHost::updateCaptionDisplaySizes()
+void MediaControlsHost::updateCaptionDisplaySizes(ForceUpdate force)
 {
     if (m_textTrackContainer)
-        m_textTrackContainer->updateSizes(true);
+        m_textTrackContainer->updateSizes(force == ForceUpdate::Yes ? MediaControlTextTrackContainerElement::ForceUpdate::Yes : MediaControlTextTrackContainerElement::ForceUpdate::No);
 }
     
 bool MediaControlsHost::allowsInlineMediaPlayback() const

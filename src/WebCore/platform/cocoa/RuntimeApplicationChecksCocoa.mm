@@ -66,28 +66,16 @@ void setApplicationBundleIdentifier(const String& bundleIdentifier)
     applicationBundleIdentifierOverride() = bundleIdentifier;
 }
 
-static Optional<uint32_t>& applicationSDKVersionOverride()
-{
-    static NeverDestroyed<Optional<uint32_t>> version;
-    return version;
-}
-
-void setApplicationSDKVersion(uint32_t version)
-{
-    applicationSDKVersionOverride() = version;
-}
-
-uint32_t applicationSDKVersion()
-{
-    if (applicationSDKVersionOverride())
-        return *applicationSDKVersionOverride();
-    return dyld_get_program_sdk_version();
-}
-
 bool isInWebProcess()
 {
     static bool mainBundleIsWebProcess = [[[NSBundle mainBundle] bundleIdentifier] hasPrefix:@"com.apple.WebKit.WebContent"];
     return mainBundleIsWebProcess;
+}
+
+bool isInNetworkProcess()
+{
+    static bool mainBundleIsNetworkProcess = [[[NSBundle mainBundle] bundleIdentifier] hasPrefix:@"com.apple.WebKit.Networking"];
+    return mainBundleIsNetworkProcess;
 }
 
 static bool applicationBundleIsEqualTo(const String& bundleIdentifierString)
@@ -256,12 +244,6 @@ bool IOSApplication::isSpringBoard()
 {
     static bool isSpringBoard = applicationBundleIsEqualTo("com.apple.springboard"_s);
     return isSpringBoard;
-}
-
-bool IOSApplication::isWebApp()
-{
-    static bool isWebApp = applicationBundleIsEqualTo("com.apple.webapp"_s);
-    return isWebApp;
 }
 
 // FIXME: this needs to be changed when the WebProcess is changed to an XPC service.

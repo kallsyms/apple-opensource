@@ -227,6 +227,7 @@ u_int32_t necp_session_count = 0;
 #define NECP_KERNEL_CONDITION_LOCAL_EMPTY                       0x1000000
 #define NECP_KERNEL_CONDITION_REMOTE_EMPTY                      0x2000000
 #define NECP_KERNEL_CONDITION_PLATFORM_BINARY                   0x4000000
+#define NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER                0x8000000
 
 #define NECP_MAX_POLICY_RESULT_SIZE                                     512
 #define NECP_MAX_ROUTE_RULES_ARRAY_SIZE                         1024
@@ -286,7 +287,8 @@ struct necp_socket_info {
 	errno_t cred_result;
 	unsigned has_client : 1;
 	unsigned is_platform_binary : 1;
-	unsigned __pad_bits : 6;
+	unsigned used_responsible_pid : 1;
+	unsigned __pad_bits : 5;
 };
 
 static  lck_grp_attr_t  *necp_kernel_policy_grp_attr    = NULL;
@@ -377,7 +379,7 @@ static bool necp_policy_mark_all_for_deletion(struct necp_session *session);
 static bool necp_policy_delete(struct necp_session *session, struct necp_session_policy *policy);
 static void necp_policy_apply_all(struct necp_session *session);
 
-static necp_kernel_policy_id necp_kernel_socket_policy_add(necp_policy_order order, u_int32_t session_order, int session_pid, u_int32_t condition_mask, u_int32_t condition_negated_mask, necp_app_id cond_app_id, necp_app_id cond_real_app_id, char *cond_custom_entitlement, u_int32_t cond_account_id, char *domain, pid_t cond_pid, uid_t cond_uid, ifnet_t cond_bound_interface, struct necp_policy_condition_tc_range cond_traffic_class, u_int16_t cond_protocol, union necp_sockaddr_union *cond_local_start, union necp_sockaddr_union *cond_local_end, u_int8_t cond_local_prefix, union necp_sockaddr_union *cond_remote_start, union necp_sockaddr_union *cond_remote_end, u_int8_t cond_remote_prefix, struct necp_policy_condition_agent_type *cond_agent_type, u_int32_t cond_client_flags, necp_kernel_policy_result result, necp_kernel_policy_result_parameter result_parameter);
+static necp_kernel_policy_id necp_kernel_socket_policy_add(necp_policy_order order, u_int32_t session_order, int session_pid, u_int32_t condition_mask, u_int32_t condition_negated_mask, necp_app_id cond_app_id, necp_app_id cond_real_app_id, char *cond_custom_entitlement, u_int32_t cond_account_id, char *domain, pid_t cond_pid, uid_t cond_uid, ifnet_t cond_bound_interface, struct necp_policy_condition_tc_range cond_traffic_class, u_int16_t cond_protocol, union necp_sockaddr_union *cond_local_start, union necp_sockaddr_union *cond_local_end, u_int8_t cond_local_prefix, union necp_sockaddr_union *cond_remote_start, union necp_sockaddr_union *cond_remote_end, u_int8_t cond_remote_prefix, struct necp_policy_condition_agent_type *cond_agent_type, u_int32_t cond_client_flags, char *cond_signing_identifier, necp_kernel_policy_result result, necp_kernel_policy_result_parameter result_parameter);
 static bool necp_kernel_socket_policy_delete(necp_kernel_policy_id policy_id);
 static bool necp_kernel_socket_policies_reprocess(void);
 static bool necp_kernel_socket_policies_update_uuid_table(void);
@@ -956,7 +958,8 @@ necp_session_set_session_priority(struct necp_session *session, struct necp_sess
 
 	// Enforce special session priorities with entitlements
 	if (requested_session_priority == NECP_SESSION_PRIORITY_CONTROL ||
-	    requested_session_priority == NECP_SESSION_PRIORITY_PRIVILEGED_TUNNEL) {
+	    requested_session_priority == NECP_SESSION_PRIORITY_PRIVILEGED_TUNNEL ||
+	    requested_session_priority == NECP_SESSION_PRIORITY_HIGH_RESTRICTED) {
 		errno_t cred_result = priv_check_cred(kauth_cred_get(), PRIV_NET_PRIVILEGED_NECP_POLICIES, 0);
 		if (cred_result != 0) {
 			NECPLOG(LOG_ERR, "Session does not hold necessary entitlement to claim priority level %d", requested_session_priority);
@@ -1788,6 +1791,10 @@ necp_policy_result_is_valid(u_int8_t *buffer, u_int32_t length)
 	u_int32_t parameter_length = necp_policy_result_get_parameter_length_from_buffer(buffer, length);
 	switch (type) {
 	case NECP_POLICY_RESULT_PASS:
+		if (parameter_length == 0 || parameter_length == sizeof(u_int32_t)) {
+			validated = TRUE;
+		}
+		break;
 	case NECP_POLICY_RESULT_DROP:
 	case NECP_POLICY_RESULT_ROUTE_RULES:
 	case NECP_POLICY_RESULT_SCOPED_DIRECT:
@@ -1928,7 +1935,8 @@ necp_policy_condition_is_valid(u_int8_t *buffer, u_int32_t length, u_int8_t poli
 	}
 	case NECP_POLICY_CONDITION_DOMAIN:
 	case NECP_POLICY_CONDITION_ACCOUNT:
-	case NECP_POLICY_CONDITION_BOUND_INTERFACE: {
+	case NECP_POLICY_CONDITION_BOUND_INTERFACE:
+	case NECP_POLICY_CONDITION_SIGNING_IDENTIFIER: {
 		if (condition_length > 0) {
 			validated = TRUE;
 		}
@@ -2676,6 +2684,11 @@ necp_handle_policy_dump_all(user_addr_t out_buffer, size_t out_buffer_length)
 			if (condition_mask & NECP_KERNEL_CONDITION_REMOTE_EMPTY) {
 				num_conditions++;
 			}
+			if (condition_mask & NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER) {
+				u_int32_t identifier_len = strlen(policy->cond_signing_identifier) + 1;
+				condition_tlv_length += identifier_len;
+				num_conditions++;
+			}
 		}
 
 		condition_tlv_length += num_conditions * (sizeof(u_int8_t) + sizeof(u_int32_t)); // These are for the condition TLVs. The space for "value" is already accounted for above.
@@ -2822,6 +2835,10 @@ necp_handle_policy_dump_all(user_addr_t out_buffer, size_t out_buffer_length)
 			}
 			if (condition_mask & NECP_KERNEL_CONDITION_REMOTE_EMPTY) {
 				cond_buf_cursor = necp_buffer_write_tlv(cond_buf_cursor, NECP_POLICY_CONDITION_FLOW_REMOTE_ADDR_EMPTY, 0, "", cond_buf, condition_tlv_length);
+			}
+			if (condition_mask & NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER) {
+				cond_buf_cursor = necp_buffer_write_tlv(cond_buf_cursor, NECP_POLICY_CONDITION_SIGNING_IDENTIFIER, strlen(policy->cond_signing_identifier) + 1, policy->cond_signing_identifier,
+				    cond_buf, condition_tlv_length);
 			}
 		}
 
@@ -3146,6 +3163,7 @@ necp_policy_apply(struct necp_session *session, struct necp_session_policy *poli
 	u_int32_t cond_account_id = 0;
 	char *cond_domain = NULL;
 	char *cond_custom_entitlement = NULL;
+	char *cond_signing_identifier = NULL;
 	pid_t cond_pid = 0;
 	uid_t cond_uid = 0;
 	necp_app_id cond_app_id = 0;
@@ -3495,6 +3513,21 @@ necp_policy_apply(struct necp_session *session, struct necp_session_policy *poli
 			socket_only_conditions = TRUE;
 			break;
 		}
+		case NECP_POLICY_CONDITION_SIGNING_IDENTIFIER: {
+			if (condition_length > 0) {
+				if (cond_signing_identifier == NULL) {
+					cond_signing_identifier = necp_copy_string((char *)condition_value, condition_length);
+					if (cond_signing_identifier != NULL) {
+						master_condition_mask |= NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER;
+						socket_only_conditions = TRUE;
+						if (condition_is_negative) {
+							master_condition_negated_mask |= NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER;
+						}
+					}
+				}
+			}
+			break;
+		}
 		default: {
 			break;
 		}
@@ -3507,6 +3540,12 @@ necp_policy_apply(struct necp_session *session, struct necp_session_policy *poli
 	ultimate_result = necp_policy_get_result_type(policy);
 	switch (ultimate_result) {
 	case NECP_POLICY_RESULT_PASS: {
+		u_int32_t pass_flags = 0;
+		if (necp_policy_result_get_parameter_length_from_buffer(policy->result, policy->result_size) > 0) {
+			if (necp_policy_get_result_parameter(policy, (u_int8_t *)&pass_flags, sizeof(pass_flags))) {
+				ultimate_result_parameter.pass_flags = pass_flags;
+			}
+		}
 		if (socket_only_conditions) {         // socket_ip_conditions can be TRUE or FALSE
 			socket_layer_non_id_conditions = TRUE;
 			ip_output_layer_id_condition = TRUE;
@@ -3669,7 +3708,7 @@ necp_policy_apply(struct necp_session *session, struct necp_session_policy *poli
 	}
 
 	if (socket_layer_non_id_conditions) {
-		necp_kernel_policy_id policy_id = necp_kernel_socket_policy_add(policy->order, session->session_order, session->proc_pid, master_condition_mask, master_condition_negated_mask, cond_app_id, cond_real_app_id, cond_custom_entitlement, cond_account_id, cond_domain, cond_pid, cond_uid, cond_bound_interface, cond_traffic_class, cond_protocol, &cond_local_start, &cond_local_end, cond_local_prefix, &cond_remote_start, &cond_remote_end, cond_remote_prefix, &cond_agent_type, cond_client_flags, ultimate_result, ultimate_result_parameter);
+		necp_kernel_policy_id policy_id = necp_kernel_socket_policy_add(policy->order, session->session_order, session->proc_pid, master_condition_mask, master_condition_negated_mask, cond_app_id, cond_real_app_id, cond_custom_entitlement, cond_account_id, cond_domain, cond_pid, cond_uid, cond_bound_interface, cond_traffic_class, cond_protocol, &cond_local_start, &cond_local_end, cond_local_prefix, &cond_remote_start, &cond_remote_end, cond_remote_prefix, &cond_agent_type, cond_client_flags, cond_signing_identifier, ultimate_result, ultimate_result_parameter);
 
 		if (policy_id == 0) {
 			NECPLOG0(LOG_DEBUG, "Error applying socket kernel policy");
@@ -3838,10 +3877,10 @@ necp_kernel_policy_get_new_id(bool socket_level)
 	return newid;
 }
 
-#define NECP_KERNEL_VALID_SOCKET_CONDITIONS (NECP_KERNEL_CONDITION_APP_ID | NECP_KERNEL_CONDITION_REAL_APP_ID | NECP_KERNEL_CONDITION_DOMAIN | NECP_KERNEL_CONDITION_ACCOUNT_ID | NECP_KERNEL_CONDITION_PID | NECP_KERNEL_CONDITION_UID | NECP_KERNEL_CONDITION_ALL_INTERFACES | NECP_KERNEL_CONDITION_BOUND_INTERFACE | NECP_KERNEL_CONDITION_TRAFFIC_CLASS | NECP_KERNEL_CONDITION_PROTOCOL | NECP_KERNEL_CONDITION_LOCAL_START | NECP_KERNEL_CONDITION_LOCAL_END | NECP_KERNEL_CONDITION_LOCAL_PREFIX | NECP_KERNEL_CONDITION_REMOTE_START | NECP_KERNEL_CONDITION_REMOTE_END | NECP_KERNEL_CONDITION_REMOTE_PREFIX | NECP_KERNEL_CONDITION_ENTITLEMENT | NECP_KERNEL_CONDITION_CUSTOM_ENTITLEMENT | NECP_KERNEL_CONDITION_AGENT_TYPE | NECP_KERNEL_CONDITION_HAS_CLIENT | NECP_KERNEL_CONDITION_LOCAL_NETWORKS | NECP_KERNEL_CONDITION_CLIENT_FLAGS | NECP_KERNEL_CONDITION_LOCAL_EMPTY | NECP_KERNEL_CONDITION_REMOTE_EMPTY | NECP_KERNEL_CONDITION_PLATFORM_BINARY)
+#define NECP_KERNEL_VALID_SOCKET_CONDITIONS (NECP_KERNEL_CONDITION_APP_ID | NECP_KERNEL_CONDITION_REAL_APP_ID | NECP_KERNEL_CONDITION_DOMAIN | NECP_KERNEL_CONDITION_ACCOUNT_ID | NECP_KERNEL_CONDITION_PID | NECP_KERNEL_CONDITION_UID | NECP_KERNEL_CONDITION_ALL_INTERFACES | NECP_KERNEL_CONDITION_BOUND_INTERFACE | NECP_KERNEL_CONDITION_TRAFFIC_CLASS | NECP_KERNEL_CONDITION_PROTOCOL | NECP_KERNEL_CONDITION_LOCAL_START | NECP_KERNEL_CONDITION_LOCAL_END | NECP_KERNEL_CONDITION_LOCAL_PREFIX | NECP_KERNEL_CONDITION_REMOTE_START | NECP_KERNEL_CONDITION_REMOTE_END | NECP_KERNEL_CONDITION_REMOTE_PREFIX | NECP_KERNEL_CONDITION_ENTITLEMENT | NECP_KERNEL_CONDITION_CUSTOM_ENTITLEMENT | NECP_KERNEL_CONDITION_AGENT_TYPE | NECP_KERNEL_CONDITION_HAS_CLIENT | NECP_KERNEL_CONDITION_LOCAL_NETWORKS | NECP_KERNEL_CONDITION_CLIENT_FLAGS | NECP_KERNEL_CONDITION_LOCAL_EMPTY | NECP_KERNEL_CONDITION_REMOTE_EMPTY | NECP_KERNEL_CONDITION_PLATFORM_BINARY | NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER)
 
 static necp_kernel_policy_id
-necp_kernel_socket_policy_add(necp_policy_order order, u_int32_t session_order, int session_pid, u_int32_t condition_mask, u_int32_t condition_negated_mask, necp_app_id cond_app_id, necp_app_id cond_real_app_id, char *cond_custom_entitlement, u_int32_t cond_account_id, char *cond_domain, pid_t cond_pid, uid_t cond_uid, ifnet_t cond_bound_interface, struct necp_policy_condition_tc_range cond_traffic_class, u_int16_t cond_protocol, union necp_sockaddr_union *cond_local_start, union necp_sockaddr_union *cond_local_end, u_int8_t cond_local_prefix, union necp_sockaddr_union *cond_remote_start, union necp_sockaddr_union *cond_remote_end, u_int8_t cond_remote_prefix, struct necp_policy_condition_agent_type *cond_agent_type, u_int32_t cond_client_flags, necp_kernel_policy_result result, necp_kernel_policy_result_parameter result_parameter)
+necp_kernel_socket_policy_add(necp_policy_order order, u_int32_t session_order, int session_pid, u_int32_t condition_mask, u_int32_t condition_negated_mask, necp_app_id cond_app_id, necp_app_id cond_real_app_id, char *cond_custom_entitlement, u_int32_t cond_account_id, char *cond_domain, pid_t cond_pid, uid_t cond_uid, ifnet_t cond_bound_interface, struct necp_policy_condition_tc_range cond_traffic_class, u_int16_t cond_protocol, union necp_sockaddr_union *cond_local_start, union necp_sockaddr_union *cond_local_end, u_int8_t cond_local_prefix, union necp_sockaddr_union *cond_remote_start, union necp_sockaddr_union *cond_remote_end, u_int8_t cond_remote_prefix, struct necp_policy_condition_agent_type *cond_agent_type, u_int32_t cond_client_flags, char *cond_signing_identifier, necp_kernel_policy_result result, necp_kernel_policy_result_parameter result_parameter)
 {
 	struct necp_kernel_socket_policy *new_kernel_policy = NULL;
 	struct necp_kernel_socket_policy *tmp_kernel_policy = NULL;
@@ -3942,6 +3981,9 @@ necp_kernel_socket_policy_add(necp_policy_order order, u_int32_t session_order, 
 	if (new_kernel_policy->condition_mask & NECP_KERNEL_CONDITION_CLIENT_FLAGS) {
 		new_kernel_policy->cond_client_flags = cond_client_flags;
 	}
+	if (new_kernel_policy->condition_mask & NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER) {
+		new_kernel_policy->cond_signing_identifier = cond_signing_identifier;
+	}
 
 	new_kernel_policy->result = result;
 	memcpy(&new_kernel_policy->result_parameter, &result_parameter, sizeof(result_parameter));
@@ -3999,6 +4041,11 @@ necp_kernel_socket_policy_delete(necp_kernel_policy_id policy_id)
 			policy->cond_custom_entitlement = NULL;
 		}
 
+		if (policy->cond_signing_identifier) {
+			FREE(policy->cond_signing_identifier, M_NECP);
+			policy->cond_signing_identifier = NULL;
+		}
+
 		FREE_ZONE(policy, sizeof(*policy), M_NECP_SOCKET_POLICY);
 		return TRUE;
 	}
@@ -4016,7 +4063,7 @@ necp_get_result_description(char *result_string, necp_kernel_policy_result resul
 		break;
 	}
 	case NECP_KERNEL_POLICY_RESULT_PASS: {
-		snprintf(result_string, MAX_RESULT_STRING_LEN, "Pass");
+		snprintf(result_string, MAX_RESULT_STRING_LEN, "Pass (%X)", result_parameter.pass_flags);
 		break;
 	}
 	case NECP_KERNEL_POLICY_RESULT_SKIP: {
@@ -5928,7 +5975,7 @@ necp_get_parent_cred_result(proc_t proc, struct necp_socket_info *info)
 
 #define NECP_KERNEL_ADDRESS_TYPE_CONDITIONS (NECP_KERNEL_CONDITION_LOCAL_START | NECP_KERNEL_CONDITION_LOCAL_END | NECP_KERNEL_CONDITION_LOCAL_PREFIX | NECP_KERNEL_CONDITION_REMOTE_START | NECP_KERNEL_CONDITION_REMOTE_END | NECP_KERNEL_CONDITION_REMOTE_PREFIX | NECP_KERNEL_CONDITION_LOCAL_EMPTY | NECP_KERNEL_CONDITION_REMOTE_EMPTY | NECP_KERNEL_CONDITION_LOCAL_NETWORKS)
 static void
-necp_application_fillout_info_locked(uuid_t application_uuid, uuid_t real_application_uuid, char *account, char *domain, pid_t pid, uid_t uid, u_int16_t protocol, u_int32_t bound_interface_index, u_int32_t traffic_class, union necp_sockaddr_union *local_addr, union necp_sockaddr_union *remote_addr, u_int16_t local_port, u_int16_t remote_port, bool has_client, proc_t proc, u_int32_t drop_order, u_int32_t client_flags, struct necp_socket_info *info)
+necp_application_fillout_info_locked(uuid_t application_uuid, uuid_t real_application_uuid, uuid_t responsible_application_uuid, char *account, char *domain, pid_t pid, uid_t uid, u_int16_t protocol, u_int32_t bound_interface_index, u_int32_t traffic_class, union necp_sockaddr_union *local_addr, union necp_sockaddr_union *remote_addr, u_int16_t local_port, u_int16_t remote_port, bool has_client, proc_t proc, proc_t responsible_proc, u_int32_t drop_order, u_int32_t client_flags, struct necp_socket_info *info)
 {
 	memset(info, 0, sizeof(struct necp_socket_info));
 
@@ -5940,18 +5987,6 @@ necp_application_fillout_info_locked(uuid_t application_uuid, uuid_t real_applic
 	info->has_client = has_client;
 	info->drop_order = drop_order;
 	info->client_flags = client_flags;
-
-	if (necp_kernel_application_policies_condition_mask & NECP_KERNEL_CONDITION_ENTITLEMENT && proc != NULL) {
-		info->cred_result = priv_check_cred(proc_ucred(proc), PRIV_NET_PRIVILEGED_NECP_MATCH, 0);
-		if (info->cred_result != 0) {
-			// Process does not have entitlement, check the parent process
-			necp_get_parent_cred_result(proc, info);
-		}
-	}
-
-	if (necp_kernel_application_policies_condition_mask & NECP_KERNEL_CONDITION_PLATFORM_BINARY && proc != NULL) {
-		info->is_platform_binary = csproc_get_platform_binary(proc) ? true : false;
-	}
 
 	if (necp_kernel_application_policies_condition_mask & NECP_KERNEL_CONDITION_APP_ID && !uuid_is_null(application_uuid)) {
 		struct necp_uuid_id_mapping *existing_mapping = necp_uuid_lookup_app_id_locked(application_uuid);
@@ -5969,6 +6004,31 @@ necp_application_fillout_info_locked(uuid_t application_uuid, uuid_t real_applic
 				info->real_application_id = existing_mapping->id;
 			}
 		}
+	}
+
+	if (necp_kernel_application_policies_condition_mask & NECP_KERNEL_CONDITION_APP_ID && !uuid_is_null(responsible_application_uuid)) {
+		struct necp_uuid_id_mapping *existing_mapping = necp_uuid_lookup_app_id_locked(responsible_application_uuid);
+		if (existing_mapping != NULL) {
+			info->real_application_id = info->application_id;
+			info->application_id = existing_mapping->id;
+			info->used_responsible_pid = true;
+		}
+	}
+
+	if (info->used_responsible_pid) {
+		proc = responsible_proc;
+	}
+
+	if (necp_kernel_application_policies_condition_mask & NECP_KERNEL_CONDITION_ENTITLEMENT && proc != NULL) {
+		info->cred_result = priv_check_cred(proc_ucred(proc), PRIV_NET_PRIVILEGED_NECP_MATCH, 0);
+		if (info->cred_result != 0) {
+			// Process does not have entitlement, check the parent process
+			necp_get_parent_cred_result(proc, info);
+		}
+	}
+
+	if (necp_kernel_application_policies_condition_mask & NECP_KERNEL_CONDITION_PLATFORM_BINARY && proc != NULL) {
+		info->is_platform_binary = csproc_get_platform_binary(proc) ? true : false;
 	}
 
 	if (necp_kernel_application_policies_condition_mask & NECP_KERNEL_CONDITION_ACCOUNT_ID && account != NULL) {
@@ -6046,7 +6106,8 @@ necp_application_find_policy_match_internal(proc_t proc,
     struct necp_client_endpoint *returned_v4_gateway,
     struct necp_client_endpoint *returned_v6_gateway,
     struct rtentry **returned_route, bool ignore_address,
-    bool has_client)
+    bool has_client,
+    uuid_t *returned_override_euuid)
 {
 	int error = 0;
 	size_t offset = 0;
@@ -6090,6 +6151,8 @@ necp_application_find_policy_match_internal(proc_t proc,
 	uuid_clear(real_application_uuid);
 	proc_getexecutableuuid(proc, real_application_uuid, sizeof(real_application_uuid));
 	uuid_copy(application_uuid, real_application_uuid);
+	uuid_t responsible_application_uuid;
+	uuid_clear(responsible_application_uuid);
 
 	char *domain = NULL;
 	char *account = NULL;
@@ -6108,6 +6171,10 @@ necp_application_find_policy_match_internal(proc_t proc,
 	bool has_checked_delegation_entitlement = FALSE;
 	bool has_delegation_entitlement = FALSE;
 
+	proc_t responsible_proc = PROC_NULL;
+	proc_t effective_proc = proc;
+	bool release_eproc = false;
+
 	if (returned_result == NULL) {
 		return EINVAL;
 	}
@@ -6118,6 +6185,10 @@ necp_application_find_policy_match_internal(proc_t proc,
 
 	if (returned_v6_gateway != NULL) {
 		memset(returned_v6_gateway, 0, sizeof(struct necp_client_endpoint));
+	}
+
+	if (returned_override_euuid != NULL) {
+		uuid_clear(*returned_override_euuid);
 	}
 
 	memset(returned_result, 0, sizeof(struct necp_aggregate_result));
@@ -6331,17 +6402,36 @@ necp_application_find_policy_match_internal(proc_t proc,
 		return 0;
 	}
 
+	if (proc_pid(effective_proc) != pid) {
+		proc_t found_proc = proc_find(pid);
+		if (found_proc != PROC_NULL) {
+			effective_proc = found_proc;
+			release_eproc = true;
+		}
+	}
+#if defined(XNU_TARGET_OS_OSX)
+	if (effective_proc->p_responsible_pid > 0 && effective_proc->p_responsible_pid != pid) {
+		responsible_proc = proc_find(effective_proc->p_responsible_pid);
+		if (responsible_proc != PROC_NULL) {
+			proc_getexecutableuuid(responsible_proc, responsible_application_uuid, sizeof(responsible_application_uuid));
+		}
+	}
+#endif /* defined(XNU_TARGET_OS_OSX) */
+
 	// Lock
 	lck_rw_lock_shared(&necp_kernel_policy_lock);
 
 	u_int32_t route_rule_id_array[MAX_AGGREGATE_ROUTE_RULES];
 	size_t route_rule_id_array_count = 0;
-	necp_application_fillout_info_locked(application_uuid, real_application_uuid, account, domain, pid, uid, protocol, bound_interface_index, traffic_class, &local_addr, &remote_addr, local_port, remote_port, has_client, proc, drop_order, client_flags, &info);
-	matched_policy = necp_socket_find_policy_match_with_info_locked(necp_kernel_socket_policies_app_layer_map, &info, &filter_control_unit, route_rule_id_array, &route_rule_id_array_count, MAX_AGGREGATE_ROUTE_RULES, &service_action, &service, netagent_ids, netagent_use_flags, NECP_MAX_NETAGENTS, required_agent_types, num_required_agent_types, proc, NULL, NULL, &drop_dest_policy_result, &drop_all_bypass);
+	necp_application_fillout_info_locked(application_uuid, real_application_uuid, responsible_application_uuid, account, domain, pid, uid, protocol, bound_interface_index, traffic_class, &local_addr, &remote_addr, local_port, remote_port, has_client, effective_proc, responsible_proc, drop_order, client_flags, &info);
+	matched_policy = necp_socket_find_policy_match_with_info_locked(necp_kernel_socket_policies_app_layer_map, &info, &filter_control_unit, route_rule_id_array, &route_rule_id_array_count, MAX_AGGREGATE_ROUTE_RULES, &service_action, &service, netagent_ids, netagent_use_flags, NECP_MAX_NETAGENTS, required_agent_types, num_required_agent_types, info.used_responsible_pid ? responsible_proc : effective_proc, NULL, NULL, &drop_dest_policy_result, &drop_all_bypass);
 	if (matched_policy) {
 		returned_result->policy_id = matched_policy->id;
 		returned_result->routing_result = matched_policy->result;
 		memcpy(&returned_result->routing_result_parameter, &matched_policy->result_parameter, sizeof(returned_result->routing_result_parameter));
+		if (returned_override_euuid != NULL && info.used_responsible_pid && !(matched_policy->condition_mask & NECP_KERNEL_CONDITION_REAL_APP_ID)) {
+			uuid_copy(*returned_override_euuid, responsible_application_uuid);
+		}
 	} else {
 		bool drop_all = false;
 		if (necp_drop_all_order > 0 || info.drop_order > 0 || drop_dest_policy_result == NECP_KERNEL_POLICY_RESULT_DROP) {
@@ -6753,6 +6843,15 @@ necp_application_find_policy_match_internal(proc_t proc,
 	// Unlock
 	lck_rw_done(&necp_kernel_policy_lock);
 
+	if (release_eproc && effective_proc != PROC_NULL) {
+		proc_rele(effective_proc);
+	}
+#if defined(XNU_TARGET_OS_OSX)
+	if (responsible_proc != PROC_NULL) {
+		proc_rele(responsible_proc);
+	}
+#endif
+
 	return error;
 }
 
@@ -6846,6 +6945,30 @@ necp_socket_check_policy(struct necp_kernel_socket_policy *kernel_policy, necp_a
 			if (app_id != kernel_policy->cond_app_id) {
 				// No match, does not match required application
 				return FALSE;
+			}
+		}
+
+		// Check signing identifier only after APP ID matched
+		if (kernel_policy->condition_negated_mask & NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER ||
+		    kernel_policy->condition_mask & NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER) {
+			u_int8_t matched = necp_boolean_state_false;
+			const char *signing_id = cs_identity_get(proc ? proc : current_proc());
+
+			if (signing_id != NULL) {
+				size_t signing_id_size = strlen(signing_id) + 1;
+				if (memcmp(signing_id, kernel_policy->cond_signing_identifier, signing_id_size) == 0) {
+					matched = necp_boolean_state_true;
+				}
+			}
+
+			if (kernel_policy->condition_negated_mask & NECP_KERNEL_CONDITION_SIGNING_IDENTIFIER) {
+				if (matched == necp_boolean_state_true) {
+					return FALSE;
+				}
+			} else {
+				if (matched != necp_boolean_state_true) {
+					return FALSE;
+				}
 			}
 		}
 	}
@@ -7129,9 +7252,11 @@ necp_socket_calc_flowhash_locked(struct necp_socket_info *info)
 }
 
 static void
-necp_socket_fillout_info_locked(struct inpcb *inp, struct sockaddr *override_local_addr, struct sockaddr *override_remote_addr, u_int32_t override_bound_interface, u_int32_t drop_order, struct necp_socket_info *info)
+necp_socket_fillout_info_locked(struct inpcb *inp, struct sockaddr *override_local_addr, struct sockaddr *override_remote_addr, u_int32_t override_bound_interface, u_int32_t drop_order, proc_t *socket_proc, struct necp_socket_info *info)
 {
 	struct socket *so = NULL;
+	proc_t sock_proc = NULL;
+	proc_t curr_proc = current_proc();
 
 	memset(info, 0, sizeof(struct necp_socket_info));
 
@@ -7184,12 +7309,27 @@ necp_socket_fillout_info_locked(struct inpcb *inp, struct sockaddr *override_loc
 	}
 
 	if (inp->inp_flags2 & INP2_WANT_APP_POLICY && necp_kernel_socket_policies_condition_mask & NECP_KERNEL_CONDITION_APP_ID) {
+		u_int32_t responsible_application_id = 0;
+
 		struct necp_uuid_id_mapping *existing_mapping = necp_uuid_lookup_app_id_locked(((so->so_flags & SOF_DELEGATED) ? so->e_uuid : so->last_uuid));
 		if (existing_mapping) {
 			info->application_id = existing_mapping->id;
 		}
 
-		if (!(so->so_flags & SOF_DELEGATED)) {
+#if defined(XNU_TARGET_OS_OSX)
+		if (so->so_rpid > 0) {
+			existing_mapping = necp_uuid_lookup_app_id_locked(so->so_ruuid);
+			if (existing_mapping != NULL) {
+				responsible_application_id = existing_mapping->id;
+			}
+		}
+#endif
+
+		if (responsible_application_id > 0) {
+			info->real_application_id = info->application_id;
+			info->application_id = responsible_application_id;
+			info->used_responsible_pid = true;
+		} else if (!(so->so_flags & SOF_DELEGATED)) {
 			info->real_application_id = info->application_id;
 		} else if (necp_kernel_socket_policies_condition_mask & NECP_KERNEL_CONDITION_REAL_APP_ID) {
 			struct necp_uuid_id_mapping *real_existing_mapping = necp_uuid_lookup_app_id_locked(so->last_uuid);
@@ -7205,10 +7345,22 @@ necp_socket_fillout_info_locked(struct inpcb *inp, struct sockaddr *override_loc
 				necp_get_parent_cred_result(NULL, info);
 			}
 		}
+	}
 
-		if (necp_kernel_socket_policies_condition_mask & NECP_KERNEL_CONDITION_PLATFORM_BINARY) {
-			info->is_platform_binary = csproc_get_platform_binary(current_proc()) ? true : false;
+	pid_t socket_pid =
+#if defined(XNU_TARGET_OS_OSX)
+	    info->used_responsible_pid ? so->so_rpid :
+#endif
+	    ((so->so_flags & SOF_DELEGATED) ? so->e_pid : so->last_pid);
+	if (socket_pid && (socket_pid != proc_pid(curr_proc))) {
+		sock_proc = proc_find(socket_pid);
+		if (socket_proc) {
+			*socket_proc = sock_proc;
 		}
+	}
+
+	if (necp_kernel_socket_policies_condition_mask & NECP_KERNEL_CONDITION_PLATFORM_BINARY) {
+		info->is_platform_binary = csproc_get_platform_binary(sock_proc ? sock_proc : curr_proc) ? true : false;
 	}
 
 	if (necp_kernel_socket_policies_condition_mask & NECP_KERNEL_CONDITION_ACCOUNT_ID && inp->inp_necp_attributes.inp_account != NULL) {
@@ -7438,7 +7590,7 @@ necp_socket_find_policy_match_with_info_locked(struct necp_kernel_socket_policy 
 				if (policy_search_array[i]->result == NECP_KERNEL_POLICY_RESULT_SKIP) {
 					skip_order = policy_search_array[i]->result_parameter.skip_policy_order;
 					skip_session_order = policy_search_array[i]->session_order + 1;
-					if (skip_policy_id) {
+					if (skip_policy_id && *skip_policy_id == NECP_KERNEL_POLICY_ID_NONE) {
 						*skip_policy_id = policy_search_array[i]->id;
 					}
 					continue;
@@ -7541,6 +7693,7 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 	necp_kernel_policy_service service = { 0, 0 };
 	u_int32_t drop_dest_policy_result = NECP_KERNEL_POLICY_RESULT_NONE;
 	necp_drop_all_bypass_check_result_t drop_all_bypass = NECP_DROP_ALL_BYPASS_CHECK_RESULT_NONE;
+	proc_t socket_proc = NULL;
 
 	u_int32_t netagent_ids[NECP_MAX_NETAGENTS];
 	memset(&netagent_ids, 0, sizeof(netagent_ids));
@@ -7588,6 +7741,11 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 
 	// Check for loopback exception
 	if (necp_socket_bypass(override_local_addr, override_remote_addr, inp)) {
+		if (inp->inp_policyresult.results.result == NECP_KERNEL_POLICY_RESULT_SOCKET_SCOPED) {
+			// If the previous policy result was "socket scoped", un-scope the socket.
+			inp->inp_flags &= ~INP_BOUND_IF;
+			inp->inp_boundifp = NULL;
+		}
 		// Mark socket as a pass
 		inp->inp_policyresult.policy_id = NECP_KERNEL_POLICY_ID_NO_MATCH;
 		inp->inp_policyresult.skip_policy_id = NECP_KERNEL_POLICY_ID_NO_MATCH;
@@ -7603,8 +7761,7 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 	// Lock
 	lck_rw_lock_shared(&necp_kernel_policy_lock);
 
-	necp_socket_fillout_info_locked(inp, override_local_addr, override_remote_addr, override_bound_interface, drop_order, &info);
-	inp->inp_policyresult.app_id = info.application_id;
+	necp_socket_fillout_info_locked(inp, override_local_addr, override_remote_addr, override_bound_interface, drop_order, &socket_proc, &info);
 
 	// Check info
 	u_int32_t flowhash = necp_socket_calc_flowhash_locked(&info);
@@ -7616,14 +7773,20 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 		// Unlock
 		lck_rw_done(&necp_kernel_policy_lock);
 
+		if (socket_proc) {
+			proc_rele(socket_proc);
+		}
+
 		return inp->inp_policyresult.policy_id;
 	}
 
+	inp->inp_policyresult.app_id = info.application_id;
+
 	// Match socket to policy
-	necp_kernel_policy_id skip_policy_id;
+	necp_kernel_policy_id skip_policy_id = NECP_KERNEL_POLICY_ID_NONE;
 	u_int32_t route_rule_id_array[MAX_AGGREGATE_ROUTE_RULES];
 	size_t route_rule_id_array_count = 0;
-	matched_policy = necp_socket_find_policy_match_with_info_locked(necp_kernel_socket_policies_map[NECP_SOCKET_MAP_APP_ID_TO_BUCKET(info.application_id)], &info, &filter_control_unit, route_rule_id_array, &route_rule_id_array_count, MAX_AGGREGATE_ROUTE_RULES, &service_action, &service, netagent_ids, NULL, NECP_MAX_NETAGENTS, NULL, 0, current_proc(), &skip_policy_id, inp->inp_route.ro_rt, &drop_dest_policy_result, &drop_all_bypass);
+	matched_policy = necp_socket_find_policy_match_with_info_locked(necp_kernel_socket_policies_map[NECP_SOCKET_MAP_APP_ID_TO_BUCKET(info.application_id)], &info, &filter_control_unit, route_rule_id_array, &route_rule_id_array_count, MAX_AGGREGATE_ROUTE_RULES, &service_action, &service, netagent_ids, NULL, NECP_MAX_NETAGENTS, NULL, 0, socket_proc ? socket_proc : current_proc(), &skip_policy_id, inp->inp_route.ro_rt, &drop_dest_policy_result, &drop_all_bypass);
 
 	// If the socket matched a scoped service policy, mark as Drop if not registered.
 	// This covers the cases in which a service is required (on demand) but hasn't started yet.
@@ -7655,6 +7818,11 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 
 			// Unlock
 			lck_rw_done(&necp_kernel_policy_lock);
+
+			if (socket_proc) {
+				proc_rele(socket_proc);
+			}
+
 			return NECP_KERNEL_POLICY_ID_NONE;
 		}
 	}
@@ -7696,6 +7864,11 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 
 					// Unlock
 					lck_rw_done(&necp_kernel_policy_lock);
+
+					if (socket_proc) {
+						proc_rele(socket_proc);
+					}
+
 					return NECP_KERNEL_POLICY_ID_NONE;
 				}
 			}
@@ -7721,6 +7894,10 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 		inp->inp_policyresult.results.result = matched_policy->result;
 		memcpy(&inp->inp_policyresult.results.result_parameter, &matched_policy->result_parameter, sizeof(matched_policy->result_parameter));
 
+		if (info.used_responsible_pid && (matched_policy->condition_mask & NECP_KERNEL_CONDITION_REAL_APP_ID)) {
+			inp->inp_policyresult.app_id = info.real_application_id;
+		}
+
 		if (necp_socket_is_connected(inp) &&
 		    (matched_policy->result == NECP_KERNEL_POLICY_RESULT_DROP ||
 		    (matched_policy->result == NECP_KERNEL_POLICY_RESULT_IP_TUNNEL && !necp_socket_uses_interface(inp, matched_policy->result_parameter.tunnel_interface_index)))) {
@@ -7744,7 +7921,7 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 			// Mark socket as a drop if set
 			drop_all = true;
 			if (drop_all_bypass == NECP_DROP_ALL_BYPASS_CHECK_RESULT_NONE) {
-				drop_all_bypass = necp_check_drop_all_bypass_result(NULL);
+				drop_all_bypass = necp_check_drop_all_bypass_result(socket_proc ? socket_proc : current_proc());
 			}
 		}
 		if (drop_all && drop_all_bypass == NECP_DROP_ALL_BYPASS_CHECK_RESULT_FALSE) {
@@ -7773,6 +7950,10 @@ necp_socket_find_policy_match(struct inpcb *inp, struct sockaddr *override_local
 	if (reset_tcp_mss) {
 		// Update MSS when not holding the policy lock to avoid recursive locking
 		tcp_mtudisc(inp, 0);
+	}
+
+	if (socket_proc) {
+		proc_rele(socket_proc);
 	}
 
 	return matched_policy_id;
@@ -8970,6 +9151,7 @@ necp_socket_is_allowed_to_send_recv_internal(struct inpcb *inp, struct sockaddr 
 	necp_drop_all_bypass_check_result_t drop_all_bypass = NECP_DROP_ALL_BYPASS_CHECK_RESULT_NONE;
 	u_int32_t netagent_ids[NECP_MAX_NETAGENTS];
 	memset(&netagent_ids, 0, sizeof(netagent_ids));
+	proc_t socket_proc = NULL;
 
 	if (return_policy_id) {
 		*return_policy_id = NECP_KERNEL_POLICY_ID_NONE;
@@ -9051,7 +9233,7 @@ necp_socket_is_allowed_to_send_recv_internal(struct inpcb *inp, struct sockaddr 
 
 	// Actually calculate policy result
 	lck_rw_lock_shared(&necp_kernel_policy_lock);
-	necp_socket_fillout_info_locked(inp, override_local_addr, override_remote_addr, 0, drop_order, &info);
+	necp_socket_fillout_info_locked(inp, override_local_addr, override_remote_addr, 0, drop_order, &socket_proc, &info);
 
 	flowhash = necp_socket_calc_flowhash_locked(&info);
 	if (inp->inp_policyresult.policy_id != NECP_KERNEL_POLICY_ID_NONE &&
@@ -9081,7 +9263,7 @@ necp_socket_is_allowed_to_send_recv_internal(struct inpcb *inp, struct sockaddr 
 
 	u_int32_t route_rule_id_array[MAX_AGGREGATE_ROUTE_RULES];
 	size_t route_rule_id_array_count = 0;
-	struct necp_kernel_socket_policy *matched_policy = necp_socket_find_policy_match_with_info_locked(necp_kernel_socket_policies_map[NECP_SOCKET_MAP_APP_ID_TO_BUCKET(info.application_id)], &info, NULL, route_rule_id_array, &route_rule_id_array_count, MAX_AGGREGATE_ROUTE_RULES, &service_action, &service, netagent_ids, NULL, NECP_MAX_NETAGENTS, NULL, 0, current_proc(), return_skip_policy_id, inp->inp_route.ro_rt, &drop_dest_policy_result, &drop_all_bypass);
+	struct necp_kernel_socket_policy *matched_policy = necp_socket_find_policy_match_with_info_locked(necp_kernel_socket_policies_map[NECP_SOCKET_MAP_APP_ID_TO_BUCKET(info.application_id)], &info, NULL, route_rule_id_array, &route_rule_id_array_count, MAX_AGGREGATE_ROUTE_RULES, &service_action, &service, netagent_ids, NULL, NECP_MAX_NETAGENTS, NULL, 0, socket_proc ? socket_proc : current_proc(), return_skip_policy_id, inp->inp_route.ro_rt, &drop_dest_policy_result, &drop_all_bypass);
 
 	if (route_rule_id_array_count == 1) {
 		route_rule_id = route_rule_id_array[0];
@@ -9120,7 +9302,7 @@ necp_socket_is_allowed_to_send_recv_internal(struct inpcb *inp, struct sockaddr 
 		if (necp_drop_all_order > 0 || info.drop_order > 0 || drop_dest_policy_result == NECP_KERNEL_POLICY_RESULT_DROP) {
 			drop_all = true;
 			if (drop_all_bypass == NECP_DROP_ALL_BYPASS_CHECK_RESULT_NONE) {
-				drop_all_bypass = necp_check_drop_all_bypass_result(NULL);
+				drop_all_bypass = necp_check_drop_all_bypass_result(socket_proc ? socket_proc : current_proc());
 			}
 		}
 		if (drop_all && drop_all_bypass == NECP_DROP_ALL_BYPASS_CHECK_RESULT_FALSE) {
@@ -9140,6 +9322,10 @@ necp_socket_is_allowed_to_send_recv_internal(struct inpcb *inp, struct sockaddr 
 done:
 	if (!allowed_to_receive && interface_type_denied != IFRTYPE_FUNCTIONAL_UNKNOWN) {
 		soevent(inp->inp_socket, (SO_FILT_HINT_LOCKED | SO_FILT_HINT_IFDENIED));
+	}
+
+	if (socket_proc) {
+		proc_rele(socket_proc);
 	}
 
 	return allowed_to_receive;
@@ -9210,7 +9396,7 @@ necp_mark_packet_from_socket(struct mbuf *packet, struct inpcb *inp, necp_kernel
 	} else {
 		packet->m_pkthdr.necp_mtag.necp_route_rule_id = inp->inp_policyresult.results.route_rule_id;
 	}
-	packet->m_pkthdr.necp_mtag.necp_app_id = inp->inp_policyresult.app_id;
+	packet->m_pkthdr.necp_mtag.necp_app_id = (inp->inp_policyresult.app_id > UINT16_MAX ? (inp->inp_policyresult.app_id - UINT16_MAX) : inp->inp_policyresult.app_id);
 
 	if (skip_policy_id != NECP_KERNEL_POLICY_ID_NONE &&
 	    skip_policy_id != NECP_KERNEL_POLICY_ID_NO_MATCH) {
@@ -9344,7 +9530,8 @@ necp_get_app_uuid_from_packet(struct mbuf *packet,
 	bool found_mapping = FALSE;
 	if (packet->m_pkthdr.necp_mtag.necp_app_id != 0) {
 		lck_rw_lock_shared(&necp_kernel_policy_lock);
-		struct necp_uuid_id_mapping *entry = necp_uuid_lookup_uuid_with_app_id_locked(packet->m_pkthdr.necp_mtag.necp_app_id);
+		necp_app_id app_id = (packet->m_pkthdr.necp_mtag.necp_app_id < UINT16_MAX ? (packet->m_pkthdr.necp_mtag.necp_app_id + UINT16_MAX) : packet->m_pkthdr.necp_mtag.necp_app_id);
+		struct necp_uuid_id_mapping *entry = necp_uuid_lookup_uuid_with_app_id_locked(app_id);
 		if (entry != NULL) {
 			uuid_copy(app_uuid, entry->uuid);
 			found_mapping = true;
@@ -9746,6 +9933,11 @@ sysctl_handle_necp_drop_dest_level SYSCTL_HANDLER_ARGS
 		case NECP_SESSION_PRIORITY_CONTROL:
 		case NECP_SESSION_PRIORITY_PRIVILEGED_TUNNEL:
 		case NECP_SESSION_PRIORITY_HIGH:
+		case NECP_SESSION_PRIORITY_HIGH_1:
+		case NECP_SESSION_PRIORITY_HIGH_2:
+		case NECP_SESSION_PRIORITY_HIGH_3:
+		case NECP_SESSION_PRIORITY_HIGH_4:
+		case NECP_SESSION_PRIORITY_HIGH_RESTRICTED:
 		case NECP_SESSION_PRIORITY_DEFAULT:
 		case NECP_SESSION_PRIORITY_LOW:
 			if (tmp_drop_dest_policy.entry_count == 0) {

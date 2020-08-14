@@ -37,7 +37,7 @@
 
 ALLOW_UNUSED_PARAMETERS_BEGIN
 
-#include <webrtc/api/mediastreaminterface.h>
+#include <webrtc/api/media_stream_interface.h>
 
 ALLOW_UNUSED_PARAMETERS_END
 
@@ -51,8 +51,6 @@ class RealtimeIncomingAudioSource
 {
 public:
     static Ref<RealtimeIncomingAudioSource> create(rtc::scoped_refptr<webrtc::AudioTrackInterface>&&, String&&);
-
-    void setSourceTrack(rtc::scoped_refptr<webrtc::AudioTrackInterface>&&);
 
 protected:
     RealtimeIncomingAudioSource(rtc::scoped_refptr<webrtc::AudioTrackInterface>&&, String&&);

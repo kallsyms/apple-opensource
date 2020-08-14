@@ -27,10 +27,12 @@
 
 #include "DrawingAreaInfo.h"
 #include "LayerTreeContext.h"
+#include "SandboxExtension.h"
 #include "SessionState.h"
 #include "WebCompiledContentRuleListData.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebPageGroupData.h"
+#include "WebPageProxyIdentifier.h"
 #include "WebPreferencesStore.h"
 #include "WebUserContentControllerDataTypes.h"
 #include <WebCore/ActivityState.h>
@@ -44,7 +46,6 @@
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/UserInterfaceLayoutDirection.h>
 #include <WebCore/ViewportArguments.h>
-#include <pal/SessionID.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
 
@@ -74,6 +75,7 @@ struct WebPageCreationParameters {
     WebPreferencesStore store;
     DrawingAreaType drawingAreaType;
     DrawingAreaIdentifier drawingAreaIdentifier;
+    WebPageProxyIdentifier webPageProxyIdentifier;
     WebPageGroupData pageGroupData;
 
     bool isEditable;
@@ -97,11 +99,9 @@ struct WebPageCreationParameters {
     String userAgent;
 
     Vector<BackForwardListItemState> itemStates;
-    PAL::SessionID sessionID;
 
     UserContentControllerIdentifier userContentControllerID;
     uint64_t visitedLinkTableID;
-    uint64_t websiteDataStoreID;
     bool canRunBeforeUnloadConfirmPanel;
     bool canRunModal;
 
@@ -118,7 +118,7 @@ struct WebPageCreationParameters {
     bool mayStartMediaWhenInWindow;
     bool mediaPlaybackIsSuspended { false };
 
-    WebCore::IntSize viewLayoutSize;
+    WebCore::IntSize minimumSizeForAutoLayout;
     bool autoSizingShouldExpandToViewHeight;
     Optional<WebCore::IntSize> viewportSizeForCSSViewportUnits;
     
@@ -183,10 +183,6 @@ struct WebPageCreationParameters {
     Optional<WebCore::ApplicationManifest> applicationManifest;
 #endif
 
-#if ENABLE(SERVICE_WORKER)
-    bool hasRegisteredServiceWorkers { true };
-#endif
-
     bool needsFontAttributes { false };
 
     // WebRTC members.
@@ -205,6 +201,9 @@ struct WebPageCreationParameters {
     Optional<WebCore::Color> backgroundColor;
 
     Optional<WebCore::PageIdentifier> oldPageID;
+
+    String overriddenMediaType;
+    Vector<String> corsDisablingPatterns;
 };
 
 } // namespace WebKit

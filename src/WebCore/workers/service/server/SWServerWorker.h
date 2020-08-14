@@ -37,13 +37,13 @@
 #include "ServiceWorkerRegistrationKey.h"
 #include "ServiceWorkerTypes.h"
 #include <wtf/RefCounted.h>
+#include <wtf/WeakPtr.h>
 
 namespace WebCore {
 
 class SWServer;
 class SWServerRegistration;
 class SWServerToContextConnection;
-struct ServiceWorkerClientData;
 struct ServiceWorkerClientIdentifier;
 struct ServiceWorkerClientQueryOptions;
 struct ServiceWorkerContextData;
@@ -62,7 +62,7 @@ public:
 
     void terminate();
 
-    WEBCORE_EXPORT void whenActivated(WTF::Function<void(bool)>&&);
+    WEBCORE_EXPORT void whenActivated(CompletionHandler<void(bool)>&&);
 
     enum class State {
         Running,
@@ -82,19 +82,20 @@ public:
     ServiceWorkerIdentifier identifier() const { return m_data.identifier; }
 
     ServiceWorkerState state() const { return m_data.state; }
+    bool isActive() const { return m_data.state == ServiceWorkerState::Activated || m_data.state == ServiceWorkerState::Activating; }
+
     void setState(ServiceWorkerState);
 
     bool hasPendingEvents() const { return m_hasPendingEvents; }
     void setHasPendingEvents(bool);
 
     void scriptContextFailedToStart(const Optional<ServiceWorkerJobDataIdentifier>&, const String& message);
-    void scriptContextStarted(const Optional<ServiceWorkerJobDataIdentifier>&);
+    void scriptContextStarted(const Optional<ServiceWorkerJobDataIdentifier>&, bool doesHandleFetch);
     void didFinishInstall(const Optional<ServiceWorkerJobDataIdentifier>&, bool wasSuccessful);
     void didFinishActivation();
     void contextTerminated();
     WEBCORE_EXPORT Optional<ServiceWorkerClientData> findClientByIdentifier(const ServiceWorkerClientIdentifier&) const;
     void matchAll(const ServiceWorkerClientQueryOptions&, ServiceWorkerClientsMatchAllCallback&&);
-    void claim();
     void setScriptResource(URL&&, ServiceWorkerContextData::ImportedScript&&);
 
     void skipWaiting();
@@ -112,8 +113,13 @@ public:
     WEBCORE_EXPORT SWServerToContextConnection* contextConnection();
     String userAgent() const;
 
+    bool shouldSkipFetchEvent() const { return m_shouldSkipHandleFetch; }
+    
+    SWServerRegistration* registration() const;
+
     void setHasTimedOutAnyFetchTasks() { m_hasTimedOutAnyFetchTasks = true; }
     bool hasTimedOutAnyFetchTasks() const { return m_hasTimedOutAnyFetchTasks; }
+    void didFailHeartBeatCheck();
 
 private:
     SWServerWorker(SWServer&, SWServerRegistration&, const URL&, const String& script, const ContentSecurityPolicyResponseHeaders&, String&& referrerPolicy, WorkerType, ServiceWorkerIdentifier, HashMap<URL, ServiceWorkerContextData::ImportedScript>&&);
@@ -122,6 +128,7 @@ private:
 
     WeakPtr<SWServer> m_server;
     ServiceWorkerRegistrationKey m_registrationKey;
+    WeakPtr<SWServerRegistration> m_registration;
     ServiceWorkerData m_data;
     String m_script;
     ContentSecurityPolicyResponseHeaders m_contentSecurityPolicy;
@@ -131,8 +138,9 @@ private:
     mutable Optional<ClientOrigin> m_origin;
     RegistrableDomain m_registrableDomain;
     bool m_isSkipWaitingFlagSet { false };
-    Vector<Function<void(bool)>> m_whenActivatedHandlers;
+    Vector<CompletionHandler<void(bool)>> m_whenActivatedHandlers;
     HashMap<URL, ServiceWorkerContextData::ImportedScript> m_scriptResourceMap;
+    bool m_shouldSkipHandleFetch;
     bool m_hasTimedOutAnyFetchTasks { false };
 };
 

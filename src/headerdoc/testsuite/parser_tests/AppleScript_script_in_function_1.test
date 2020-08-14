@@ -1,0 +1,904 @@
+FrT;@1|>>0|$15|HeaderDoc::Test%22|$4|CODE$7|COMMENT$7|CPPCODE$15|EXPECTED_RESULT$23|EXPECTED_RESULT_ALLDECS$7|FAILMSG$8|FILENAME$4|LANG$4|NAME$7|SUBLANG$4|TYPE$348|on outerFunction(theParent)
+	(*! Script inside the function. *)
+	script InnerScript
+		(*!
+		    @abstract
+			Method inside InnerScript.
+		*)
+		on innerMethod(data)
+			local n
+			set n to the length of the data
+		end innerMethod
+	end script
+end outerFunction
+(*! @abstract This should not get parsed. *)
+on afterOuterFunction
+end afterOuterFunction
+$55|(*!
+    @abstract
+ 	Function with a script inside.
+ *)
+$0|$22610|-=: TOP LEVEL COMMENT PARSE VALUES :=-
+inHeader: 0
+inClass: 0
+inInterface: 0
+inCPPHeader: 0
+inOCCHeader: 0
+inPerlScript: 0
+inShellScript: 0
+inPHPScript: 0
+inJavaSource: 0
+inFunctionGroup: 0
+inGroup: 0
+inFunction: 0
+inPDefine: 0
+inTypedef: 0
+inUnion: 0
+inStruct: 0
+inConstant: 0
+inVar: 0
+inEnum: 0
+inMethod: 0
+inAvailabilityMacro: 0
+inUnknown: 1
+classType: unknown
+inputCounter: 0
+blockOffset: 0
+fullpath: /test_suite_bogus_path/AppleScript_script_in_function_1.test
+-=: BLOCKPARSE PARSER STATE KEYS :=-
+$parserState->{ASLBRACEPRECURSOR} => 
+$parserState->{ASLBRACEPRECURSORTAG} => 
+$parserState->{FULLPATH} => /test_suite_bogus_path/AppleScript_script_in_function_1.test
+$parserState->{NEXTTOKENNOCPP} => 0
+$parserState->{afterNL} => 2
+$parserState->{availability} => 
+$parserState->{backslashcount} => 0
+$parserState->{basetype} => 
+$parserState->{bracePending} => 0
+$parserState->{callbackIsTypedef} => 0
+$parserState->{callbackName} => 
+$parserState->{callbackNamePending} => -1
+$parserState->{categoryClass} => 
+$parserState->{classtype} => 
+$parserState->{freezeStack} => ARRAY(OBJID)
+$parserState->{freezereturn} => 1
+$parserState->{frozensodname} => outerFunction
+$parserState->{functionContents} => 
+outerFunction
+
+$parserState->{functionReturnsCallback} => 0
+$parserState->{hollow} => HeaderDoc::ParseTree=HASH(OBJID)
+$parserState->{inBrackets} => 0
+$parserState->{inChar} => 0
+$parserState->{inClass} => 0
+$parserState->{inComment} => 0
+$parserState->{inGiven} => 0
+$parserState->{inInlineComment} => 0
+$parserState->{inLabel} => 0
+$parserState->{inMacro} => 0
+$parserState->{inMacroLine} => 0
+$parserState->{inOfIn} => 0
+$parserState->{inOperator} => 0
+$parserState->{inPrivateParamTypes} => 0
+$parserState->{inString} => 0
+$parserState->{inTemplate} => 0
+$parserState->{initbsCount} => 0
+$parserState->{inputCounter} => 10
+$parserState->{kr_c_function} => 0
+$parserState->{kr_c_name} => 
+$parserState->{lang} => applescript
+$parserState->{lastDisplayNode} => HeaderDoc::ParseTree=HASH(OBJID)
+$parserState->{lastTreeNode} => HeaderDoc::ParseTree=HASH(OBJID)
+$parserState->{lastsymbol} => 
+$parserState->{macroNoTrunc} => 1
+$parserState->{name} => outerFunction
+$parserState->{namePending} => 0
+$parserState->{noInsert} => 0
+$parserState->{occmethod} => 0
+$parserState->{occmethodname} => 
+$parserState->{occparmlabelfound} => 3
+$parserState->{onlyComments} => 0
+$parserState->{parsedParamAtBrace} => ARRAY(OBJID)
+$parserState->{parsedParamList} => ARRAY(OBJID)
+$parserState->{parsedParamParse} => 0
+$parserState->{parsedParamStateAtBrace} => ARRAY(OBJID)
+$parserState->{posstypes} => 
+$parserState->{posstypesPending} => 0
+$parserState->{pplStack} => ARRAY(OBJID)
+$parserState->{preEqualsSymbol} => 
+$parserState->{preTemplateSymbol} => 
+$parserState->{prekeywordsodname} => 
+$parserState->{prekeywordsodtype} => 
+$parserState->{pushedfuncbrace} => 2
+$parserState->{returntype} => on
+$parserState->{seenBraces} => 1
+$parserState->{seenMacroPart} => 0
+$parserState->{seenTilde} => 0
+$parserState->{simpleTDcontents} => 
+$parserState->{simpleTypedef} => 0
+$parserState->{sodclass} => function
+$parserState->{sodname} => outerFunction
+$parserState->{sodtype} => 
+$parserState->{stackFrozen} => 1
+$parserState->{startOfDec} => 0
+$parserState->{storeDec} =>  on outerFunction(
+
+$parserState->{sublang} => applescript
+$parserState->{treePopTwo} => 0
+$parserState->{typestring} => function
+$parserState->{value} => 
+$parserState->{valuepending} => 0
+-=: BLOCKPARSE RETURN VALUES :=-
+newcount: 10
+typelist: function
+namelist: outerFunction
+posstypes: function method 
+value: 
+returntype: 
+pridec: 
+simpleTDcontents: 
+bpavail: 
+blockOffset: 3
+conformsToList: 
+functionContents: 
+outerFunction
+
+extendsClass: 
+implementsClass: 
+-=: LIST OF PARSED PARAMETERS :=-
+Parsed Param 0 => theParent
+-=: DUMP OF PARSE TREE :=-
++---on
++--- 
++---outerFunction
++---(
+|   +---theParent
+|   +---)
++---(*
+|   +---!
+|   +--- Script inside the function. 
+|   +---*)
++---[ NEWLINE ]
++---        
++-*-script (HAS STATE)
++--- 
++---InnerScript
++---[ NEWLINE ]
+|   +---(*
+|   |   +---!
+|   |   +---
+@abstract
+|   |   +---
+Method inside InnerScript.
+|   |   +---[ NEWLINE ]
+|   |   +---*)
+|   +---[ NEWLINE ]
+|   +---                
+|   +-*-on (HAS STATE)
+|   +--- 
+|   +---innerMethod
+|   +---(
+|   |   +---data
+|   |   +---)
+|   +---                        
+|   +-*-local (HAS STATE)
+|   +--- 
+|   +---n
+|   +---[ NEWLINE ]
+|   +---                        
+|   +---set
+|   +--- 
+|   +---n
+|   +--- 
+|   +---to
+|   +--- 
+|   +---the
+|   +--- 
+|   +---length
+|   +--- 
+|   +---of
+|   +--- 
+|   +---the
+|   +--- 
+|   +---data
+|   +---[ NEWLINE ]
+|   +---                
+|   +---end
+|   +--- 
+|   +---[ NEWLINE ]
+|   +---        
+|   +---end
+|   +--- 
+|   +---script
++---[ NEWLINE ]
+-=-=-=-=-=-=- EODEC -=-=-=-=-=-=-
++---end
++--- 
+-=: COMPUTED VALUE :=-
+SUCCESS: 0
+VALUE: 0
+-=: CPP CHANGES :=-
+NO CPP CHANGES
+-=: FOUND MATCH :=-
+1
+-=: NAMED OBJECTS :=-
+TREE COUNT: 0
+INDEX GROUP: 
+IS BLOCK: 
+OBJECT TYPE: HeaderDoc::Header
+NAME: AppleScript script in function 1
+APIUID: //test_ref/doc/header/AppleScript_script_in_function_1.test
+ABSTRACT: ""
+DISCUSSION: "<p></p>"
+UPDATED: ""
+COPYRIGHT: ""
+HTMLMETA: ""
+PRIVATEDECLARATION: ""
+GROUP: ""
+INDEXGROUP: ""
+THROWS: ""
+XMLTHROWS: ""
+UPDATED: ""
+LINKAGESTATE: ""
+ACCESSCONTROL: ""
+AVAILABILITY: ""
+LINKUID: ""
+ORIGCLASS: ""
+ISDEFINE: ""
+ISTEMPLATE: ""
+VALUE: "UNKNOWN"
+RETURNTYPE: ""
+LINENUM: ""
+CLASS: "HeaderDoc::Header"
+MASTERENUM: ""
+APIREFSETUPDONE: "1"
+TPCDONE: ""
+NOREGISTERUID: ""
+SUPPRESSCHILDREN: ""
+NAMELINE_DISCUSSION: ""
+HIDEDOC: ""
+HIDESINGLETONS: ""
+HIDECONTENTS: ""
+MAINOBJECT: ""
+LIST ATTRIBUTES: 
+SHORT ATTRIBUTES: 
+LONG ATTRIBUTES: 
+    TREE COUNT: 1
+    INDEX GROUP: 
+    IS BLOCK: 
+    OBJECT TYPE: HeaderDoc::Function
+    NAME: outerFunction
+    APIUID: //test_ref/applescript/func/outerFunction
+    ABSTRACT: "<p>Function with a script inside."
+    DISCUSSION: "<p></p>"
+    UPDATED: ""
+    COPYRIGHT: ""
+    HTMLMETA: ""
+    PRIVATEDECLARATION: ""
+    GROUP: "default_function_group"
+    INDEXGROUP: ""
+    THROWS: ""
+    XMLTHROWS: ""
+    UPDATED: ""
+    LINKAGESTATE: ""
+    ACCESSCONTROL: ""
+    AVAILABILITY: ""
+    LINKUID: ""
+    ORIGCLASS: ""
+    ISDEFINE: ""
+    ISTEMPLATE: ""
+    VALUE: "UNKNOWN"
+    RETURNTYPE: ""
+    LINENUM: ""
+    CLASS: "HeaderDoc::Function"
+    MASTERENUM: ""
+    APIREFSETUPDONE: "1"
+    TPCDONE: ""
+    NOREGISTERUID: ""
+    SUPPRESSCHILDREN: "0"
+    NAMELINE_DISCUSSION: ""
+    HIDEDOC: ""
+    HIDESINGLETONS: ""
+    HIDECONTENTS: ""
+    MAINOBJECT: ""
+    LIST ATTRIBUTES: 
+    SHORT ATTRIBUTES: 
+    LONG ATTRIBUTES: 
+    PARSED PARAMETERS:
+        TREE COUNT: 0
+        INDEX GROUP: 
+        IS BLOCK: 
+        OBJECT TYPE: HeaderDoc::MinorAPIElement
+        NAME: 
+        TYPE:  theParent
+        APIUID: //test_ref/applescript/internal_temporary_object/
+        ABSTRACT: ""
+        DISCUSSION: "<p></p>"
+        UPDATED: ""
+        COPYRIGHT: ""
+        HTMLMETA: ""
+        PRIVATEDECLARATION: ""
+        GROUP: ""
+        INDEXGROUP: ""
+        THROWS: ""
+        XMLTHROWS: ""
+        UPDATED: ""
+        LINKAGESTATE: ""
+        ACCESSCONTROL: ""
+        AVAILABILITY: ""
+        LINKUID: ""
+        ORIGCLASS: ""
+        ISDEFINE: ""
+        ISTEMPLATE: ""
+        VALUE: "UNKNOWN"
+        RETURNTYPE: ""
+        LINENUM: ""
+        CLASS: "HeaderDoc::MinorAPIElement"
+        MASTERENUM: ""
+        APIREFSETUPDONE: "1"
+        TPCDONE: ""
+        NOREGISTERUID: ""
+        SUPPRESSCHILDREN: ""
+        NAMELINE_DISCUSSION: ""
+        HIDEDOC: ""
+        HIDESINGLETONS: ""
+        HIDECONTENTS: ""
+        MAINOBJECT: ""
+        LIST ATTRIBUTES: 
+        SHORT ATTRIBUTES: 
+        LONG ATTRIBUTES: 
+            TREE COUNT: 1
+            INDEX GROUP: 
+            IS BLOCK: 
+            OBJECT TYPE: HeaderDoc::CPPClass
+            NAME: InnerScript
+            APIUID: 
+            ABSTRACT: ""
+            DISCUSSION: "<p>Script inside the function. "
+            UPDATED: ""
+            COPYRIGHT: ""
+            HTMLMETA: ""
+            PRIVATEDECLARATION: ""
+            GROUP: ""
+            INDEXGROUP: ""
+            THROWS: ""
+            XMLTHROWS: ""
+            UPDATED: ""
+            LINKAGESTATE: ""
+            ACCESSCONTROL: ""
+            AVAILABILITY: ""
+            LINKUID: ""
+            ORIGCLASS: ""
+            ISDEFINE: ""
+            ISTEMPLATE: ""
+            VALUE: "UNKNOWN"
+            RETURNTYPE: ""
+            LINENUM: ""
+            CLASS: "HeaderDoc::CPPClass"
+            MASTERENUM: ""
+            APIREFSETUPDONE: "1"
+            TPCDONE: ""
+            NOREGISTERUID: ""
+            SUPPRESSCHILDREN: "0"
+            NAMELINE_DISCUSSION: ""
+            HIDEDOC: ""
+            HIDESINGLETONS: ""
+            HIDECONTENTS: ""
+            MAINOBJECT: ""
+            LIST ATTRIBUTES: 
+            SHORT ATTRIBUTES: <p><b>Declared In</b></p><p><a href="../../../index.html#//test_ref/applescript/func/outerFunction" logicalPath="//test_ref/applescript/func/outerFunction" target="_top" machineGenerated="true">outerFunction</a></p>
+
+            LONG ATTRIBUTES: 
+                TREE COUNT: 1
+                INDEX GROUP: 
+                IS BLOCK: 
+                OBJECT TYPE: HeaderDoc::Function
+                NAME: innerMethod
+                APIUID: //test_ref/applescript/instm/InnerScript/innerMethod//(data)
+                ABSTRACT: "<p>Method inside InnerScript.
+"
+                DISCUSSION: "<p></p>"
+                UPDATED: ""
+                COPYRIGHT: ""
+                HTMLMETA: ""
+                PRIVATEDECLARATION: ""
+                GROUP: ""
+                INDEXGROUP: ""
+                THROWS: ""
+                XMLTHROWS: ""
+                UPDATED: ""
+                LINKAGESTATE: ""
+                ACCESSCONTROL: ""
+                AVAILABILITY: ""
+                LINKUID: ""
+                ORIGCLASS: ""
+                ISDEFINE: ""
+                ISTEMPLATE: ""
+                VALUE: "UNKNOWN"
+                RETURNTYPE: ""
+                LINENUM: ""
+                CLASS: "HeaderDoc::Function"
+                MASTERENUM: ""
+                APIREFSETUPDONE: "1"
+                TPCDONE: ""
+                NOREGISTERUID: ""
+                SUPPRESSCHILDREN: "0"
+                NAMELINE_DISCUSSION: ""
+                HIDEDOC: ""
+                HIDESINGLETONS: ""
+                HIDECONTENTS: ""
+                MAINOBJECT: ""
+                LIST ATTRIBUTES: 
+                SHORT ATTRIBUTES: 
+                LONG ATTRIBUTES: 
+                PARSED PARAMETERS:
+                    TREE COUNT: 0
+                    INDEX GROUP: 
+                    IS BLOCK: 
+                    OBJECT TYPE: HeaderDoc::MinorAPIElement
+                    NAME: 
+                    TYPE:  data
+                    APIUID: //test_ref/applescript/internal_temporary_object/InnerScript
+                    ABSTRACT: ""
+                    DISCUSSION: "<p></p>"
+                    UPDATED: ""
+                    COPYRIGHT: ""
+                    HTMLMETA: ""
+                    PRIVATEDECLARATION: ""
+                    GROUP: ""
+                    INDEXGROUP: ""
+                    THROWS: ""
+                    XMLTHROWS: ""
+                    UPDATED: ""
+                    LINKAGESTATE: ""
+                    ACCESSCONTROL: ""
+                    AVAILABILITY: ""
+                    LINKUID: ""
+                    ORIGCLASS: ""
+                    ISDEFINE: ""
+                    ISTEMPLATE: ""
+                    VALUE: "UNKNOWN"
+                    RETURNTYPE: ""
+                    LINENUM: ""
+                    CLASS: "HeaderDoc::MinorAPIElement"
+                    MASTERENUM: ""
+                    APIREFSETUPDONE: "1"
+                    TPCDONE: ""
+                    NOREGISTERUID: ""
+                    SUPPRESSCHILDREN: ""
+                    NAMELINE_DISCUSSION: ""
+                    HIDEDOC: ""
+                    HIDESINGLETONS: ""
+                    HIDECONTENTS: ""
+                    MAINOBJECT: ""
+                    LIST ATTRIBUTES: 
+                    SHORT ATTRIBUTES: 
+                    LONG ATTRIBUTES: 
+        TREE COUNT: 1
+        INDEX GROUP: 
+        IS BLOCK: 
+        OBJECT TYPE: HeaderDoc::CPPClass
+        NAME: InnerScript
+        APIUID: 
+        ABSTRACT: ""
+        DISCUSSION: "<p>Script inside the function. "
+        UPDATED: ""
+        COPYRIGHT: ""
+        HTMLMETA: ""
+        PRIVATEDECLARATION: ""
+        GROUP: ""
+        INDEXGROUP: ""
+        THROWS: ""
+        XMLTHROWS: ""
+        UPDATED: ""
+        LINKAGESTATE: ""
+        ACCESSCONTROL: ""
+        AVAILABILITY: ""
+        LINKUID: ""
+        ORIGCLASS: ""
+        ISDEFINE: ""
+        ISTEMPLATE: ""
+        VALUE: "UNKNOWN"
+        RETURNTYPE: ""
+        LINENUM: ""
+        CLASS: "HeaderDoc::CPPClass"
+        MASTERENUM: ""
+        APIREFSETUPDONE: "1"
+        TPCDONE: ""
+        NOREGISTERUID: ""
+        SUPPRESSCHILDREN: "0"
+        NAMELINE_DISCUSSION: ""
+        HIDEDOC: ""
+        HIDESINGLETONS: ""
+        HIDECONTENTS: ""
+        MAINOBJECT: ""
+        LIST ATTRIBUTES: 
+        SHORT ATTRIBUTES: <p><b>Declared In</b></p><p><a href="../../../index.html#//test_ref/applescript/func/outerFunction" logicalPath="//test_ref/applescript/func/outerFunction" target="_top" machineGenerated="true">outerFunction</a></p>
+
+        LONG ATTRIBUTES: 
+            TREE COUNT: 1
+            INDEX GROUP: 
+            IS BLOCK: 
+            OBJECT TYPE: HeaderDoc::Function
+            NAME: innerMethod
+            APIUID: //test_ref/applescript/instm/InnerScript/innerMethod//(data)
+            ABSTRACT: "<p>Method inside InnerScript.
+"
+            DISCUSSION: "<p></p>"
+            UPDATED: ""
+            COPYRIGHT: ""
+            HTMLMETA: ""
+            PRIVATEDECLARATION: ""
+            GROUP: ""
+            INDEXGROUP: ""
+            THROWS: ""
+            XMLTHROWS: ""
+            UPDATED: ""
+            LINKAGESTATE: ""
+            ACCESSCONTROL: ""
+            AVAILABILITY: ""
+            LINKUID: ""
+            ORIGCLASS: ""
+            ISDEFINE: ""
+            ISTEMPLATE: ""
+            VALUE: "UNKNOWN"
+            RETURNTYPE: ""
+            LINENUM: ""
+            CLASS: "HeaderDoc::Function"
+            MASTERENUM: ""
+            APIREFSETUPDONE: "1"
+            TPCDONE: ""
+            NOREGISTERUID: ""
+            SUPPRESSCHILDREN: "0"
+            NAMELINE_DISCUSSION: ""
+            HIDEDOC: ""
+            HIDESINGLETONS: ""
+            HIDECONTENTS: ""
+            MAINOBJECT: ""
+            LIST ATTRIBUTES: 
+            SHORT ATTRIBUTES: 
+            LONG ATTRIBUTES: 
+            PARSED PARAMETERS:
+                TREE COUNT: 0
+                INDEX GROUP: 
+                IS BLOCK: 
+                OBJECT TYPE: HeaderDoc::MinorAPIElement
+                NAME: 
+                TYPE:  data
+                APIUID: //test_ref/applescript/internal_temporary_object/InnerScript
+                ABSTRACT: ""
+                DISCUSSION: "<p></p>"
+                UPDATED: ""
+                COPYRIGHT: ""
+                HTMLMETA: ""
+                PRIVATEDECLARATION: ""
+                GROUP: ""
+                INDEXGROUP: ""
+                THROWS: ""
+                XMLTHROWS: ""
+                UPDATED: ""
+                LINKAGESTATE: ""
+                ACCESSCONTROL: ""
+                AVAILABILITY: ""
+                LINKUID: ""
+                ORIGCLASS: ""
+                ISDEFINE: ""
+                ISTEMPLATE: ""
+                VALUE: "UNKNOWN"
+                RETURNTYPE: ""
+                LINENUM: ""
+                CLASS: "HeaderDoc::MinorAPIElement"
+                MASTERENUM: ""
+                APIREFSETUPDONE: "1"
+                TPCDONE: ""
+                NOREGISTERUID: ""
+                SUPPRESSCHILDREN: ""
+                NAMELINE_DISCUSSION: ""
+                HIDEDOC: ""
+                HIDESINGLETONS: ""
+                HIDECONTENTS: ""
+                MAINOBJECT: ""
+                LIST ATTRIBUTES: 
+                SHORT ATTRIBUTES: 
+                LONG ATTRIBUTES: 
+-=: NAMED OBJECT PARSE TREES :=-
+OBJECT: outerFunction (HeaderDoc::Function)
++---on
++--- 
++---outerFunction
++---(
+|   +---theParent
+|   +---)
++---(*
+|   +---!
+|   +--- Script inside the function. 
+|   +---*)
++---[ NEWLINE ]
++---        
++-*-script (HAS STATE)
++--- 
++---InnerScript
++---[ NEWLINE ]
+|   +---(*
+|   |   +---!
+|   |   +---
+@abstract
+|   |   +---
+Method inside InnerScript.
+|   |   +---[ NEWLINE ]
+|   |   +---*)
+|   +---[ NEWLINE ]
+|   +---                
+|   +-*-on (HAS STATE)
+|   +--- 
+|   +---innerMethod
+|   +---(
+|   |   +---data
+|   |   +---)
+|   +---                        
+|   +-*-local (HAS STATE)
+|   +--- 
+|   +---n
+|   +---[ NEWLINE ]
+|   +---                        
+|   +---set
+|   +--- 
+|   +---n
+|   +--- 
+|   +---to
+|   +--- 
+|   +---the
+|   +--- 
+|   +---length
+|   +--- 
+|   +---of
+|   +--- 
+|   +---the
+|   +--- 
+|   +---data
+|   +---[ NEWLINE ]
+|   +---                
+|   +---end
+|   +--- 
+|   +---[ NEWLINE ]
+|   +---        
+|   +---end
+|   +--- 
+|   +---script
++---[ NEWLINE ]
+-=-=-=-=-=-=- EODEC -=-=-=-=-=-=-
++---end
++--- 
+END OF OBJECT
+
+
+OBJECT: InnerScript (HeaderDoc::CPPClass)
++-*-script (HAS STATE)
++--- 
++---InnerScript
++---[ NEWLINE ]
+|   +---(*
+|   |   +---!
+|   |   +---
+@abstract
+|   |   +---
+Method inside InnerScript.
+|   |   +---[ NEWLINE ]
+|   |   +---*)
+|   +---[ NEWLINE ]
+|   +---                
+|   +-*-on (HAS STATE)
+|   +--- 
+|   +---innerMethod
+|   +---(
+|   |   +---data
+|   |   +---)
+|   +---                        
+|   +-*-local (HAS STATE)
+|   +--- 
+|   +---n
+|   +---[ NEWLINE ]
+|   +---                        
+|   +---set
+|   +--- 
+|   +---n
+|   +--- 
+|   +---to
+|   +--- 
+|   +---the
+|   +--- 
+|   +---length
+|   +--- 
+|   +---of
+|   +--- 
+|   +---the
+|   +--- 
+|   +---data
+|   +---[ NEWLINE ]
+|   +---                
+|   +---end
+|   +--- 
+|   +---[ NEWLINE ]
+|   +---        
+|   +---end
+|   +--- 
+|   +---script
++---[ NEWLINE ]
+-=-=-=-=-=-=- EODEC -=-=-=-=-=-=-
++---end
++--- 
+END OF OBJECT
+
+
+OBJECT: innerMethod (HeaderDoc::Function)
++-*-on (HAS STATE)
++--- 
++---innerMethod
++---(
+|   +---data
+|   +---)
++---                        
++-*-local (HAS STATE)
++--- 
++---n
++---[ NEWLINE ]
++---                        
++---set
++--- 
++---n
++--- 
++---to
++--- 
++---the
++--- 
++---length
++--- 
++---of
++--- 
++---the
++--- 
++---data
++---[ NEWLINE ]
++---                
++---end
++--- 
+-=-=-=-=-=-=- EODEC -=-=-=-=-=-=-
++---[ NEWLINE ]
++---        
++---end
++--- 
++---script
+END OF OBJECT
+
+
+OBJECT: InnerScript (HeaderDoc::CPPClass)
++-*-script (HAS STATE)
++--- 
++---InnerScript
++---[ NEWLINE ]
+|   +---(*
+|   |   +---!
+|   |   +---
+@abstract
+|   |   +---
+Method inside InnerScript.
+|   |   +---[ NEWLINE ]
+|   |   +---*)
+|   +---[ NEWLINE ]
+|   +---                
+|   +-*-on (HAS STATE)
+|   +--- 
+|   +---innerMethod
+|   +---(
+|   |   +---data
+|   |   +---)
+|   +---                        
+|   +-*-local (HAS STATE)
+|   +--- 
+|   +---n
+|   +---[ NEWLINE ]
+|   +---                        
+|   +---set
+|   +--- 
+|   +---n
+|   +--- 
+|   +---to
+|   +--- 
+|   +---the
+|   +--- 
+|   +---length
+|   +--- 
+|   +---of
+|   +--- 
+|   +---the
+|   +--- 
+|   +---data
+|   +---[ NEWLINE ]
+|   +---                
+|   +---end
+|   +--- 
+|   +---[ NEWLINE ]
+|   +---        
+|   +---end
+|   +--- 
+|   +---script
++---[ NEWLINE ]
+-=-=-=-=-=-=- EODEC -=-=-=-=-=-=-
++---end
++--- 
+END OF OBJECT
+
+
+OBJECT: innerMethod (HeaderDoc::Function)
++-*-on (HAS STATE)
++--- 
++---innerMethod
++---(
+|   +---data
+|   +---)
++---                        
++-*-local (HAS STATE)
++--- 
++---n
++---[ NEWLINE ]
++---                        
++---set
++--- 
++---n
++--- 
++---to
++--- 
++---the
++--- 
++---length
++--- 
++---of
++--- 
++---the
++--- 
++---data
++---[ NEWLINE ]
++---                
++---end
++--- 
+-=-=-=-=-=-=- EODEC -=-=-=-=-=-=-
++---[ NEWLINE ]
++---        
++---end
++--- 
++---script
+END OF OBJECT
+
+
+
+-=: HTML OUTPUT OF PARSE TREES :=-
+OBJECT: outerFunction (HeaderDoc::Function)
+	<span class="keyword">on</span> <!-- a logicalPath="//test_ref/applescript/instm/outerFunction //test_ref/applescript/clm/outerFunction //test_ref/applescript/intfcm/outerFunction //test_ref/applescript/intfm/outerFunction //test_ref/applescript/func/outerFunction //test_ref/applescript/ftmplt/outerFunction //test_ref/applescript/defn/outerFunction //test_ref/applescript/macro/outerFunction //test_ref/doc/anysymbol/outerFunction" machineGenerated="true" --><span class="function">outerFunction</span><!-- /a -->(
+	    <span class="param">theParent</span>)
+END OF OBJECT
+
+
+OBJECT: InnerScript (HeaderDoc::CPPClass)
+	<span class="keyword">script</span> <!-- a logicalPath="//test_ref/applescript/econst/InnerScript //test_ref/applescript/data/outerFunction/InnerScript //test_ref/applescript/data/InnerScript //test_ref/applescript/clconst/outerFunction/InnerScript " machineGenerated="true" --><span class="var">InnerScript</span><!-- /a --> 
+END OF OBJECT
+
+
+OBJECT: innerMethod (HeaderDoc::Function)
+	<span class="keyword">on</span> <!-- a logicalPath="//test_ref/applescript/instm/InnerScript/innerMethod //test_ref/applescript/clm/InnerScript/innerMethod //test_ref/applescript/intfcm/InnerScript/innerMethod //test_ref/applescript/intfm/InnerScript/innerMethod //test_ref/applescript/func/innerMethod //test_ref/applescript/ftmplt/InnerScript/innerMethod //test_ref/applescript/defn/innerMethod //test_ref/applescript/macro/innerMethod //test_ref/doc/anysymbol/innerMethod" machineGenerated="true" --><span class="function">innerMethod</span><!-- /a -->(
+	    <span class="param">data</span>)
+END OF OBJECT
+
+
+OBJECT: InnerScript (HeaderDoc::CPPClass)
+	<span class="keyword">script</span> <!-- a logicalPath="//test_ref/applescript/econst/InnerScript //test_ref/applescript/data/outerFunction/InnerScript //test_ref/applescript/data/InnerScript //test_ref/applescript/clconst/outerFunction/InnerScript " machineGenerated="true" --><span class="var">InnerScript</span><!-- /a --> 
+END OF OBJECT
+
+
+OBJECT: innerMethod (HeaderDoc::Function)
+	<span class="keyword">on</span> <!-- a logicalPath="//test_ref/applescript/instm/InnerScript/innerMethod //test_ref/applescript/clm/InnerScript/innerMethod //test_ref/applescript/intfcm/InnerScript/innerMethod //test_ref/applescript/intfm/InnerScript/innerMethod //test_ref/applescript/func/innerMethod //test_ref/applescript/ftmplt/InnerScript/innerMethod //test_ref/applescript/defn/innerMethod //test_ref/applescript/macro/innerMethod //test_ref/doc/anysymbol/innerMethod" machineGenerated="true" --><span class="function">innerMethod</span><!-- /a -->(
+	    <span class="param">data</span>)
+END OF OBJECT
+
+
+
+__$114|/Users/dg/headerdoc-techpubs/Modules/HeaderDoc//../../testsuite/parser_tests/AppleScript_script_in_function_1.test$11|applescript$32|AppleScript script in function 1$11|applescript$6|parser

@@ -32,6 +32,8 @@
 namespace JSC {
 
 // Now, it is only used for serialization.
+// FIXME: We should use JSInternalFieldObjectImpl to implement real JSMapIterator used in JSC.
+// Currently, JSC is using final objects to implement MapIterator.
 class JSMapIterator final : public JSCell {
     typedef HashMapBucket<HashMapBucketDataKeyValue> HashMapBucketType;
 public:
@@ -39,9 +41,15 @@ public:
 
     DECLARE_EXPORT_INFO;
 
+    template<typename CellType, SubspaceAccess mode>
+    static IsoSubspace* subspaceFor(VM& vm)
+    {
+        return vm.mapIteratorSpace<mode>();
+    }
+
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
     static JSMapIterator* create(VM& vm, Structure* structure, JSMap* iteratedObject, IterationKind kind)
@@ -51,12 +59,12 @@ public:
         return instance;
     }
 
-    ALWAYS_INLINE HashMapBucketType* advanceIter(ExecState* exec)
+    ALWAYS_INLINE HashMapBucketType* advanceIter(JSGlobalObject* globalObject)
     {
         HashMapBucketType* prev = m_iter.get();
         if (!prev)
             return nullptr;
-        VM& vm = exec->vm();
+        VM& vm = getVM(globalObject);
         HashMapBucketType* bucket = m_iter->next();
         while (bucket && bucket->deleted())
             bucket = bucket->next();
@@ -67,9 +75,9 @@ public:
         setIterator(vm, bucket); // We keep m_iter on the last value since the first thing we do in this function is call next().
         return bucket;
     }
-    bool next(ExecState* exec, JSValue& value)
+    bool next(JSGlobalObject* globalObject, JSValue& value)
     {
-        HashMapBucketType* bucket = advanceIter(exec);
+        HashMapBucketType* bucket = advanceIter(globalObject);
         if (!bucket)
             return false;
 
@@ -78,13 +86,13 @@ public:
         else if (m_kind == IterateKey)
             value = bucket->key();
         else
-            value = createPair(exec, bucket->key(), bucket->value());
+            value = createPair(globalObject, bucket->key(), bucket->value());
         return true;
     }
 
-    bool nextKeyValue(ExecState* exec, JSValue& key, JSValue& value)
+    bool nextKeyValue(JSGlobalObject* globalObject, JSValue& key, JSValue& value)
     {
-        HashMapBucketType* bucket = advanceIter(exec);
+        HashMapBucketType* bucket = advanceIter(globalObject);
         if (!bucket)
             return false;
 
@@ -108,7 +116,7 @@ private:
     }
 
     JS_EXPORT_PRIVATE void finishCreation(VM&, JSMap*);
-    JSValue createPair(CallFrame*, JSValue, JSValue);
+    JSValue createPair(JSGlobalObject*, JSValue, JSValue);
     static void visitChildren(JSCell*, SlotVisitor&);
 
     WriteBarrier<JSMap> m_map;

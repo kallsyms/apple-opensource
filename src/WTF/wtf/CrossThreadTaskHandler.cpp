@@ -37,6 +37,9 @@ CrossThreadTaskHandler::CrossThreadTaskHandler(const char* threadName, Autodrain
     Locker<Lock> locker(m_taskThreadCreationLock);
     Thread::create(threadName, [this] {
         taskRunLoop();
+
+        if (m_completionCallback)
+            m_completionCallback();
     })->detach();
 }
 
@@ -73,7 +76,7 @@ void CrossThreadTaskHandler::taskRunLoop()
 
     while (!m_taskQueue.isKilled()) {
         {
-            std::unique_ptr<AutodrainedPool> autodrainedPool = (m_useAutodrainedPool == AutodrainedPoolForRunLoop::Use) ? std::make_unique<AutodrainedPool>() : nullptr;
+            std::unique_ptr<AutodrainedPool> autodrainedPool = (m_useAutodrainedPool == AutodrainedPoolForRunLoop::Use) ? makeUnique<AutodrainedPool>() : nullptr;
 
             m_taskQueue.waitForMessage().performTask();
         }
@@ -130,6 +133,17 @@ void CrossThreadTaskHandler::resume()
         m_shouldSuspend = false;
         m_shouldSuspendCondition.notifyOne();
     }
+}
+
+void CrossThreadTaskHandler::setCompletionCallback(Function<void ()>&& completionCallback)
+{
+    m_completionCallback = WTFMove(completionCallback);
+}
+
+void CrossThreadTaskHandler::kill()
+{
+    m_taskQueue.kill();
+    m_taskReplyQueue.kill();
 }
 
 } // namespace WTF
