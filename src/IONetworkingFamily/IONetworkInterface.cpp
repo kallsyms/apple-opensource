@@ -912,8 +912,13 @@ UInt32 IONetworkInterface::inputPacket( mbuf_t          packet,
 
     assert(packet);
     assert(_backingIfnet);
-    if (!packet || !_backingIfnet)
+    if (!packet)
         return 0;
+    if (!_backingIfnet)
+	{
+        mbuf_freem(packet);
+        return 1;
+	}
 
     assert((mbuf_flags(packet) & MBUF_PKTHDR));
     assert((mbuf_nextpkt(packet) == 0));
@@ -2599,6 +2604,8 @@ IOReturn IONetworkInterface::dequeueOutputPackets(
 
     assert(_backingIfnet);
 
+    txByteCount = 0;
+
     if (maxCount == 1)
     {
         error = ifnet_dequeue(_backingIfnet, packetHead);
@@ -2709,6 +2716,7 @@ IOReturn IONetworkInterface::dequeueOutputPacketsWithServiceClass(
             return kIOReturnBadArgument;
     }
 
+    txByteCount = 0;
     if (maxCount == 1)
     {
         error = ifnet_dequeue_service_class(

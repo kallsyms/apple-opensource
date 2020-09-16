@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2019 Apple Inc. All rights reserved.
+ * Copyright (c) 2004-2020 Apple Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  *
@@ -828,6 +828,7 @@ SCNetworkSetCopyServices(SCNetworkSetRef set)
 		return NULL;
 	}
 
+
 	path = SCPreferencesPathKeyCreateSetNetworkService(NULL, setPrivate->setID, NULL);
 	dict = SCPreferencesPathGetValue(setPrivate->prefs, path);
 	CFRelease(path);
@@ -968,6 +969,7 @@ _SCNetworkSetCreateDefault(SCPreferencesRef prefs)
 	Boolean		ok		= TRUE;
 	SCNetworkSetRef	set;
 	CFStringRef	setName		= NULL;
+	CFNumberRef	version;
 
 	set = SCNetworkSetCopyCurrent(prefs);
 	if (set != NULL) {
@@ -1007,6 +1009,15 @@ _SCNetworkSetCreateDefault(SCPreferencesRef prefs)
 	if (model == NULL) {
 		model = _SC_hw_model(FALSE);
 		SCPreferencesSetValue(prefs, MODEL, model);
+	}
+
+	version = SCPreferencesGetValue(prefs, kSCPrefVersion);
+	if (version == NULL) {
+		const int	new_version	= NETWORK_CONFIGURATION_VERSION;
+
+		version = CFNumberCreate(NULL, kCFNumberIntType, &new_version);
+		SCPreferencesSetValue(prefs, kSCPrefVersion, version);
+		CFRelease(version);
 	}
 
     done :

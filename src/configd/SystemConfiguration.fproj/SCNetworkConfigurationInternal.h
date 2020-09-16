@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Apple Inc. All rights reserved.
+ * Copyright (c) 2004-2020 Apple Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  *
@@ -37,6 +37,9 @@
 #include "SCPreferencesPathKey.h"
 #include "IPMonitorControl.h"
 #include <IOKit/IOKitLib.h>
+
+
+#define	NETWORK_CONFIGURATION_VERSION	20191120
 
 
 typedef struct {
@@ -166,6 +169,7 @@ typedef struct {
 	} usb;
 
 	// misc
+	CFArrayRef		matchingMACs;
 	unsigned int		sort_order;		// sort order for this interface
 
 	// for BOND interfaces
@@ -199,9 +203,21 @@ typedef struct {
 
 __BEGIN_DECLS
 
+#pragma mark -
+#pragma mark SCNetworkConfiguration (internal)
+
+
+
+Boolean
+__SCNetworkConfigurationBackup			(SCPreferencesRef	prefs,
+						 CFStringRef		suffix,
+						 SCPreferencesRef	relativeTo);
+
+
 
 #pragma mark -
 #pragma mark SCNetworkInterface configuration (internal)
+
 
 Boolean
 __SCNetworkInterfaceMatchesName			(CFStringRef		name,
@@ -209,17 +225,6 @@ __SCNetworkInterfaceMatchesName			(CFStringRef		name,
 
 CFArrayRef
 __SCNetworkInterfaceCopyAll_IONetworkInterface	(Boolean		keep_pre_configured);
-
-/*!
- @function __SCNetworkInterfaceCopyStorageEntity
- @discussion Create interface entity of network interface as seen in
- NetworkInterfaces.plist
- @param interface The network interface from which interface entity is create
- @result Dictionary which contains information about interface entity
- You must release the returned value.
- */
-CFDictionaryRef
-__SCNetworkInterfaceCopyStorageEntity		(SCNetworkInterfaceRef	interface);
 
 /*!
  @function __SCNetworkInterfaceCopyStoredWithPreferences
@@ -371,7 +376,6 @@ __SCNetworkInterfaceSetDeepConfiguration	(SCNetworkSetRef	set,
  @discussion Will allow the caller to set IO Interface Unit
  @param interface The network interface
  @param unit The new interface unit to set
-
  */
 void
 __SCNetworkInterfaceSetIOInterfaceUnit		(SCNetworkInterfaceRef interface,
@@ -401,6 +405,36 @@ _SCNetworkInterfaceCacheOpen(void);
 
 void
 _SCNetworkInterfaceCacheClose(void);
+
+
+#pragma mark -
+#pragma mark SCNetworkInterface (NetworkInterfaces.plist) configuration (internal)
+
+
+#define kSCNetworkInterfaceActive			"Active"
+#define kSCNetworkInterfaceInfo				"SCNetworkInterfaceInfo"
+#define kSCNetworkInterfaceType				"SCNetworkInterfaceType"
+#define kSCNetworkInterfaceBSDName			kIOBSDNameKey
+#define kSCNetworkInterfaceIOBuiltin			kIOBuiltin
+#define kSCNetworkInterfaceIOInterfaceNamePrefix	kIOInterfaceNamePrefix
+#define kSCNetworkInterfaceIOInterfaceType		kIOInterfaceType
+#define kSCNetworkInterfaceIOInterfaceUnit		kIOInterfaceUnit
+#define kSCNetworkInterfaceIOMACAddress			kIOMACAddress
+#define kSCNetworkInterfaceIOPathMatch			kIOPathMatchKey
+#define kSCNetworkInterfaceMatchingMACs			"MatchingMACs"
+
+
+/*!
+	@function __SCNetworkInterfaceCopyStorageEntity
+	@discussion Create interface entity of network interface as seen in
+		NetworkInterfaces.plist
+	@param interface The network interface from which interface entity is create
+	@result Dictionary which contains information about interface entity.
+		You must release the returned value.
+ */
+CFDictionaryRef
+__SCNetworkInterfaceCopyStorageEntity		(SCNetworkInterfaceRef	interface);
+
 
 #pragma mark -
 #pragma mark SCNetworkProtocol configuration (internal)
@@ -447,8 +481,8 @@ Boolean
 __SCNetworkServiceIsPPTP			(SCNetworkServiceRef	service);
 
 
-SCPreferencesRef
-__SCNetworkCreateDefaultNIPrefs			(CFStringRef		prefsID);
+void
+__SCNetworkPopulateDefaultNIPrefs		(SCPreferencesRef	ni_prefs);
 
 /*!
  @function __SCNetworkServiceMigrateNew
@@ -470,6 +504,7 @@ __SCNetworkServiceAddProtocolToService		(SCNetworkServiceRef		service,
 						 CFStringRef			protocolType,
 						 CFDictionaryRef		configuration,
 						 Boolean			enabled);
+
 
 #pragma mark -
 #pragma mark SCNetworkSet configuration (internal)
@@ -501,11 +536,11 @@ __copyProtocolTemplate				(CFStringRef		interfaceType,
 						 CFStringRef		protocolType);
 
 CFDictionaryRef
-__getPrefsConfiguration				(SCPreferencesRef       prefs,
+__SCNetworkConfigurationGetValue		(SCPreferencesRef       prefs,
 						 CFStringRef		path);
 
 Boolean
-__setPrefsConfiguration				(SCPreferencesRef       prefs,
+__SCNetworkConfigurationSetValue		(SCPreferencesRef       prefs,
 						 CFStringRef		path,
 						 CFDictionaryRef	config,
 						 Boolean		keepInactive);

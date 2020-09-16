@@ -2810,7 +2810,7 @@ UInt64 IOBreaker::getBreakSize(
 
             segmentCount++;
         }
-        else if ( chunk + chunkSize == segment )
+		else if ( chunk + chunkSize == segment )
         {
             breakSize  += segmentSize;
             chunkSize  += segmentSize;

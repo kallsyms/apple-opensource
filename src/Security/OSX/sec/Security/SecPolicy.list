@@ -99,3 +99,8 @@ POLICYMACRO(FDRProvisioning,                        91,  , FDRProvisioning,     
 POLICYMACRO(ComponentCertificate,                   92, E, Component,                             ,  , AppleComponentCertificate)
 POLICYMACRO(KeyTransparency,                        93, E, KT,                                   N, Y, AppleKeyTransparency)
 POLICYMACRO(LegacySSL,                              94, E, legacySSL,                             ,  , LegacySSL)
+POLICYMACRO(Alisha,                                 95, E, Alisha,                                , Y, Alisha)
+POLICYMACRO(MeasuredBootPolicySigning,              96, E, MeasuredBootPolicySigning,             , Y, MeasuredBootPolicySigning)
+// 97-99 used on master
+POLICYMACRO(EscrowServiceIdKeySigning,             100, E, AppleEscrowServiceIdKeySigning,        , Y, EscrowServiceIdKeySigning)
+POLICYMACRO(PCSEscrowServiceIdKeySigning,          101, E, ApplePCSEscrowServiceIdKeySigning,     , Y, PCSEscrowServiceIdKeySigning)

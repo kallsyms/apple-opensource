@@ -251,11 +251,13 @@ typedef uint32_t IOHIDQueueOptionsType;
   @constant kIOHIDStandardTypeANSI ANSI.
   @constant kIOHIDStandardTypeISO ISO.
   @constant kIOHIDStandardTypeJIS JIS.
+  @constant kIOHIDStandardTypeUnspecified.
 */
 enum {
-    kIOHIDStandardTypeANSI                = 0,
-    kIOHIDStandardTypeISO                 = 1,
-    kIOHIDStandardTypeJIS                 = 2
+    kIOHIDStandardTypeANSI                = 0x0,
+    kIOHIDStandardTypeISO                 = 0x1,
+    kIOHIDStandardTypeJIS                 = 0x2,
+    kIOHIDStandardTypeUnspecified         = 0xFFFFFFFF,
 };
 typedef uint32_t IOHIDStandardType;
 
@@ -357,6 +359,16 @@ typedef uint32_t IOHIDStandardType;
                 descriptor.
  */
 #define kIOHIDSensorPropertyMaxFIFOEventsKey    "MaxFIFOEvents"
+
+/*!
+   @defined    kIOHIDDigitizerSurfaceSwitchKey
+   @abstract   Property to turn on / of surface digitizer contact reporting
+   @discussion To allow for better power management, a host may wish to indicate what it would like a touchpad digitizer to not report surface digitizer contacts by clearing this
+                flag. By default, upon cold‐boot/power cycle, touchpads that support reporting surface
+                contacts shall do so by default.
+*/
+
+#define kIOHIDDigitizerSurfaceSwitchKey "DigitizerSurfaceSwitch"
 
 __END_DECLS
 

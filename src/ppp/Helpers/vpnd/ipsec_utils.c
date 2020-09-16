@@ -808,6 +808,9 @@ configure_remote(int level, FILE *file, CFDictionaryRef ipsec_dict, char **errst
 			CFDictionaryGetValue(ipsec_dict, kRASPropIPSecForceLocalAddress) == kCFBooleanTrue) {
 			char src_address[256];
 			GetStrAddrFromDict(ipsec_dict, kRASPropIPSecLocalAddress, src_address, sizeof(src_address));
+			if (!racoon_validate_cfg_str(src_address)) {
+				FAIL("invalid force local address");
+			}
 			snprintf(text, sizeof(text), "local_address %s;\n", src_address);
 			WRITE(text);
 		}
@@ -1247,14 +1250,20 @@ racoon_configure(CFDictionaryRef ipsec_dict, char **errstr, int apply)
 		local address is REQUIRED 
 		verify it is defined, not needed in racoon configuration
 	*/
-	if (!GetStrAddrFromDict(ipsec_dict, kRASPropIPSecLocalAddress, local_address, sizeof(local_address)))
+	if (!GetStrAddrFromDict(ipsec_dict, kRASPropIPSecLocalAddress, local_address, sizeof(local_address))) {
 		FAIL("incorrect local address found");
+	} else if (!racoon_validate_cfg_str(local_address)) {
+		FAIL("invalid local address");
+	}
 
 	/*
 		remote address is REQUIRED 
 	*/
-	if (!GetStrAddrFromDict(ipsec_dict, kRASPropIPSecRemoteAddress, remote_address, sizeof(remote_address)))
+	if (!GetStrAddrFromDict(ipsec_dict, kRASPropIPSecRemoteAddress, remote_address, sizeof(remote_address))) {
 		FAIL("incorrect remote address found");
+	} else if (!racoon_validate_cfg_str(remote_address)) {
+		FAIL("invalid remote address");
+	}
 
 	anonymous = inet_addr(remote_address) == 0;
     /*
@@ -1375,11 +1384,17 @@ racoon_configure(CFDictionaryRef ipsec_dict, char **errstr, int apply)
 				}
 
 				if (tunnel) {
-					if (!GetStrNetFromDict(policy, kRASPropIPSecPolicyLocalAddress, local_network, sizeof(local_network)))  
+					if (!GetStrNetFromDict(policy, kRASPropIPSecPolicyLocalAddress, local_network, sizeof(local_network)))
 						FAIL("incorrect policy local network");
+
+					if (!racoon_validate_cfg_str(local_network))
+						FAIL("invalid local network");
 						
 					if (!GetStrNetFromDict(policy, kRASPropIPSecPolicyRemoteAddress, remote_network, sizeof(remote_network)))
 						FAIL("incorrect policy remote network");
+
+					if (!racoon_validate_cfg_str(remote_network))
+						FAIL("invalid remote network");
 
 					GetIntFromDict(policy, kRASPropIPSecPolicyLocalPrefix, &local_prefix, 24);
 					if (local_prefix == 0)
@@ -3690,13 +3705,31 @@ int
 find_injection(CFStringRef str, CFStringRef invalidStr, CFIndex strLen)
 {
     CFRange theRange, searchRange;
+
+	theRange = CFStringFind(str, CFSTR("\""), 0);
+	if (theRange.length != 0) {
+		SCLog(TRUE, LOG_ERR, CFSTR("injection: string contains \" "));
+		return TRUE;
+	}
     
+    theRange = CFStringFind(str, CFSTR(";"), 0);
+    if (theRange.length != 0) {
+        searchRange.location = theRange.location + theRange.length; // start after the string
+        searchRange.length = strLen - searchRange.location;
+		if (CFStringFindWithOptions(str, invalidStr, searchRange, 0, NULL)) {
+			SCLog(TRUE, LOG_ERR, CFSTR("injection: string contains %@"), invalidStr);
+            return TRUE;
+		}
+    }
+
     theRange = CFStringFind(str, invalidStr, 0);
     if (theRange.length != 0) {
         searchRange.location = theRange.location + theRange.length; // start after the string
         searchRange.length = strLen - searchRange.location;
-        if (CFStringFindWithOptions(str, CFSTR(";"), searchRange, 0, NULL))
+		if (CFStringFindWithOptions(str, CFSTR(";"), searchRange, 0, NULL)) {
+			SCLog(TRUE, LOG_ERR, CFSTR("injection: string contains %@"), invalidStr);
             return TRUE;
+		}
     }
     return FALSE;
 }
@@ -3709,7 +3742,7 @@ racoon_validate_cfg_str (char *str_buf)
     
     CFStringRef theString = NULL;
     CFIndex theLength;
-    
+
     theString = CFStringCreateWithCString(NULL, str_buf, kCFStringEncodingUTF8);
     if (theString == NULL)
         goto failed;
@@ -3729,6 +3762,12 @@ racoon_validate_cfg_str (char *str_buf)
         goto failed;
     if (find_injection(theString, CFSTR("sainfo "), theLength))
         goto failed;
+	if (find_injection(theString, CFSTR("banner "), theLength))
+		goto failed;
+	if (find_injection(theString, CFSTR("my_identifier "), theLength))
+		goto failed;
+	if (find_injection(theString, CFSTR("peers_identifier "), theLength))
+		goto failed;
     CFRelease(theString);
     return TRUE;
     

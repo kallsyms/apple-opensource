@@ -84,6 +84,7 @@ private:
             OSArray *           blessedUsagePairs;
             UInt8               bootMouseData[4];
             bool                appleVendorSupported;
+            IOHIDElement *      keyboardPower;
         } keyboard;
         
         struct {
@@ -94,6 +95,9 @@ private:
             bool                collectionDispatch;
             IOFixed             centroidX;
             IOFixed             centroidY;
+            IOHIDElement *      relativeScanTime;
+            IOHIDElement *      surfaceSwitch;
+            IOHIDElement *      reportRate;
         } digitizer;
         
         struct {
@@ -245,6 +249,7 @@ private:
     void                    setTemperatureProperties();
     void                    setSensorProperties();
     void                    setDeviceOrientationProperties();
+    void                    setSurfaceDimensions();
 
     UInt32                  checkGameControllerElement(IOHIDElement * element);
     UInt32                  checkMultiAxisElement(IOHIDElement * element);

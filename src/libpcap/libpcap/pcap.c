@@ -1477,8 +1477,15 @@ pcap_lookupnet(const char *device, bpf_u_int32 *netp, bpf_u_int32 *maskp,
 	(void)pcap_strlcpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
 	if (ioctl(fd, SIOCGIFADDR, (char *)&ifr) < 0) {
 		if (errno == EADDRNOTAVAIL) {
+#ifdef __APPLE__
+			/* No reason fail if there is no IPv4 address */
+			*netp = *maskp = 0;
+			(void)close(fd);
+			return 0;
+#else
 			(void)pcap_snprintf(errbuf, PCAP_ERRBUF_SIZE,
 			    "%s: no IPv4 address assigned", device);
+#endif /* __APPLE__ */
 		} else {
 			pcap_fmt_errmsg_for_errno(errbuf, PCAP_ERRBUF_SIZE,
 			    errno, "SIOCGIFADDR: %s", device);
@@ -3828,9 +3835,15 @@ pcap_inject(pcap_t *p, const void *buf, size_t size)
 void
 pcap_close(pcap_t *p)
 {
+#if __APPLE__
+	p->cleanup_op(p);
+	if (p->opt.device != NULL)
+		free(p->opt.device);
+#else
 	if (p->opt.device != NULL)
 		free(p->opt.device);
 	p->cleanup_op(p);
+#endif /* __APPLE__ */
 	free(p);
 }
 
