@@ -6,18 +6,10 @@ ifndef DEVELOPER_DIR
 DEVELOPER_DIR := $(shell xcode-select -p)
 endif
 
-ifndef DEVELOPER_INSTALL_DIR
-DEVELOPER_INSTALL_DIR := $(shell xcode-select -p)
-endif
-
-ifndef CLTOOLS_INSTALL_DIR
-CLTOOLS_INSTALL_DIR= /Library/Developer/CommandLineTools
-endif
-
 APR_TOOLCHAIN_DIR=$(dir $(shell xcrun --toolchain $(TOOLCHAINS) -f apr-1-config))/..
 
 Project               = subversion
-ProjectVersion        = 1.10.4
+ProjectVersion        = 1.10.6
 
 #-------------------------------------------------------------------------
 # build/get-py-info.py appends "-framework Python" to its --link and --libs
@@ -31,30 +23,19 @@ Patches        = build_get-py-info.py.diff \
                  configure.diff \
                  Makefile.in.diff \
                  spawn.diff \
-                 xcode.diff \
-                 configure.noperli386.diff \
-                 PR-11438447.diff \
                  build-outputs.mk.perl.diff \
-                 serf-1.diff \
-                 PR-13100837.diff \
                  apr14.diff
 
 Extra_Make_Flags = -j $(shell sysctl -n hw.activecpu)
 Extra_Cxx_Flags = -stdlib=libc++
-Extra_LD_Flags = -headerpad_max_install_names
+Extra_LD_Flags =
 
 ifndef SDKROOT
 SDKROOT := $(shell xcrun --sdk macosx.internal --show-sdk-path)
 endif
 
-ifndef XCODE_SDKROOT
-XCODE_SDKROOT := $(shell xcrun --sdk com.apple.dt.xcode.macosx.support.internal --show-sdk-path)
-endif
-export XCODE_SDKROOT
-
-include $(DEVELOPER_DIR)/AppleInternal/Makefiles/DT_Signing.mk
 export CODESIGN_ALLOCATE :=  $(shell xcrun -find -sdk $(SDKROOT) codesign_allocate)
-CODESIGN = /usr/bin/codesign --force --sign - $(DVT_CODE_SIGN_FLAGS) --timestamp=none
+CODESIGN = /usr/bin/codesign --force --sign - --timestamp=none
 
 include Makefile.$(RC_ProjectName)
 
@@ -70,8 +51,8 @@ install_source::
 	done
 	ed - $(SRCROOT)/$(Project)/build-outputs.mk < $(SRCROOT)/files/fix-build-outputs.mk.ed
 
-OSV = $(DSTROOT)$(DEVELOPER_INSTALL_DIR)/usr/local/OpenSourceVersions
-OSL = $(DSTROOT)$(DEVELOPER_INSTALL_DIR)/usr/local/OpenSourceLicenses
+OSV = $(DSTROOT)/usr/local/OpenSourceVersions
+OSL = $(DSTROOT)/usr/local/OpenSourceLicenses
 
 install-plist:
 	$(MKDIR) $(OSV)

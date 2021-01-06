@@ -1,5 +1,5 @@
 ifndef SVN_INSTALL_DIR
-export SVN_INSTALL_DIR = $(DEVELOPER_INSTALL_DIR)/usr
+export SVN_INSTALL_DIR = /usr/local
 endif
 
 Install_Prefix = $(SVN_INSTALL_DIR)
@@ -13,12 +13,13 @@ Extra_Configure_Flags = --enable-shared --disable-static \
                         --with-utf8proc=internal \
                         --with-apr=$(APR_TOOLCHAIN_DIR) \
                         --with-apr-util=$(APR_TOOLCHAIN_DIR) \
-                        --with-serf=$(XCODE_SDKROOT)/$(subst $(XBS_MERGE_SOURCE_SUBPATH_FOR_SDK_CONTENT),,$(SVN_INSTALL_DIR)) \
+                        --with-serf=$(SDKROOT)/usr/local \
                         --with-swig=$(shell test -e /usr/bin/swig && echo /usr || echo /usr/local) \
-                        --with-ruby-sitedir=$(RBLIBDIR)/ruby \
                         --with-sasl=$(SDKROOT)/usr \
-                        --includedir=$(Install_Prefix)/local/include \
+                        --includedir=$(Install_Prefix)/include \
                         --without-libmagic
+
+Extra_Make_Flags = V=1
 
 include $(MAKEFILEPATH)/CoreOS/ReleaseControl/GNUSource.make
 
@@ -28,7 +29,6 @@ Install_Flags   = DESTDIR=$(DSTROOT)
 # Post-install cleanup
 post-install:
 	[ -n "$(DSTROOT)" ] || exit 1
-	/bin/sh $(SRCROOT)/rpath_subversion.sh
 	@for binary in svn svnadmin svndumpfilter svnlook svnrdump svnserve svnsync svnversion; do \
 		file=$(DSTROOT)$(Install_Prefix)/bin/$${binary}; \
 		echo $(CP) $${file} $(SYMROOT); \
@@ -46,5 +46,3 @@ post-install:
 	done
 	find $(DSTROOT) -name \*.la -delete
 	rm -rf $(DSTROOT)$(SVN_INSTALL_DIR)/share/pkgconfig
-	install -m 0755 -d $(DSTROOT)$(CLTOOLS_INSTALL_DIR)
-	ditto $(DSTROOT)$(DEVELOPER_INSTALL_DIR) $(DSTROOT)$(CLTOOLS_INSTALL_DIR)

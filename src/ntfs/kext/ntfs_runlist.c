@@ -2123,7 +2123,6 @@ errno_t ntfs_rl_read(ntfs_volume *vol, ntfs_runlist *runlist, u8 *dst,
 {
 	u8 *dst_end = dst + initialized_size;
 	ntfs_rl_element *rl;
-	vnode_t dev_vn = vol->dev_vn;
 	buf_t buf;
 	errno_t err;
 	unsigned block_size = vol->sector_size;
@@ -2133,9 +2132,10 @@ errno_t ntfs_rl_read(ntfs_volume *vol, ntfs_runlist *runlist, u8 *dst,
 	ntfs_debug("Entering.");
 	if (!vol || !runlist || !dst || size <= 0 || initialized_size < 0 ||
 			initialized_size > size) {
-		ntfs_error(vol->mp, "Received invalid arguments.");
+        ntfs_error((vol ? vol->mp : NULL), "Received invalid arguments.");
 		return EINVAL;
 	}
+    vnode_t dev_vn = vol->dev_vn;
 	if (!initialized_size) {
 		bzero(dst, size);
 		ntfs_debug("Done (!initialized_size).");
@@ -2247,7 +2247,6 @@ errno_t ntfs_rl_write(ntfs_volume *vol, u8 *src, const s64 size,
 	VCN vcn;
 	u8 *src_end, *src_stop;
 	ntfs_rl_element *rl;
-	vnode_t dev_vn = vol->dev_vn;
 	errno_t err;
 	unsigned block_size, block_shift, cluster_shift, shift, delta, vcn_ofs;
 
@@ -2255,9 +2254,11 @@ errno_t ntfs_rl_write(ntfs_volume *vol, u8 *src, const s64 size,
 			(unsigned long long)size, (unsigned long long)ofs);
 	if (!vol || !src || size <= 0 || !runlist || !runlist->elements ||
 			ofs < 0 || cnt < 0 || ofs + cnt > size) {
-		ntfs_error(vol->mp, "Received invalid arguments.");
+        ntfs_error((vol ? vol->mp : NULL), "Received invalid arguments.");
 		return EINVAL;
 	}
+
+    vnode_t dev_vn = vol->dev_vn;
 	src_stop = src_end = src + size;
 	if (cnt) {
 		src_stop = src + ofs + cnt;
@@ -2381,15 +2382,15 @@ err:
 errno_t ntfs_rl_set(ntfs_volume *vol, const ntfs_rl_element *rl, const u8 val)
 {
 	VCN vcn;
-	vnode_t dev_vn = vol->dev_vn;
 	errno_t err;
 	unsigned block_size, shift;
 
 	ntfs_debug("Entering (val 0x%x).", (unsigned)val);
 	if (!vol || !rl || !rl->length) {
-		ntfs_error(vol->mp, "Received invalid arguments.");
+        ntfs_error((vol ? vol->mp : NULL), "Received invalid arguments.");
 		return EINVAL;
 	}
+    vnode_t dev_vn = vol->dev_vn;
 	block_size = vol->sector_size;
 	shift = vol->cluster_size_shift - vol->sector_size_shift;
 	/* Write the clusters specified by the runlist one at a time. */

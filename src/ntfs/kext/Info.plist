@@ -9,7 +9,7 @@
 	<key>CFBundleGetInfoString</key>
 	<string>$NTFS_COPYRIGHT_INFO_STRING</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.apple.filesystems.ntfs</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

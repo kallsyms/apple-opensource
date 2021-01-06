@@ -8473,10 +8473,10 @@ resolve_incoming_move_file_text_merge(svn_client_conflict_option_t *option,
   if (operation == svn_wc_operation_update ||
       operation == svn_wc_operation_switch)
     {
-      svn_stream_t *working_stream;
+      svn_stream_t *moved_to_stream;
       svn_stream_t *incoming_stream;
 
-      /* Create a temporary copy of the working file in repository-normal form.
+      /* Create a temporary copy of the moved file in repository-normal form.
        * Set up this temporary file to be automatically removed. */
       err = svn_stream_open_unique(&incoming_stream,
                                    &incoming_abspath, wc_tmpdir,
@@ -8485,15 +8485,28 @@ resolve_incoming_move_file_text_merge(svn_client_conflict_option_t *option,
       if (err)
         goto unlock_wc;
 
-      err = svn_wc__translated_stream(&working_stream, ctx->wc_ctx,
-                                      local_abspath, local_abspath,
+      err = svn_wc__translated_stream(&moved_to_stream, ctx->wc_ctx,
+                                      moved_to_abspath,
+                                      moved_to_abspath,
                                       SVN_WC_TRANSLATE_TO_NF,
                                       scratch_pool, scratch_pool);
       if (err)
         goto unlock_wc;
 
-      err = svn_stream_copy3(working_stream, incoming_stream,
+      err = svn_stream_copy3(moved_to_stream, incoming_stream,
                              NULL, NULL, /* no cancellation */
+                             scratch_pool);
+      if (err)
+        goto unlock_wc;
+
+      /* Overwrite the moved file with the conflict victim's content.
+       * Incoming changes will be merged in from the temporary file created
+       * above. This is required to correctly make local changes show up as
+       * 'mine' during the three-way text merge between the ancestor file,
+       * the conflict victim ('mine'), and the moved file ('theirs') which
+       * was brought in by the update/switch operation and occupies the path
+       * of the merge target. */
+      err = svn_io_copy_file(local_abspath, moved_to_abspath, FALSE,
                              scratch_pool);
       if (err)
         goto unlock_wc;
@@ -8649,8 +8662,8 @@ resolve_incoming_move_dir_merge(svn_client_conflict_option_t *option,
   struct conflict_tree_incoming_delete_details *details;
   apr_array_header_t *possible_moved_to_abspaths;
   const char *moved_to_abspath;
-  svn_client__pathrev_t *yca_loc;
-  svn_opt_revision_t yca_opt_rev;
+  const char *incoming_old_url;
+  svn_opt_revision_t incoming_old_opt_rev;
   svn_client__conflict_report_t *conflict_report;
   svn_boolean_t is_copy;
   svn_boolean_t is_modified;
@@ -8743,30 +8756,6 @@ resolve_incoming_move_dir_merge(svn_client_conflict_option_t *option,
       goto unlock_wc;
     }
 
-  /* Now find the youngest common ancestor of these nodes. */
-  err = find_yca(&yca_loc, victim_repos_relpath, victim_peg_rev,
-                 moved_to_repos_relpath, moved_to_peg_rev,
-                 repos_root_url, repos_uuid,
-                 NULL, ctx, scratch_pool, scratch_pool);
-  if (err)
-    goto unlock_wc;
-
-  if (yca_loc == NULL)
-    {
-      err = svn_error_createf(SVN_ERR_WC_CONFLICT_RESOLVER_FAILURE, NULL,
-                              _("Cannot resolve tree conflict on '%s' "
-                                "(could not find common ancestor of '^/%s@%ld' "
-                                " and '^/%s@%ld')"),
-                              svn_dirent_local_style(local_abspath,
-                                                     scratch_pool),
-                              victim_repos_relpath, victim_peg_rev,
-                              moved_to_repos_relpath, moved_to_peg_rev);
-      goto unlock_wc;
-    }
-
-  yca_opt_rev.kind = svn_opt_revision_number;
-  yca_opt_rev.value.number = yca_loc->rev;
-
   err = verify_local_state_for_incoming_delete(conflict, option, ctx,
                                                scratch_pool);
   if (err)
@@ -8795,7 +8784,12 @@ resolve_incoming_move_dir_merge(svn_client_conflict_option_t *option,
       if (err)
         goto unlock_wc;
 
-      /* Merge YCA_URL@YCA_REV->MOVE_TARGET_URL@MERGE_RIGHT into move target. */
+      /* Merge INCOMING_OLD_URL@MERGE_LEFT->MOVE_TARGET_URL@MERGE_RIGHT
+       * into move target. */
+      incoming_old_url = apr_pstrcat(scratch_pool, repos_root_url, "/",
+                                     incoming_old_repos_relpath, SVN_VA_NULL);
+      incoming_old_opt_rev.kind = svn_opt_revision_number;
+      incoming_old_opt_rev.value.number = incoming_old_pegrev;
       move_target_url = apr_pstrcat(scratch_pool, repos_root_url, "/",
                                     get_moved_to_repos_relpath(details,
                                                                scratch_pool),
@@ -8803,7 +8797,7 @@ resolve_incoming_move_dir_merge(svn_client_conflict_option_t *option,
       incoming_new_opt_rev.kind = svn_opt_revision_number;
       incoming_new_opt_rev.value.number = incoming_new_pegrev;
       err = svn_client__merge_locked(&conflict_report,
-                                     yca_loc->url, &yca_opt_rev,
+                                     incoming_old_url, &incoming_old_opt_rev,
                                      move_target_url, &incoming_new_opt_rev,
                                      moved_to_abspath, svn_depth_infinity,
                                      TRUE, TRUE, /* do a no-ancestry merge */
@@ -9917,6 +9911,7 @@ configure_option_incoming_move_file_merge(svn_client_conflict_t *conflict,
 {
   svn_node_kind_t victim_node_kind;
   svn_wc_conflict_action_t incoming_change;
+  svn_wc_conflict_reason_t local_change;
   const char *incoming_old_repos_relpath;
   svn_revnum_t incoming_old_pegrev;
   svn_node_kind_t incoming_old_kind;
@@ -9924,6 +9919,7 @@ configure_option_incoming_move_file_merge(svn_client_conflict_t *conflict,
   svn_revnum_t incoming_new_pegrev;
   svn_node_kind_t incoming_new_kind;
   incoming_change = svn_client_conflict_get_incoming_change(conflict);
+  local_change = svn_client_conflict_get_local_change(conflict);
   victim_node_kind = svn_client_conflict_tree_get_victim_node_kind(conflict);
   SVN_ERR(svn_client_conflict_get_incoming_old_repos_location(
             &incoming_old_repos_relpath, &incoming_old_pegrev,
@@ -9937,7 +9933,8 @@ configure_option_incoming_move_file_merge(svn_client_conflict_t *conflict,
   if (victim_node_kind == svn_node_file &&
       incoming_old_kind == svn_node_file &&
       incoming_new_kind == svn_node_none &&
-      incoming_change == svn_wc_conflict_action_delete)
+      incoming_change == svn_wc_conflict_action_delete &&
+      local_change == svn_wc_conflict_reason_edited)
     {
       struct conflict_tree_incoming_delete_details *details;
       const char *description;

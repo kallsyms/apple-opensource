@@ -5444,19 +5444,20 @@ err:
  */
 static int ntfs_vnop_link(struct vnop_link_args *a)
 {
-	ntfs_inode *ni, *dir_ni;
-	ntfs_volume *vol;
-	struct componentname *cn;
 	errno_t err;
 
-	ni = NTFS_I(a->a_vp);
-	vol = ni->vol;
-	dir_ni = NTFS_I(a->a_tdvp);
-	if (!dir_ni || !ni) {
-		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
+	ntfs_inode *ni = NTFS_I(a->a_vp);
+    if (!ni) {
+        ntfs_debug("Entered with NULL ntfs_inode, aborting.");
+        return EINVAL;
+    }
+	ntfs_inode *dir_ni = NTFS_I(a->a_tdvp);
+	if (!dir_ni) {
+		ntfs_debug("Entered with NULL dir ntfs_inode, aborting.");
 		return EINVAL;
 	}
-	cn = a->a_cnp;
+    ntfs_volume *vol = ni->vol;
+	struct componentname *cn = a->a_cnp;
 	ntfs_debug("Creating a hard link to mft_no 0x%llx, named %.*s in "
 			"directory mft_no 0x%llx.",
 			(unsigned long long)ni->mft_no, (int)cn->cn_namelen,

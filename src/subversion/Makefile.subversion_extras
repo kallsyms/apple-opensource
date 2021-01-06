@@ -1,5 +1,5 @@
 ifndef SVN_INSTALL_DIR
-export SVN_INSTALL_DIR = $(DEVELOPER_INSTALL_DIR)/usr
+export SVN_INSTALL_DIR = /usr/local
 endif
 
 Install_Prefix = $(SVN_INSTALL_DIR)
@@ -14,9 +14,10 @@ Extra_Configure_Flags = --enable-shared --disable-static \
                         --with-apr=$(APR_TOOLCHAIN_DIR) \
                         --with-apr-util=$(APR_TOOLCHAIN_DIR) \
                         --with-swig=$(shell test -e /usr/bin/swig && echo /usr || echo /usr/local) \
-                        --with-ruby-sitedir=$(RBLIBDIR)/ruby \
                         --with-sasl=$(SDKROOT)/usr \
                         --includedir=$(Install_Prefix)/local/include
+
+Extra_Make_Flags = V=1
 
 # We are only performing post-install actions here.
 GnuNoBuild            = YES
@@ -57,6 +58,7 @@ configure:: $(ConfigStamp2)
 PERLVERS := $(shell perl -MConfig -e 'print $$Config::Config{revision}.".".$$Config::Config{patchlevel}')
 PYTHONVERS := $(shell python -c 'import sys; print("%d.%d" % sys.version_info[:2])')
 MAKEFILEPL := subversion/bindings/swig/perl/native/Makefile.PL
+PR57510742_LINK_DIR := $(BuildDirectory)/subversion/libsvn_pr57510742
 $(ConfigStamp2): $(ConfigStamp)
 	mv '$(BuildDirectory)/Makefile' '$(BuildDirectory)/Makefile.bak'
 	sed -e '/^SWIG_PL_INCLUDES/s/$(PERLVERS)/$$(VERSIONER_PERL_VERSION)/g' \
@@ -66,6 +68,35 @@ $(ConfigStamp2): $(ConfigStamp)
 	    '$(BuildDirectory)/Makefile.bak' > '$(BuildDirectory)/Makefile'
 	mv '$(BuildDirectory)/$(MAKEFILEPL)' '$(BuildDirectory)/$(MAKEFILEPL).bak'
 	sed 's,-L/usr/lib,,' '$(BuildDirectory)/$(MAKEFILEPL).bak' > '$(BuildDirectory)/$(MAKEFILEPL)'
+	# 57510742 - Hack around ExtUtils-MakeMaker not searching $SDKROOT/usr/local/lib nor understanding .tbd files
+	mkdir -p $(BuildDirectory)/subversion/libsvn_client/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_delta/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_diff/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_fs/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_fs_fs/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_fs_util/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_fs_x/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_ra/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_ra_local/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_ra_serf/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_ra_svn/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_repos/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_subr/.libs
+	mkdir -p $(BuildDirectory)/subversion/libsvn_wc/.libs
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_client-1.tbd $(BuildDirectory)/subversion/libsvn_client/.libs/libsvn_client-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_delta-1.tbd $(BuildDirectory)/subversion/libsvn_delta/.libs/libsvn_delta-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_diff-1.tbd $(BuildDirectory)/subversion/libsvn_diff/.libs/libsvn_diff-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_fs-1.tbd $(BuildDirectory)/subversion/libsvn_fs/.libs/libsvn_fs-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_fs_fs-1.tbd $(BuildDirectory)/subversion/libsvn_fs_fs/.libs/libsvn_fs_fs-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_fs_util-1.tbd $(BuildDirectory)/subversion/libsvn_fs_util/.libs/libsvn_fs_util-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_fs_x-1.tbd $(BuildDirectory)/subversion/libsvn_fs_x/.libs/libsvn_fs_x-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_ra-1.tbd $(BuildDirectory)/subversion/libsvn_ra/.libs/libsvn_ra-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_ra_local-1.tbd $(BuildDirectory)/subversion/libsvn_ra_local/.libs/libsvn_ra_local-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_ra_serf-1.tbd $(BuildDirectory)/subversion/libsvn_ra_serf/.libs/libsvn_ra_serf-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_ra_svn-1.tbd $(BuildDirectory)/subversion/libsvn_ra_svn/.libs/libsvn_ra_svn-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_repos-1.tbd $(BuildDirectory)/subversion/libsvn_repos/.libs/libsvn_repos-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_subr-1.tbd $(BuildDirectory)/subversion/libsvn_subr/.libs/libsvn_subr-1.dylib
+	ln -s $(SDKROOT)/usr/local/lib/libsvn_wc-1.tbd $(BuildDirectory)/subversion/libsvn_wc/.libs/libsvn_wc-1.dylib
 	$(TOUCH) $(ConfigStamp2)
 
 # Perl multi-version support
@@ -87,16 +118,15 @@ perl-bindings:
 	cd $(BuildDirectory) && \
 	for vers in $(PERLORDEREDVERS); do \
 	    export VERSIONER_PERL_VERSION=$${vers} && \
-	    installarchlib=`perl -MConfig -e 'print $$Config::Config{installarchlib}' | sed "s,^/System,$(DEVELOPER_INSTALL_DIR),"` && \
-	    installprivlib=`perl -MConfig -e 'print $$Config::Config{installprivlib}' | sed "s,^/System,$(DEVELOPER_INSTALL_DIR),"` && \
+	    installarchlib=`perl -MConfig -e 'print $$Config::Config{installarchlib}' | sed "s,^/System/Library/Perl,/usr/local/lib/subversion/perl,"` && \
+	    installprivlib=`perl -MConfig -e 'print $$Config::Config{installprivlib}' | sed "s,^/System/Library/Perl,/usr/local/lib/subversion/perl,"` && \
 	    installbin=$${installprivlib}/bin && \
-	    PLARGS="INSTALLDIRS=perl INSTALLARCHLIB='$${installarchlib}' INSTALLPRIVLIB='$${installprivlib}' INSTALLBIN='$${installbin}' INSTALLSCRIPT='$${installbin}' INSTALLMAN3DIR='$(DEVELOPER_INSTALL_DIR)/usr/share/man/man3'" && \
+	    PLARGS="INSTALLDIRS=perl INSTALLARCHLIB='$${installarchlib}' INSTALLPRIVLIB='$${installprivlib}' INSTALLBIN='$${installbin}' INSTALLSCRIPT='$${installbin}' INSTALLMAN3DIR='/usr/local/share/man/man3'" && \
 	    MAKEARGS="$(Extra_Make_Flags) DESTDIR='$(DSTROOT)'" && \
 	    export RPATHVERS="$${installarchlib}/lib" && \
 	    ditto $(PERLTOPDIRORIG) $(PERLTOPDIR) && \
 	    make -j1 swig-pl PLARGS="$${PLARGS}" MAKEARGS="$${MAKEARGS}" ARCHFLAGS="$(RC_CFLAGS)" && \
 	    make -j1 install-swig-pl PLARGS="$${PLARGS}" MAKEARGS="$${MAKEARGS}" DESTDIR="$(DSTROOT)" && \
-	    sh $(SRCROOT)/rpath_extras.sh && \
 	    for module in Client Core Delta Fs Ra Repos Wc; do\
 		    $(CP) $(DSTROOT)$${installarchlib}/auto/SVN/_$${module}/_$${module}.bundle $(SYMROOT) && \
 		    $(STRIP) -x $(DSTROOT)$${installarchlib}/auto/SVN/_$${module}/_$${module}.bundle && \
@@ -117,6 +147,12 @@ post-install:
 		$(CODESIGN) $${library} || exit 1; \
 	done
 	find $(DSTROOT) -name \*.la -delete
-	find $(DSTROOT)$(DEVELOPER_INSTALL_DIR)/Library/Perl -name .packlist -delete
-	install -m 0755 -d $(DSTROOT)$(CLTOOLS_INSTALL_DIR)
-	ditto $(DSTROOT)$(DEVELOPER_INSTALL_DIR) $(DSTROOT)$(CLTOOLS_INSTALL_DIR)
+	find $(DSTROOT) -name .packlist -delete
+	install -d -o root -g wheel -m 0755 $(DSTROOT)/usr/local/bin
+	install -o root -g wheel -m 0755 $(SRCROOT)/git-svn/git-svn $(DSTROOT)/usr/local/bin
+	sed -i '' -e 's:/usr/bin/perl:/usr/bin/perl$(PERLDEFAULT):' $(DSTROOT)/usr/local/bin/git-svn
+	$(MKDIR) $(OSL)
+	$(INSTALL_FILE) $(SRCROOT)/git-svn/COPYING $(OSL)/git-svn.txt
+	install -d -o root -g wheel -m 0755 $(DSTROOT)/usr/local/share/git-core/perl
+	ditto $(SRCROOT)/git-svn/perl $(DSTROOT)/usr/local/share/git-core/perl
+	chown -R root:wheel $(DSTROOT)/usr/local/share/git-core/perl

@@ -4,10 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>$NTFS_COPYRIGHT_INFO_STRING</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.apple.filesystems.util.ntfs</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -22,22 +20,6 @@
 	<string>$NTFS_VERSION</string>
 	<key>FSMediaTypes</key>
 	<dict>
-		<key>Windows_NTFS</key>
-		<dict>
-			<key>FSMediaProperties</key>
-			<dict>
-				<key>Content Hint</key>
-				<string>Windows_NTFS</string>
-				<key>Leaf</key>
-				<true/>
-			</dict>
-			<key>FSProbeArguments</key>
-			<string>-p</string>
-			<key>FSProbeExecutable</key>
-			<string>ntfs.util</string>
-			<key>FSProbeOrder</key>
-			<integer>1000</integer>
-		</dict>
 		<key>EBD0A0A2-B9E5-4433-87C0-68B6B72699C7</key>
 		<dict>
 			<key>FSMediaProperties</key>
@@ -70,6 +52,22 @@
 			<key>FSProbeOrder</key>
 			<integer>4000</integer>
 		</dict>
+		<key>Windows_NTFS</key>
+		<dict>
+			<key>FSMediaProperties</key>
+			<dict>
+				<key>Content Hint</key>
+				<string>Windows_NTFS</string>
+				<key>Leaf</key>
+				<true/>
+			</dict>
+			<key>FSProbeArguments</key>
+			<string>-p</string>
+			<key>FSProbeExecutable</key>
+			<string>ntfs.util</string>
+			<key>FSProbeOrder</key>
+			<integer>1000</integer>
+		</dict>
 	</dict>
 	<key>FSPersonalities</key>
 	<dict>
@@ -83,5 +81,7 @@
 			<string>Windows NT File System (NTFS)</string>
 		</dict>
 	</dict>
+	<key>NSHumanReadableCopyright</key>
+	<string>$NTFS_COPYRIGHT_INFO_STRING</string>
 </dict>
 </plist>

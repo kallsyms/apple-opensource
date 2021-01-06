@@ -789,8 +789,6 @@ static volatile svn_atomic_t sqlite_init_state = 0;
 static svn_error_t *
 init_sqlite(void *baton, apr_pool_t *pool)
 {
-#if !__APPLE__
-// <rdar://problem/11438447> Xcode 4.4 subversion won't run on Lion
   if (sqlite3_libversion_number() < SVN_SQLITE_MIN_VERSION_NUMBER)
     {
       return svn_error_createf(
@@ -798,7 +796,6 @@ init_sqlite(void *baton, apr_pool_t *pool)
                     _("SQLite compiled for %s, but running with %s"),
                     SVN_SQLITE_MIN_VERSION, sqlite3_libversion());
     }
-#endif
 
 #if APR_HAS_THREADS
 
