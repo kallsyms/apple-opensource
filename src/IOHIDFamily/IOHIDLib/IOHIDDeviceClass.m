@@ -334,7 +334,6 @@ exit:
         return kIOReturnSuccess;
     }
     
-#if TARGET_OS_OSX
     uint64_t regID;
     
     IORegistryEntryGetRegistryEntryID(_service, &regID);
@@ -359,7 +358,6 @@ exit:
         HIDLogError("0x%llx: TCC deny IOHIDDeviceOpen", regID);
     }
     require_action(_tccGranted, exit, ret = kIOReturnNotPermitted);
-#endif
     
     ret = IOServiceOpen(_service,
                         mach_task_self(),
@@ -494,6 +492,7 @@ static IOReturn _getProperty(void *iunknown,
             // Force a copy of the string to avoid the key reference from getting courrpted
             NSString * dictKey = [key mutableCopy];
             _properties[dictKey] = (__bridge id)prop;
+            CFRelease(prop);
         }
     }
     

@@ -247,6 +247,7 @@ OSDefineMetaClassAndStructors( IOHIDEventDriver, IOHIDEventService )
 #define _sensorProperty                 _reserved->sensorProperty
 #define _orientation                    _reserved->orientation
 #define _phase                          _reserved->phase
+#define _proximity                      _reserved->proximity
 #define _workLoop                       _reserved->workLoop
 #define _commandGate                    _reserved->commandGate
 
@@ -311,6 +312,7 @@ void IOHIDEventDriver::free ()
     OSSafeReleaseNULL(_sensorProperty.sniffControl);
     OSSafeReleaseNULL(_orientation.cmElements);
     OSSafeReleaseNULL(_orientation.tiltElements);
+    OSSafeReleaseNULL(_proximity.elements);
 
     if (_commandGate) {
         if ( _workLoop ) {
@@ -374,26 +376,7 @@ bool IOHIDEventDriver::handleStart(IOService *provider)
     }
     OSSafeReleaseNULL(obj);
     
-#if TARGET_OS_IPHONE
-    uint32_t debug;
-    if (!PE_parse_boot_argn("IOHIDEventDriver-debug", &debug, sizeof (debug))) {
-        debug = 0;
-    }
-    
-    if (debug & kIOHIDEventDriverDebugSkipGCAuth) {
-        _authenticatedDevice = true;
-    } else {
-        obj = _interface->copyProperty(kIOHIDAuthenticatedDeviceKey);
-        _authenticatedDevice = (OSDynamicCast(OSBoolean, obj) && obj == kOSBooleanTrue);
-        OSSafeReleaseNULL(obj);
-        if (conformTo(kHIDPage_GenericDesktop, kHIDUsage_GD_GamePad) ||
-            conformTo(kHIDPage_GenericDesktop, kHIDUsage_GD_Joystick)) {
-            require_action(_authenticatedDevice, exit, HIDLogError("Un-authenticated game controller device attached"));
-        }
-    }
-#else
     _authenticatedDevice = true;
-#endif
     
     obj = copyProperty(kIOHIDAbsoluteAxisBoundsRemovalPercentage, gIOServicePlane);
     if (OSDynamicCast(OSNumber, obj)) {
@@ -606,6 +589,7 @@ bool IOHIDEventDriver::parseElements ( OSArray* elementArray, UInt32 bootProtoco
                 parseRelativeElement(element) ||
                 parseScrollElement(element) ||
                 parseLEDElement(element) ||
+                parseProximityElement(element) ||
                 parseKeyboardElement(element) ||
                 parseUnicodeElement(element) ||
                 parseBiometricElement(element) ||
@@ -622,7 +606,6 @@ bool IOHIDEventDriver::parseElements ( OSArray* elementArray, UInt32 bootProtoco
         }
         
         if (element->getUsagePage() == kHIDPage_Button) {
-#if TARGET_OS_OSX
             IOHIDElement *  parent = element;
             while ((parent = parent->getParentElement()) != NULL) {
                 if (parent->getUsagePage() == kHIDPage_Consumer) {
@@ -632,7 +615,6 @@ bool IOHIDEventDriver::parseElements ( OSArray* elementArray, UInt32 bootProtoco
             if (parent != NULL) {
               continue;
             }
-#endif
             if ( !pendingButtonElements ) {
                 pendingButtonElements = OSArray::withCapacity(4);
                 require_action(pendingButtonElements, exit, result = false);
@@ -1041,13 +1023,9 @@ void IOHIDEventDriver::setDigitizerProperties()
     require(properties, exit);
     require(_digitizer.transducers, exit);
 
-#if TARGET_OS_TV
-    _digitizer.collectionDispatch = true;
-#else
     if (conformTo (kHIDPage_AppleVendor, kHIDUsage_AppleVendor_DFR) || conformTo(kHIDPage_Digitizer, kHIDUsage_Dig_TouchPad) || getProperty(kIOHIDDigitizerCollectionDispatchKey, gIOServicePlane) == kOSBooleanTrue) {
         _digitizer.collectionDispatch = true;
     }
-#endif
   
     properties->setObject("touchCancelElement", _digitizer.touchCancelElement);
     properties->setObject("Transducers", _digitizer.transducers);
@@ -1438,7 +1416,6 @@ bool  IOHIDEventDriver::conformTo (UInt32 usagePage, UInt32 usage) {
 //====================================================================================================
 void IOHIDEventDriver::setAccelerationProperties()
 {
-#if TARGET_OS_OSX
     bool        pointer             = false;
     OSArray     *deviceUsagePairs   = getDeviceUsagePairs();
     
@@ -1486,7 +1463,6 @@ void IOHIDEventDriver::setAccelerationProperties()
             }
         }
     }
-#endif /* TARGET_OS_OSX */
 }
 
 //====================================================================================================
@@ -1877,6 +1853,8 @@ bool IOHIDEventDriver::parseDigitizerTransducerElement(IOHIDElement * element, I
     bool                    shouldCalibrate = false;
     bool                    result          = false;
     UInt32                  index, count;
+    
+    require(element->getUsage() <= kHIDUsage_MaxUsage, exit);
     
     switch ( element->getUsagePage() ) {
         case kHIDPage_GenericDesktop:
@@ -2307,145 +2285,6 @@ exit:
 //====================================================================================================
 // IOHIDEventDriver::parseUnicodeElement
 //====================================================================================================
-#if TARGET_OS_IPHONE
-bool IOHIDEventDriver::parseUnicodeElement(IOHIDElement * element)
-{
-    bool store = false;
-
-    store = parseLegacyUnicodeElement(element);
-    require(!store, exit);
-    
-    store = parseGestureUnicodeElement(element);
-
-exit:
-    return store;
-}
-
-//====================================================================================================
-// IOHIDEventDriver::parseLegacyUnicodeElement
-//====================================================================================================
-bool IOHIDEventDriver::parseLegacyUnicodeElement(IOHIDElement * element)
-{
-    UInt32 usagePage    = element->getUsagePage();
-    bool   store        = false;
-    
-    require(usagePage==kHIDPage_Unicode, exit);
-    
-    if ( !_unicode.legacyElements ) {
-        _unicode.legacyElements = OSArray::withCapacity(4);
-        require(_unicode.legacyElements, exit);
-    }
-    
-    _unicode.legacyElements->setObject(element);
-    store = true;
-    
-exit:
-    return store;
-}
-
-//====================================================================================================
-// IOHIDEventDriver::parseGestureUnicodeElement
-//====================================================================================================
-bool IOHIDEventDriver::parseGestureUnicodeElement(IOHIDElement * element)
-{
-    IOHIDElement *              parent      = NULL;
-    EventElementCollection *    candidate   = NULL;
-    UInt32                      usagePage   = element->getUsagePage();
-    UInt32                      usage       = element->getUsage();
-    bool                        result      = false;
-    UInt32                      index, count;
-
-    require(usage <= kHIDUsage_MaxUsage, exit);
-    switch ( usagePage ) {
-        case kHIDPage_Digitizer:
-            switch ( usage ) {
-                case kHIDUsage_Dig_GestureCharacterQuality:
-                    calibrateJustifiedPreferredStateElement(element, 0);
-                case kHIDUsage_Dig_GestureCharacterData:
-                case kHIDUsage_Dig_GestureCharacterDataLength:
-                case kHIDUsage_Dig_GestureCharacterEncodingUTF8:
-                case kHIDUsage_Dig_GestureCharacterEncodingUTF16LE:
-                case kHIDUsage_Dig_GestureCharacterEncodingUTF16BE:
-                    result = true;
-                    break;
-                case kHIDUsage_Dig_GestureCharacterEnable:
-                    if ( element->getType() == kIOHIDElementTypeFeature ) {
-                        _unicode.gestureStateElement = element;
-                        _unicode.gestureStateElement->retain();
-                        result = true;
-                        goto exit;
-                    }
-                    break;
-                default:
-                    break;
-            }
-            break;
-        default:
-            break;
-    }
-    
-    require(result, exit);
-
-    parent = element;
-    while ( (parent = parent->getParentElement()) ) {
-        switch ( parent->getCollectionType() ) {
-            case kIOHIDElementCollectionTypeLogical:
-            case kIOHIDElementCollectionTypePhysical:
-                break;
-            default:
-                continue;
-        }
-        
-        if ( parent->getUsagePage() != kHIDPage_Digitizer )
-            continue;
-
-        if ( parent->getUsage() != kHIDUsage_Dig_GestureCharacter)
-            continue;
-        
-        break;
-    }
-    
-    require_action(parent, exit, result=false);
-    
-    require_action(GetReportType(element->getType()) == kIOHIDReportTypeInput, exit, result=false);
-    
-    if ( !_unicode.gesturesCandidates ) {
-        _unicode.gesturesCandidates = OSArray::withCapacity(4);
-        require_action(_unicode.gesturesCandidates, exit, result=false);
-    }
-    
-    // go through exising transducers
-    for ( index=0,count=_unicode.gesturesCandidates->getCount(); index<count; index++) {
-        EventElementCollection * tempCandidate;
-        
-        tempCandidate = OSDynamicCast(EventElementCollection,_unicode.gesturesCandidates->getObject(index));
-        if ( !tempCandidate )
-            continue;
-        
-        if ( tempCandidate->collection != parent )
-            continue;
-        
-        candidate = tempCandidate;
-        break;
-    }
-    
-    // no match, let's create one
-    if ( !candidate ) {
-        candidate = EventElementCollection::candidate(parent);
-        require_action(candidate, exit, result=false);
-        
-        _unicode.gesturesCandidates->setObject(candidate);
-        candidate->release();
-    }
-    
-    candidate->elements->setObject(element);
-    result = true;
-    
-exit:
-    return result;
-}
-
-#else
 bool IOHIDEventDriver::parseUnicodeElement(IOHIDElement * )
 {
     return false;
@@ -2458,7 +2297,6 @@ bool IOHIDEventDriver::parseGestureUnicodeElement(IOHIDElement * element __unuse
 {
     return false;
 }
-#endif
 
 
 //====================================================================================================
@@ -2893,7 +2731,38 @@ exit:
     return store;
 }
 
+bool IOHIDEventDriver::parseProximityElement(IOHIDElement *element) {
+    UInt32 usagePage    = element->getUsagePage();
+    UInt32 usage        = element->getUsage();
+    bool   store        = false;
 
+    require(usage <= kHIDUsage_MaxUsage, exit);
+    switch (usagePage) {
+        case kHIDPage_Consumer:
+            switch (usage) {
+                case kHIDUsage_Csmr_Proximity:
+                    store = true;
+                    break;
+
+                default:
+                    break;
+            }
+        default:
+            break;
+    }
+
+    require(store, exit);
+
+    if (!_proximity.elements) {
+        _proximity.elements = OSArray::withCapacity(1);
+        require(_proximity.elements, exit);
+    }
+
+    _proximity.elements->setObject(element);
+
+exit:
+    return store;
+}
 
 //====================================================================================================
 // IOHIDEventDriver::checkGameControllerElement
@@ -3080,6 +2949,7 @@ void IOHIDEventDriver::handleInterruptReport (
     handleCompassReport (timeStamp, reportID);
     handleTemperatureReport (timeStamp, reportID);
     handleDeviceOrientationReport (timeStamp, reportID);
+    handleProximityReport(timeStamp, reportID);
 
     handleVendorMessageReport(timeStamp, report, reportID, kIOHandlePrimaryVendorMessageReport);
 
@@ -4056,186 +3926,6 @@ exit:
 //====================================================================================================
 // IOHIDEventDriver::handleUnicodeReport
 //====================================================================================================
-#if TARGET_OS_IPHONE
-void IOHIDEventDriver::handleUnicodeReport(AbsoluteTime timeStamp, UInt32 reportID)
-{
-    handleUnicodeLegacyReport(timeStamp, reportID);
-    handleUnicodeGestureReport(timeStamp, reportID);
-}
-
-//====================================================================================================
-// IOHIDEventDriver::handleUnicodeLegacyReport
-//====================================================================================================
-void IOHIDEventDriver::handleUnicodeLegacyReport(AbsoluteTime timeStamp, UInt32 reportID)
-{
-    UInt32      index, count;
-    
-    require_quiet(_unicode.legacyElements, exit);
-
-    for (index=0, count=_unicode.legacyElements->getCount(); index<count; index++) {
-        IOHIDElement *  element;
-        AbsoluteTime    elementTimeStamp;
-        
-        element = OSDynamicCast(IOHIDElement, _unicode.legacyElements->getObject(index));
-        if ( !element )
-            continue;
-        
-        if ( element->getReportID() != reportID )
-            continue;
-        
-        elementTimeStamp = element->getTimeStamp();
-        if ( CMP_ABSOLUTETIME(&timeStamp, &elementTimeStamp) != 0 )
-            continue;
-        
-        switch ( element->getUsagePage() ) {
-            case kHIDPage_Unicode:
-                if ( element->getValue() ) {
-                    uint32_t usage  =element->getUsage();
-                    
-                    if ( usage > 0 && usage <= kHIDUsage_MaxUsage ) {
-                        uint16_t unicode_char = usage;
-                        
-                        unicode_char = OSSwapHostToLittleInt16(unicode_char);
-                        
-                        dispatchUnicodeEvent(timeStamp, (UInt8 *)&unicode_char, sizeof(unicode_char));
-                    }
-                }
-                break;
-        }
-    }
-exit:
-    return;
-}
-
-//====================================================================================================
-// IOHIDEventDriver::handleUnicodeGestureReport
-//====================================================================================================
-void IOHIDEventDriver::handleUnicodeGestureReport(AbsoluteTime timeStamp, UInt32 reportID)
-{
-    IOHIDEvent * main = NULL;
-    UInt32 index, count;
-    
-    require_quiet(_unicode.gesturesCandidates, exit);
-    
-    for (index=0, count=_unicode.gesturesCandidates->getCount(); index<count; index++) {
-        EventElementCollection *  candidate   = NULL;
-        IOHIDEvent *        event       = NULL;
-        
-        candidate = OSDynamicCast(EventElementCollection, _unicode.gesturesCandidates->getObject(index));
-        if ( !candidate )
-            continue;
-        
-        event = handleUnicodeGestureCandidateReport(candidate, timeStamp, reportID);
-        if ( !event )
-            continue;
-        
-        if ( main ) {
-            main->appendChild(event);
-        } else {
-            main = event;
-            main->retain();
-        }
-        event->release();
-    }
-    
-    require(main, exit);
-    
-    dispatchEvent(main);
-    
-    main->release();
-    
-exit:
-    return;
-}
-
-//====================================================================================================
-// IOHIDEventDriver::handleUnicodeGestureCandidateReport
-//====================================================================================================
-IOHIDEvent * IOHIDEventDriver::handleUnicodeGestureCandidateReport(EventElementCollection * candidate, AbsoluteTime timeStamp, UInt32 reportID)
-{
-    IOHIDEvent *        result        = NULL;
-    uint8_t *           payload       = NULL;
-    uint32_t            payloadLength = 0;
-    uint32_t            length        = 0;
-    UnicodeEncodingType encoding      = kUnicodeEncodingTypeUTF16LE;
-    IOFixed             quality       = (1<<16);
-    bool                handled       = false;
-    uint32_t            index, count;
-    OSData *            payloadData   = NULL;
-    require(candidate->elements, exit);
-    
-    for ( index=0, count=candidate->elements->getCount(); index<count; index++ ) {
-        IOHIDElement *  element;
-        AbsoluteTime    elementTimeStamp;
-        bool            elementIsCurrent;
-        UInt32          usagePage;
-        UInt32          usage;
-        
-        element = OSDynamicCast(IOHIDElement, candidate->elements->getObject(index));
-        if ( !element )
-            continue;
-        
-        elementTimeStamp = element->getTimeStamp();
-        elementIsCurrent = (element->getReportID()==reportID) && (CMP_ABSOLUTETIME(&timeStamp, &elementTimeStamp)==0);
-        
-        handled    |= elementIsCurrent;
-        
-        usagePage   = element->getUsagePage();
-        usage       = element->getUsage();
-        
-        switch ( usagePage ) {
-            case kHIDPage_Digitizer:
-                switch ( usage ) {
-                    case kHIDUsage_Dig_GestureCharacterData:
-                        payloadData  = element->getDataValue();
-                        if (payloadData) {
-                            payload = (uint8_t*)payloadData->getBytesNoCopy();
-                            payloadLength = payloadData->getLength ();
-                        }
-                        break;
-                    case kHIDUsage_Dig_GestureCharacterDataLength:
-                        length = element->getValue();
-                        break;
-                    case kHIDUsage_Dig_GestureCharacterEncodingUTF8:
-                        if ( element->getValue() )
-                            encoding = kUnicodeEncodingTypeUTF8;
-                        break;
-                    case kHIDUsage_Dig_GestureCharacterEncodingUTF16LE:
-                        if ( element->getValue() )
-                            encoding = kUnicodeEncodingTypeUTF16LE;
-                        break;
-                    case kHIDUsage_Dig_GestureCharacterEncodingUTF16BE:
-                        if ( element->getValue() )
-                            encoding = kUnicodeEncodingTypeUTF16BE;
-                        break;
-                    case kHIDUsage_Dig_GestureCharacterEncodingUTF32LE:
-                        if ( element->getValue() )
-                            encoding = kUnicodeEncodingTypeUTF32LE;
-                        break;
-                    case kHIDUsage_Dig_GestureCharacterEncodingUTF32BE:
-                        if ( element->getValue() )
-                            encoding = kUnicodeEncodingTypeUTF32BE;
-                        break;
-                    case kHIDUsage_Dig_GestureCharacterQuality:
-                        quality = element->getScaledFixedValue(kIOHIDValueScaleTypeCalibrated);
-                        break;
-                    default:
-                        break;
-                }
-                break;
-            default:
-                break;
-        }
-    }
-    
-    require(handled, exit);
-    
-    result = IOHIDEvent::unicodeEvent(timeStamp, payload, payloadLength < length ? payloadLength : length, encoding, quality, 0);
-
-exit:
-    return result;
-}
-#else
 void IOHIDEventDriver::handleUnicodeReport(AbsoluteTime , UInt32 )
 {
     
@@ -4252,7 +3942,6 @@ IOHIDEvent * IOHIDEventDriver::handleUnicodeGestureCandidateReport(EventElementC
 {
     return NULL;
 }
-#endif
 
 
 //====================================================================================================
@@ -4855,6 +4544,35 @@ void IOHIDEventDriver::handlePhaseReport(AbsoluteTime timeStamp, UInt32 reportID
                     break;
             }
         }
+    }
+
+exit:
+    return;
+}
+
+void IOHIDEventDriver::handleProximityReport(AbsoluteTime timeStamp, UInt32 reportID)
+{
+    UInt32 index;
+    UInt32 count;
+    require_quiet(_proximity.elements, exit);
+
+    for (index = 0, count = _proximity.elements->getCount(); index < count; ++index) {
+        IOHIDElement *element = OSDynamicCast(IOHIDElement, _proximity.elements->getObject(index));
+
+        UInt32 preValue = element->getValue(kIOHIDValueOptionsFlagPrevious);
+        UInt32 value = element->getValue();
+
+        if (reportID != element->getReportID()) {
+            continue;
+        }
+
+        if (value == preValue) {
+            continue;
+        }
+
+        IOHIDEvent * proxEvent = IOHIDEvent::proximityEvent(timeStamp, value != 0 ? kIOHIDProximityDetectionLargeBodyContact : 0, value, 0);
+        dispatchEvent(proxEvent);
+        proxEvent->release();
     }
 
 exit:

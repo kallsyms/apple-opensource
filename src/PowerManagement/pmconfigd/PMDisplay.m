@@ -107,6 +107,10 @@ __private_extern__ void blankDisplay()
 
 __private_extern__ bool canSustainFullWake()
 {
+    if (isEmergencySleep()) {
+        INFO_LOG("Cannot sustain full wake due to emergency sleep");
+        return false;
+    }
     if (gClamshellState == kPMClamshellClosed) {
         if (_getPowerSource() != kACPowered && !(getClamshellSleepState() & kClamshellDisableAssertions)) {
             // device is on battery and no assertions preventing clamshell sleep
@@ -222,6 +226,7 @@ __private_extern__ void resetDisplayState()
 {
     if (gDisplayOn) {
         INFO_LOG("Resetting display state to off on sleep");
+        blankDisplay();
         displayStateDidChange(kDisplaysUnpowered);
     }
 }

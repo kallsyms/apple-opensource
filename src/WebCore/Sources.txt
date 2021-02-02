@@ -161,6 +161,7 @@ Modules/mediastream/RTCIceCandidate.cpp
 Modules/mediastream/RTCIceTransport.cpp
 Modules/mediastream/RTCPeerConnection.cpp
 Modules/mediastream/RTCPeerConnectionIceEvent.cpp
+Modules/mediastream/RTCPeerConnectionIceErrorEvent.cpp
 Modules/mediastream/RTCRtpReceiver.cpp
 Modules/mediastream/RTCRtpSender.cpp
 Modules/mediastream/RTCRtpTransceiver.cpp
@@ -1259,6 +1260,7 @@ html/canvas/WebGLCompressedTextureETC.cpp
 html/canvas/WebGLCompressedTextureETC1.cpp
 html/canvas/WebGLCompressedTexturePVRTC.cpp
 html/canvas/WebGLCompressedTextureS3TC.cpp
+html/canvas/WebGLCompressedTextureS3TCsRGB.cpp
 html/canvas/WebGLContextEvent.cpp
 html/canvas/WebGLContextGroup.cpp
 html/canvas/WebGLContextObject.cpp
@@ -3238,6 +3240,7 @@ JSRTCOfferAnswerOptions.cpp
 JSRTCOfferOptions.cpp
 JSRTCPeerConnection.cpp
 JSRTCPeerConnectionIceEvent.cpp
+JSRTCPeerConnectionIceErrorEvent.cpp
 JSRTCPeerConnectionState.cpp
 JSRTCPriorityType.cpp
 JSRTCRtpCapabilities.cpp
@@ -3532,6 +3535,7 @@ JSWebGLCompressedTextureETC.cpp
 JSWebGLCompressedTextureETC1.cpp
 JSWebGLCompressedTexturePVRTC.cpp
 JSWebGLCompressedTextureS3TC.cpp
+JSWebGLCompressedTextureS3TCsRGB.cpp
 JSWebGLContextAttributes.cpp
 JSWebGLContextEvent.cpp
 JSWebGLDebugRendererInfo.cpp

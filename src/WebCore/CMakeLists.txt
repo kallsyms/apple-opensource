@@ -370,6 +370,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediastream/RTCOfferAnswerOptions.idl
     Modules/mediastream/RTCOfferOptions.idl
     Modules/mediastream/RTCPeerConnection.idl
+    Modules/mediastream/RTCPeerConnectionIceErrorEvent.idl
     Modules/mediastream/RTCPeerConnectionIceEvent.idl
     Modules/mediastream/RTCPeerConnectionState.idl
     Modules/mediastream/RTCPriorityType.idl
@@ -1421,6 +1422,7 @@ if (ENABLE_WEBGL)
         html/canvas/WebGLCompressedTextureETC1.cpp
         html/canvas/WebGLCompressedTexturePVRTC.cpp
         html/canvas/WebGLCompressedTextureS3TC.cpp
+        html/canvas/WebGLCompressedTextureS3TCsRGB.cpp
         html/canvas/WebGLContextEvent.cpp
         html/canvas/WebGLContextGroup.cpp
         html/canvas/WebGLContextObject.cpp
@@ -1477,6 +1479,7 @@ list(APPEND WebCore_IDL_FILES
     html/canvas/WebGLCompressedTextureETC1.idl
     html/canvas/WebGLCompressedTexturePVRTC.idl
     html/canvas/WebGLCompressedTextureS3TC.idl
+    html/canvas/WebGLCompressedTextureS3TCsRGB.idl
     html/canvas/WebGLContextAttributes.idl
     html/canvas/WebGLContextEvent.idl
     html/canvas/WebGLDebugRendererInfo.idl

@@ -894,7 +894,7 @@ UInt32 IOPCIDevice::findPCICapability( UInt8 capabilityID, UInt8 * offset )
 
 UInt32 IOPCIDevice::extendedFindPCICapability( UInt32 capabilityID, IOByteCount * offset )
 {
-    return (parent->extendedFindPCICapability(space, capabilityID, offset));
+    return (parent->extendedFindPCICapability(reserved->configEntry, capabilityID, offset));
 }
 
 UInt32 IOPCIDevice::setConfigBits( UInt8 reg, UInt32 mask, UInt32 value )
@@ -1986,7 +1986,7 @@ IMPL(IOPCIDevice, _MemoryAccess)
     else
 #endif
     {
-        switch (operation)
+        switch (operation & (~kPCIDriverKitMemoryAccessOperationDeviceMemoryIndexMask))
         {
             case kPCIDriverKitMemoryAccessOperationConfigurationRead | kPCIDriverKitMemoryAccessOperation32Bit:
             {

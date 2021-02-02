@@ -746,9 +746,14 @@ make_roff_command (const char *path, const char *file) {
 #ifdef __APPLE__
 static char *
 make_mandoc_command(const char * __unused path, const char *file) {
-    int ll = setll();
+    // like setll()
+    int width = line_length;
+    if (width > 80) {
+	width = width * 9/10;
+    }
+
     char *command = my_xsprintf("%s -c -O width=%d %s",
-	    "/usr/bin/mandoc", ll, file);
+	    "/usr/bin/mandoc", width, file);
 
     if (os_variant_is_darwinos("com.apple.man")) {
 	// darwinOS won't have roff available
@@ -1225,7 +1230,7 @@ do_global_apropos (char *name, char *section) {
 					       "> /dev/null 2> /dev/null",
 				 expander, *gf, name);
 		    else
-			 command = my_xsprintf("grep '%Q' %S"
+			 command = my_xsprintf("grep '%Q' '%Q'"
 					       "> /dev/null 2> /dev/null",
 				 name, *gf);
 		    res = do_system_command (command, 1);
