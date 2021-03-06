@@ -5,6 +5,7 @@
 #include "refs.h"
 #include "refspec.h"
 #include "remote.h"
+#include "sequencer.h"
 #include "commit.h"
 #include "worktree.h"
 
@@ -268,7 +269,7 @@ void create_branch(struct repository *r,
 	}
 
 	real_ref = NULL;
-	if (get_oid(start_name, &oid)) {
+	if (get_oid_mb(start_name, &oid)) {
 		if (explicit_tracking) {
 			if (advice_set_upstream_failure) {
 				error(_(upstream_missing), start_name);
@@ -337,15 +338,19 @@ void create_branch(struct repository *r,
 	free(real_ref);
 }
 
-void remove_branch_state(struct repository *r)
+void remove_merge_branch_state(struct repository *r)
 {
-	unlink(git_path_cherry_pick_head(r));
-	unlink(git_path_revert_head(r));
 	unlink(git_path_merge_head(r));
 	unlink(git_path_merge_rr(r));
 	unlink(git_path_merge_msg(r));
 	unlink(git_path_merge_mode(r));
+}
+
+void remove_branch_state(struct repository *r, int verbose)
+{
+	sequencer_post_commit_cleanup(r, verbose);
 	unlink(git_path_squash_msg(r));
+	remove_merge_branch_state(r);
 }
 
 void die_if_checked_out(const char *branch, int ignore_current_worktree)

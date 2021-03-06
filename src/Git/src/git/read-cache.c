@@ -17,6 +17,7 @@
 #include "commit.h"
 #include "blob.h"
 #include "resolve-undo.h"
+#include "run-command.h"
 #include "strbuf.h"
 #include "varint.h"
 #include "split-index.h"
@@ -194,7 +195,7 @@ int match_stat_data(const struct stat_data *sd, struct stat *st)
  * cache, ie the parts that aren't tracked by GIT, and only used
  * to validate the cache.
  */
-void fill_stat_cache_info(struct cache_entry *ce, struct stat *st)
+void fill_stat_cache_info(struct index_state *istate, struct cache_entry *ce, struct stat *st)
 {
 	fill_stat_data(&ce->ce_stat_data, st);
 
@@ -203,7 +204,7 @@ void fill_stat_cache_info(struct cache_entry *ce, struct stat *st)
 
 	if (S_ISREG(st->st_mode)) {
 		ce_mark_uptodate(ce);
-		mark_fsmonitor_valid(ce);
+		mark_fsmonitor_valid(istate, ce);
 	}
 }
 
@@ -548,7 +549,7 @@ static int index_name_stage_pos(const struct index_state *istate, const char *na
 	first = 0;
 	last = istate->cache_nr;
 	while (last > first) {
-		int next = (last + first) >> 1;
+		int next = first + ((last - first) >> 1);
 		struct cache_entry *ce = istate->cache[next];
 		int cmp = cache_name_stage_compare(name, namelen, stage, ce->name, ce_namelen(ce), ce_stage(ce));
 		if (!cmp)
@@ -588,13 +589,19 @@ int remove_index_entry_at(struct index_state *istate, int pos)
  * CE_REMOVE is set in ce_flags.  This is much more effective than
  * calling remove_index_entry_at() for each entry to be removed.
  */
-void remove_marked_cache_entries(struct index_state *istate)
+void remove_marked_cache_entries(struct index_state *istate, int invalidate)
 {
 	struct cache_entry **ce_array = istate->cache;
 	unsigned int i, j;
 
 	for (i = j = 0; i < istate->cache_nr; i++) {
 		if (ce_array[i]->ce_flags & CE_REMOVE) {
+			if (invalidate) {
+				cache_tree_invalidate_path(istate,
+							   ce_array[i]->name);
+				untracked_cache_remove_from_index(istate,
+								  ce_array[i]->name);
+			}
 			remove_name_hash(istate, ce_array[i]);
 			save_or_free_index_entry(istate, ce_array[i]);
 		}
@@ -702,6 +709,7 @@ int add_to_index(struct index_state *istate, const char *path, struct stat *st, 
 	int add_option = (ADD_CACHE_OK_TO_ADD|ADD_CACHE_OK_TO_REPLACE|
 			  (intent_only ? ADD_CACHE_NEW_ONLY : 0));
 	int hash_flags = HASH_WRITE_OBJECT;
+	struct object_id oid;
 
 	if (flags & ADD_CACHE_RENORMALIZE)
 		hash_flags |= HASH_RENORMALIZE;
@@ -711,6 +719,8 @@ int add_to_index(struct index_state *istate, const char *path, struct stat *st, 
 
 	namelen = strlen(path);
 	if (S_ISDIR(st_mode)) {
+		if (resolve_gitlink_ref(path, "HEAD", &oid) < 0)
+			return error(_("'%s' does not have a commit checked out"), path);
 		while (namelen && path[namelen-1] == '/')
 			namelen--;
 	}
@@ -718,7 +728,7 @@ int add_to_index(struct index_state *istate, const char *path, struct stat *st, 
 	memcpy(ce->name, path, namelen);
 	ce->ce_namelen = namelen;
 	if (!intent_only)
-		fill_stat_cache_info(ce, st);
+		fill_stat_cache_info(istate, ce, st);
 	else
 		ce->ce_flags |= CE_INTENT_TO_ADD;
 
@@ -1277,7 +1287,7 @@ static int add_index_entry_with_check(struct index_state *istate, struct cache_e
 	 */
 	if (istate->cache_nr > 0 &&
 		strcmp(ce->name, istate->cache[istate->cache_nr - 1]->name) > 0)
-		pos = -istate->cache_nr - 1;
+		pos = index_pos_to_insert_pos(istate->cache_nr);
 	else
 		pos = index_name_stage_pos(istate, ce->name, ce_namelen(ce), ce_stage(ce));
 
@@ -1433,7 +1443,7 @@ static struct cache_entry *refresh_cache_ent(struct index_state *istate,
 			 */
 			if (!S_ISGITLINK(ce->ce_mode)) {
 				ce_mark_uptodate(ce);
-				mark_fsmonitor_valid(ce);
+				mark_fsmonitor_valid(istate, ce);
 			}
 			return ce;
 		}
@@ -1448,7 +1458,7 @@ static struct cache_entry *refresh_cache_ent(struct index_state *istate,
 	updated = make_empty_cache_entry(istate, ce_namelen(ce));
 	copy_cache_entry(updated, ce);
 	memcpy(updated->name, ce->name, ce->ce_namelen + 1);
-	fill_stat_cache_info(updated, &st);
+	fill_stat_cache_info(istate, updated, &st);
 	/*
 	 * If ignore_valid is not set, we should leave CE_VALID bit
 	 * alone.  Otherwise, paths marked with --no-assume-unchanged
@@ -1472,6 +1482,27 @@ static void show_file(const char * fmt, const char * name, int in_porcelain,
 	}
 	printf(fmt, name);
 }
+
+int repo_refresh_and_write_index(struct repository *repo,
+				 unsigned int refresh_flags,
+				 unsigned int write_flags,
+				 int gentle,
+				 const struct pathspec *pathspec,
+				 char *seen, const char *header_msg)
+{
+	struct lock_file lock_file = LOCK_INIT;
+	int fd, ret = 0;
+
+	fd = repo_hold_locked_index(repo, &lock_file, 0);
+	if (!gentle && fd < 0)
+		return -1;
+	if (refresh_index(repo->index, refresh_flags, pathspec, seen, header_msg))
+		ret = 1;
+	if (0 <= fd && write_locked_index(repo->index, &lock_file, COMMIT_LOCK | write_flags))
+		ret = -1;
+	return ret;
+}
+
 
 int refresh_index(struct index_state *istate, unsigned int flags,
 		  const struct pathspec *pathspec,
@@ -1600,16 +1631,17 @@ struct cache_entry *refresh_cache_entry(struct index_state *istate,
 
 #define INDEX_FORMAT_DEFAULT 3
 
-static unsigned int get_index_format_default(void)
+static unsigned int get_index_format_default(struct repository *r)
 {
 	char *envversion = getenv("GIT_INDEX_VERSION");
 	char *endp;
-	int value;
 	unsigned int version = INDEX_FORMAT_DEFAULT;
 
 	if (!envversion) {
-		if (!git_config_get_int("index.version", &value))
-			version = value;
+		prepare_repo_settings(r);
+
+		if (r->settings.index_version >= 0)
+			version = r->settings.index_version;
 		if (version < INDEX_FORMAT_LB || INDEX_FORMAT_UB < version) {
 			warning(_("index.version set, but the value is invalid.\n"
 				  "Using version %i"), INDEX_FORMAT_DEFAULT);
@@ -1645,39 +1677,24 @@ struct ondisk_cache_entry {
 	uint32_t uid;
 	uint32_t gid;
 	uint32_t size;
-	unsigned char sha1[20];
-	uint16_t flags;
-	char name[FLEX_ARRAY]; /* more */
-};
-
-/*
- * This struct is used when CE_EXTENDED bit is 1
- * The struct must match ondisk_cache_entry exactly from
- * ctime till flags
- */
-struct ondisk_cache_entry_extended {
-	struct cache_time ctime;
-	struct cache_time mtime;
-	uint32_t dev;
-	uint32_t ino;
-	uint32_t mode;
-	uint32_t uid;
-	uint32_t gid;
-	uint32_t size;
-	unsigned char sha1[20];
-	uint16_t flags;
-	uint16_t flags2;
-	char name[FLEX_ARRAY]; /* more */
+	/*
+	 * unsigned char hash[hashsz];
+	 * uint16_t flags;
+	 * if (flags & CE_EXTENDED)
+	 *	uint16_t flags2;
+	 */
+	unsigned char data[GIT_MAX_RAWSZ + 2 * sizeof(uint16_t)];
+	char name[FLEX_ARRAY];
 };
 
 /* These are only used for v3 or lower */
 #define align_padding_size(size, len) ((size + (len) + 8) & ~7) - (size + len)
-#define align_flex_name(STRUCT,len) ((offsetof(struct STRUCT,name) + (len) + 8) & ~7)
+#define align_flex_name(STRUCT,len) ((offsetof(struct STRUCT,data) + (len) + 8) & ~7)
 #define ondisk_cache_entry_size(len) align_flex_name(ondisk_cache_entry,len)
-#define ondisk_cache_entry_extended_size(len) align_flex_name(ondisk_cache_entry_extended,len)
-#define ondisk_ce_size(ce) (((ce)->ce_flags & CE_EXTENDED) ? \
-			    ondisk_cache_entry_extended_size(ce_namelen(ce)) : \
-			    ondisk_cache_entry_size(ce_namelen(ce)))
+#define ondisk_data_size(flags, len) (the_hash_algo->rawsz + \
+				     ((flags & CE_EXTENDED) ? 2 : 1) * sizeof(uint16_t) + len)
+#define ondisk_data_size_max(len) (ondisk_data_size(CE_EXTENDED, len))
+#define ondisk_ce_size(ce) (ondisk_cache_entry_size(ondisk_data_size((ce)->ce_flags, ce_namelen(ce))))
 
 /* Allow fsck to force verification of the index checksum. */
 int verify_index_checksum;
@@ -1751,6 +1768,8 @@ static struct cache_entry *create_from_disk(struct mem_pool *ce_mem_pool,
 	struct cache_entry *ce;
 	size_t len;
 	const char *name;
+	const unsigned hashsz = the_hash_algo->rawsz;
+	const uint16_t *flagsp = (const uint16_t *)(ondisk->data + hashsz);
 	unsigned int flags;
 	size_t copy_len = 0;
 	/*
@@ -1763,22 +1782,20 @@ static struct cache_entry *create_from_disk(struct mem_pool *ce_mem_pool,
 	int expand_name_field = version == 4;
 
 	/* On-disk flags are just 16 bits */
-	flags = get_be16(&ondisk->flags);
+	flags = get_be16(flagsp);
 	len = flags & CE_NAMEMASK;
 
 	if (flags & CE_EXTENDED) {
-		struct ondisk_cache_entry_extended *ondisk2;
 		int extended_flags;
-		ondisk2 = (struct ondisk_cache_entry_extended *)ondisk;
-		extended_flags = get_be16(&ondisk2->flags2) << 16;
+		extended_flags = get_be16(flagsp + 1) << 16;
 		/* We do not yet understand any bit out of CE_EXTENDED_FLAGS */
 		if (extended_flags & ~CE_EXTENDED_FLAGS)
 			die(_("unknown index entry format 0x%08x"), extended_flags);
 		flags |= extended_flags;
-		name = ondisk2->name;
+		name = (const char *)(flagsp + 2);
 	}
 	else
-		name = ondisk->name;
+		name = (const char *)(flagsp + 1);
 
 	if (expand_name_field) {
 		const unsigned char *cp = (const unsigned char *)name;
@@ -1817,7 +1834,9 @@ static struct cache_entry *create_from_disk(struct mem_pool *ce_mem_pool,
 	ce->ce_flags = flags & ~CE_NAMEMASK;
 	ce->ce_namelen = len;
 	ce->index = 0;
-	hashcpy(ce->oid.hash, ondisk->sha1);
+	hashcpy(ce->oid.hash, ondisk->data);
+	memcpy(ce->name, name, len);
+	ce->name[len] = '\0';
 
 	if (expand_name_field) {
 		if (copy_len)
@@ -1858,18 +1877,17 @@ static void check_ce_order(struct index_state *istate)
 
 static void tweak_untracked_cache(struct index_state *istate)
 {
-	switch (git_config_get_untracked_cache()) {
-	case -1: /* keep: do nothing */
-		break;
-	case 0: /* false */
+	struct repository *r = the_repository;
+
+	prepare_repo_settings(r);
+
+	if (r->settings.core_untracked_cache  == UNTRACKED_CACHE_REMOVE) {
 		remove_untracked_cache(istate);
-		break;
-	case 1: /* true */
-		add_untracked_cache(istate);
-		break;
-	default: /* unknown value: do nothing */
-		break;
+		return;
 	}
+
+	if (r->settings.core_untracked_cache == UNTRACKED_CACHE_WRITE)
+		add_untracked_cache(istate);
 }
 
 static void tweak_split_index(struct index_state *istate)
@@ -1908,7 +1926,7 @@ static size_t estimate_cache_size(size_t ondisk_size, unsigned int entries)
 	/*
 	 * Account for potential alignment differences.
 	 */
-	per_entry += align_padding_size(sizeof(struct cache_entry), -sizeof(struct ondisk_cache_entry));
+	per_entry += align_padding_size(per_entry, 0);
 	return ondisk_size + entries * per_entry;
 }
 
@@ -2051,7 +2069,7 @@ static void *load_cache_entries_thread(void *_data)
 }
 
 static unsigned long load_cache_entries_threaded(struct index_state *istate, const char *mmap, size_t mmap_size,
-			unsigned long src_offset, int nr_threads, struct index_entry_offset_table *ieot)
+						 int nr_threads, struct index_entry_offset_table *ieot)
 {
 	int i, offset, ieot_blocks, ieot_start, err;
 	struct load_cache_entries_thread_data *data;
@@ -2154,7 +2172,7 @@ int do_read_index(struct index_state *istate, const char *path, int must_exist)
 	if (mmap_size < sizeof(struct cache_header) + the_hash_algo->rawsz)
 		die(_("%s: index file smaller than expected"), path);
 
-	mmap = xmmap(NULL, mmap_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	mmap = xmmap_gently(NULL, mmap_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (mmap == MAP_FAILED)
 		die_errno(_("%s: unable to map index file"), path);
 	close(fd);
@@ -2212,7 +2230,7 @@ int do_read_index(struct index_state *istate, const char *path, int must_exist)
 		ieot = read_ieot_extension(mmap, mmap_size, extension_offset);
 
 	if (ieot) {
-		src_offset += load_cache_entries_threaded(istate, mmap, mmap_size, src_offset, nr_threads, ieot);
+		src_offset += load_cache_entries_threaded(istate, mmap, mmap_size, nr_threads, ieot);
 		free(ieot);
 	} else {
 		src_offset += load_all_cache_entries(istate, mmap, mmap_size, src_offset);
@@ -2231,6 +2249,16 @@ int do_read_index(struct index_state *istate, const char *path, int must_exist)
 		load_index_extensions(&p);
 	}
 	munmap((void *)mmap, mmap_size);
+
+	/*
+	 * TODO trace2: replace "the_repository" with the actual repo instance
+	 * that is associated with the given "istate".
+	 */
+	trace2_data_intmax("index", the_repository, "read/version",
+			   istate->version);
+	trace2_data_intmax("index", the_repository, "read/cache_nr",
+			   istate->cache_nr);
+
 	return istate->cache_nr;
 
 unmap:
@@ -2262,9 +2290,17 @@ int read_index_from(struct index_state *istate, const char *path,
 	if (istate->initialized)
 		return istate->cache_nr;
 
+	/*
+	 * TODO trace2: replace "the_repository" with the actual repo instance
+	 * that is associated with the given "istate".
+	 */
+	trace2_region_enter_printf("index", "do_read_index", the_repository,
+				   "%s", path);
 	trace_performance_enter();
 	ret = do_read_index(istate, path, 0);
 	trace_performance_leave("read cache %s", path);
+	trace2_region_leave_printf("index", "do_read_index", the_repository,
+				   "%s", path);
 
 	split_index = istate->split_index;
 	if (!split_index || is_null_oid(&split_index->base_oid)) {
@@ -2280,7 +2316,11 @@ int read_index_from(struct index_state *istate, const char *path,
 
 	base_oid_hex = oid_to_hex(&split_index->base_oid);
 	base_path = xstrfmt("%s/sharedindex.%s", gitdir, base_oid_hex);
+	trace2_region_enter_printf("index", "shared/do_read_index",
+				   the_repository, "%s", base_path);
 	ret = do_read_index(split_index->base, base_path, 1);
+	trace2_region_leave_printf("index", "shared/do_read_index",
+				   the_repository, "%s", base_path);
 	if (!oideq(&split_index->base_oid, &split_index->base->oid))
 		die(_("broken index, expect %s in %s, got %s"),
 		    base_oid_hex, base_path,
@@ -2318,6 +2358,7 @@ int discard_index(struct index_state *istate)
 	free_name_hash(istate);
 	cache_tree_free(&(istate->cache_tree));
 	istate->initialized = 0;
+	istate->fsmonitor_has_run_once = 0;
 	FREE_AND_NULL(istate->cache);
 	istate->cache_alloc = 0;
 	discard_split_index(istate);
@@ -2539,6 +2580,8 @@ static void copy_cache_entry_to_ondisk(struct ondisk_cache_entry *ondisk,
 				       struct cache_entry *ce)
 {
 	short flags;
+	const unsigned hashsz = the_hash_algo->rawsz;
+	uint16_t *flagsp = (uint16_t *)(ondisk->data + hashsz);
 
 	ondisk->ctime.sec = htonl(ce->ce_stat_data.sd_ctime.sec);
 	ondisk->mtime.sec = htonl(ce->ce_stat_data.sd_mtime.sec);
@@ -2550,15 +2593,13 @@ static void copy_cache_entry_to_ondisk(struct ondisk_cache_entry *ondisk,
 	ondisk->uid  = htonl(ce->ce_stat_data.sd_uid);
 	ondisk->gid  = htonl(ce->ce_stat_data.sd_gid);
 	ondisk->size = htonl(ce->ce_stat_data.sd_size);
-	hashcpy(ondisk->sha1, ce->oid.hash);
+	hashcpy(ondisk->data, ce->oid.hash);
 
 	flags = ce->ce_flags & ~CE_NAMEMASK;
 	flags |= (ce_namelen(ce) >= CE_NAMEMASK ? CE_NAMEMASK : ce_namelen(ce));
-	ondisk->flags = htons(flags);
+	flagsp[0] = htons(flags);
 	if (ce->ce_flags & CE_EXTENDED) {
-		struct ondisk_cache_entry_extended *ondisk2;
-		ondisk2 = (struct ondisk_cache_entry_extended *)ondisk;
-		ondisk2->flags2 = htons((ce->ce_flags & CE_EXTENDED_FLAGS) >> 16);
+		flagsp[1] = htons((ce->ce_flags & CE_EXTENDED_FLAGS) >> 16);
 	}
 }
 
@@ -2577,10 +2618,7 @@ static int ce_write_entry(git_hash_ctx *c, int fd, struct cache_entry *ce,
 		stripped_name = 1;
 	}
 
-	if (ce->ce_flags & CE_EXTENDED)
-		size = offsetof(struct ondisk_cache_entry_extended, name);
-	else
-		size = offsetof(struct ondisk_cache_entry, name);
+	size = offsetof(struct ondisk_cache_entry,data) + ondisk_data_size(ce->ce_flags, 0);
 
 	if (!previous_name) {
 		int len = ce_namelen(ce);
@@ -2738,7 +2776,7 @@ static int do_write_index(struct index_state *istate, struct tempfile *tempfile,
 	struct cache_entry **cache = istate->cache;
 	int entries = istate->cache_nr;
 	struct stat st;
-	struct ondisk_cache_entry_extended ondisk;
+	struct ondisk_cache_entry ondisk;
 	struct strbuf previous_name_buf = STRBUF_INIT, *previous_name;
 	int drop_cache_tree = istate->drop_cache_tree;
 	off_t offset;
@@ -2759,7 +2797,7 @@ static int do_write_index(struct index_state *istate, struct tempfile *tempfile,
 	}
 
 	if (!istate->version) {
-		istate->version = get_index_format_default();
+		istate->version = get_index_format_default(the_repository);
 		if (git_env_bool("GIT_TEST_SPLIT_INDEX", 0))
 			init_split_index(istate);
 	}
@@ -2905,7 +2943,8 @@ static int do_write_index(struct index_state *istate, struct tempfile *tempfile,
 			return -1;
 	}
 
-	if (!strip_extensions && istate->split_index) {
+	if (!strip_extensions && istate->split_index &&
+	    !is_null_oid(&istate->split_index->base_oid)) {
 		struct strbuf sb = STRBUF_INIT;
 
 		err = write_link_extension(&sb, istate) < 0 ||
@@ -2987,6 +3026,16 @@ static int do_write_index(struct index_state *istate, struct tempfile *tempfile,
 	istate->timestamp.sec = (unsigned int)st.st_mtime;
 	istate->timestamp.nsec = ST_MTIME_NSEC(st);
 	trace_performance_since(start, "write index, changed mask = %x", istate->cache_changed);
+
+	/*
+	 * TODO trace2: replace "the_repository" with the actual repo instance
+	 * that is associated with the given "istate".
+	 */
+	trace2_data_intmax("index", the_repository, "write/version",
+			   istate->version);
+	trace2_data_intmax("index", the_repository, "write/cache_nr",
+			   istate->cache_nr);
+
 	return 0;
 }
 
@@ -3006,12 +3055,32 @@ static int commit_locked_index(struct lock_file *lk)
 static int do_write_locked_index(struct index_state *istate, struct lock_file *lock,
 				 unsigned flags)
 {
-	int ret = do_write_index(istate, lock->tempfile, 0);
+	int ret;
+
+	/*
+	 * TODO trace2: replace "the_repository" with the actual repo instance
+	 * that is associated with the given "istate".
+	 */
+	trace2_region_enter_printf("index", "do_write_index", the_repository,
+				   "%s", lock->tempfile->filename.buf);
+	ret = do_write_index(istate, lock->tempfile, 0);
+	trace2_region_leave_printf("index", "do_write_index", the_repository,
+				   "%s", lock->tempfile->filename.buf);
+
 	if (ret)
 		return ret;
 	if (flags & COMMIT_LOCK)
-		return commit_locked_index(lock);
-	return close_lock_file_gently(lock);
+		ret = commit_locked_index(lock);
+	else
+		ret = close_lock_file_gently(lock);
+
+	run_hook_le(NULL, "post-index-change",
+			istate->updated_workdir ? "1" : "0",
+			istate->updated_skipworktree ? "1" : "0", NULL);
+	istate->updated_workdir = 0;
+	istate->updated_skipworktree = 0;
+
+	return ret;
 }
 
 static int write_split_index(struct index_state *istate,
@@ -3091,7 +3160,13 @@ static int write_shared_index(struct index_state *istate,
 	int ret;
 
 	move_cache_to_base_index(istate);
+
+	trace2_region_enter_printf("index", "shared/do_write_index",
+				   the_repository, "%s", (*temp)->filename.buf);
 	ret = do_write_index(si->base, *temp, 1);
+	trace2_region_leave_printf("index", "shared/do_write_index",
+				   the_repository, "%s", (*temp)->filename.buf);
+
 	if (ret)
 		return ret;
 	ret = adjust_shared_perm(get_tempfile_path(*temp));
@@ -3200,7 +3275,7 @@ int write_locked_index(struct index_state *istate, struct lock_file *lock,
 	ret = write_split_index(istate, lock, flags);
 
 	/* Freshen the shared index only if the split-index was written */
-	if (!ret && !new_shared_index) {
+	if (!ret && !new_shared_index && !is_null_oid(&si->base_oid)) {
 		const char *shared_index = git_path("sharedindex.%s",
 						    oid_to_hex(&si->base_oid));
 		freshen_shared_index(shared_index, 1);

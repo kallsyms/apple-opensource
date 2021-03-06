@@ -770,7 +770,7 @@ hand resolutions to their corresponding automerge results.</p></div>
 <td class="icon">
 <div class="title">Note</div>
 </td>
-<td class="content">You need to set the configuration variable rerere.enabled in order to
+<td class="content">You need to set the configuration variable <code>rerere.enabled</code> in order to
 enable this command.</td>
 </tr></table>
 </div>
@@ -864,7 +864,7 @@ even before your topic branch is ready to be pushed upstream:</p></div>
 One way to do it is to pull master into the topic branch:</p></div>
 <div class="listingblock">
 <div class="content">
-<pre><code>        $ git checkout topic
+<pre><code>        $ git switch topic
         $ git merge master
 
               o---*---o---+ topic
@@ -884,10 +884,10 @@ the upstream might have been advanced since the test merge <code>+</code>,
 in which case the final commit graph would look like this:</p></div>
 <div class="listingblock">
 <div class="content">
-<pre><code>        $ git checkout topic
+<pre><code>        $ git switch topic
         $ git merge master
         $ ... work on both topic and master branches
-        $ git checkout master
+        $ git switch master
         $ git merge topic
 
               o---*---o---+---o---o topic
@@ -905,11 +905,11 @@ merges, you could blow away the test merge, and keep building on
 top of the tip before the test merge:</p></div>
 <div class="listingblock">
 <div class="content">
-<pre><code>        $ git checkout topic
+<pre><code>        $ git switch topic
         $ git merge master
         $ git reset --hard HEAD^ ;# rewind the test merge
         $ ... work on both topic and master branches
-        $ git checkout master
+        $ git switch master
         $ git merge topic
 
               o---*---o-------o---o topic
@@ -990,7 +990,7 @@ setting in <a href="gitattributes.html">gitattributes(5)</a> can be used.</p></d
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2018-09-17 15:45:24 PDT
+ 2019-07-10 11:51:04 JST
 </div>
 </div>
 </body>

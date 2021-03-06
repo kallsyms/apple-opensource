@@ -475,8 +475,18 @@ else
       if test "$git_cv_ld_rpath" = "yes"; then
          CC_LD_DYNPATH=-rpath
       else
-         CC_LD_DYNPATH=
-         AC_MSG_WARN([linker does not support runtime path to dynamic libraries])
+         AC_CACHE_CHECK([if linker supports -Wl,+b,], git_cv_ld_wl_b, [
+            SAVE_LDFLAGS="${LDFLAGS}"
+            LDFLAGS="${SAVE_LDFLAGS} -Wl,+b,/"
+            AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [git_cv_ld_wl_b=yes], [git_cv_ld_wl_b=no])
+            LDFLAGS="${SAVE_LDFLAGS}"
+         ])
+         if test "$git_cv_ld_wl_b" = "yes"; then
+            CC_LD_DYNPATH=-Wl,+b,
+          else
+             CC_LD_DYNPATH=
+             AC_MSG_WARN([linker does not support runtime path to dynamic libraries])
+          fi
       fi
    fi
 fi
@@ -763,9 +773,19 @@ AC_CHECK_LIB([c], [basename],
 GIT_CONF_SUBST([NEEDS_LIBGEN])
 test -n "$NEEDS_LIBGEN" && LIBS="$LIBS -lgen"
 
-AC_CHECK_LIB([c], [gettext],
-[LIBC_CONTAINS_LIBINTL=YesPlease],
-[LIBC_CONTAINS_LIBINTL=])
+AC_DEFUN([LIBINTL_SRC], [
+AC_LANG_PROGRAM([[
+#include <libintl.h>
+]],[[
+char *msg = gettext("test");
+]])])
+
+AC_MSG_CHECKING([if libc contains libintl])
+AC_LINK_IFELSE([LIBINTL_SRC],
+	[AC_MSG_RESULT([yes])
+	LIBC_CONTAINS_LIBINTL=YesPlease],
+	[AC_MSG_RESULT([no])
+	LIBC_CONTAINS_LIBINTL=])
 GIT_CONF_SUBST([LIBC_CONTAINS_LIBINTL])
 
 #

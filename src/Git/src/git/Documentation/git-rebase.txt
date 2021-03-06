@@ -8,16 +8,16 @@ git-rebase - Reapply commits on top of another base tip
 SYNOPSIS
 --------
 [verse]
-'git rebase' [-i | --interactive] [<options>] [--exec <cmd>] [--onto <newbase>]
-	[<upstream> [<branch>]]
+'git rebase' [-i | --interactive] [<options>] [--exec <cmd>]
+	[--onto <newbase> | --keep-base] [<upstream> [<branch>]]
 'git rebase' [-i | --interactive] [<options>] [--exec <cmd>] [--onto <newbase>]
 	--root [<branch>]
-'git rebase' --continue | --skip | --abort | --quit | --edit-todo | --show-current-patch
+'git rebase' (--continue | --skip | --abort | --quit | --edit-todo | --show-current-patch)
 
 DESCRIPTION
 -----------
 If <branch> is specified, 'git rebase' will perform an automatic
-`git checkout <branch>` before doing anything else.  Otherwise
+`git switch <branch>` before doing anything else.  Otherwise
 it remains on the current branch.
 
 If <upstream> is not specified, the upstream configured in
@@ -217,6 +217,24 @@ As a special case, you may use "A\...B" as a shortcut for the
 merge base of A and B if there is exactly one merge base. You can
 leave out at most one of A and B, in which case it defaults to HEAD.
 
+--keep-base::
+	Set the starting point at which to create the new commits to the
+	merge base of <upstream> <branch>. Running
+	'git rebase --keep-base <upstream> <branch>' is equivalent to
+	running 'git rebase --onto <upstream>... <upstream>'.
++
+This option is useful in the case where one is developing a feature on
+top of an upstream branch. While the feature is being worked on, the
+upstream branch may advance and it may not be the best idea to keep
+rebasing on top of the upstream but to keep the base commit as-is.
++
+Although both this option and --fork-point find the merge base between
+<upstream> and <branch>, this option uses the merge base as the _starting
+point_ on which new commits will be created, whereas --fork-point uses
+the merge base to determine the _set of commits_ which will be rebased.
++
+See also INCOMPATIBLE OPTIONS below.
+
 <upstream>::
 	Upstream branch to compare against.  May be any valid commit,
 	not just an existing branch name. Defaults to the configured
@@ -300,6 +318,11 @@ See also INCOMPATIBLE OPTIONS below.
 +
 See also INCOMPATIBLE OPTIONS below.
 
+--rerere-autoupdate::
+--no-rerere-autoupdate::
+	Allow the rerere mechanism to update the index with the
+	result of auto-conflict resolution if possible.
+
 -S[<keyid>]::
 --gpg-sign[=<keyid>]::
 	GPG-sign commits. The `keyid` argument is optional and
@@ -364,6 +387,10 @@ ends up being empty, the <upstream> will be used as a fallback.
 +
 If either <upstream> or --root is given on the command line, then the
 default is `--no-fork-point`, otherwise the default is `--fork-point`.
++
+If your branch was based on <upstream> but <upstream> was rewound and
+your branch contains commits which were dropped, this option can be used
+with `--keep-base` in order to drop those commits from your branch.
 
 --ignore-whitespace::
 --whitespace=<option>::
@@ -410,14 +437,14 @@ See also INCOMPATIBLE OPTIONS below.
 +
 By default, or when `no-rebase-cousins` was specified, commits which do not
 have `<upstream>` as direct ancestor will keep their original branch point,
-i.e. commits that would be excluded by gitlink:git-log[1]'s
+i.e. commits that would be excluded by linkgit:git-log[1]'s
 `--ancestry-path` option will keep their original ancestry by default. If
 the `rebase-cousins` mode is turned on, such commits are instead rebased
 onto `<upstream>` (or `<onto>`, if specified).
 +
-The `--rebase-merges` mode is similar in spirit to `--preserve-merges`, but
-in contrast to that option works well in interactive rebases: commits can be
-reordered, inserted and dropped at will.
+The `--rebase-merges` mode is similar in spirit to the deprecated
+`--preserve-merges`, but in contrast to that option works well in interactive
+rebases: commits can be reordered, inserted and dropped at will.
 +
 It is currently only possible to recreate the merge commits using the
 `recursive` merge strategy; Different merge strategies can be used only via
@@ -427,9 +454,10 @@ See also REBASING MERGES and INCOMPATIBLE OPTIONS below.
 
 -p::
 --preserve-merges::
-	Recreate merge commits instead of flattening the history by replaying
-	commits a merge commit introduces. Merge conflict resolutions or manual
-	amendments to merge commits are not preserved.
+	[DEPRECATED: use `--rebase-merges` instead] Recreate merge commits
+	instead of flattening the history by replaying commits a merge commit
+	introduces. Merge conflict resolutions or manual amendments to merge
+	commits are not preserved.
 +
 This uses the `--interactive` machinery internally, but combining it
 with the `--interactive` option explicitly is generally not a good
@@ -537,8 +565,8 @@ In addition, the following pairs of options are incompatible:
  * --preserve-merges and --interactive
  * --preserve-merges and --signoff
  * --preserve-merges and --rebase-merges
- * --rebase-merges and --strategy
- * --rebase-merges and --strategy-option
+ * --keep-base and --onto
+ * --keep-base and --root
 
 BEHAVIORAL DIFFERENCES
 -----------------------
@@ -669,7 +697,8 @@ $ git rebase -i HEAD~5
 
 And move the first patch to the end of the list.
 
-You might want to preserve merges, if you have a history like this:
+You might want to recreate merge commits, e.g. if you have a history
+like this:
 
 ------------------
            X
@@ -683,7 +712,7 @@ Suppose you want to rebase the side branch starting at "A" to "Q". Make
 sure that the current HEAD is "B", and call
 
 -----------------------------
-$ git rebase -i -p --onto Q O
+$ git rebase -i -r --onto Q O
 -----------------------------
 
 Reordering and editing commits usually creates untested intermediate
@@ -825,7 +854,8 @@ Hard case: The changes are not the same.::
 	This happens if the 'subsystem' rebase had conflicts, or used
 	`--interactive` to omit, edit, squash, or fixup commits; or
 	if the upstream used one of `commit --amend`, `reset`, or
-	`filter-branch`.
+	a full history rewriting command like
+	https://github.com/newren/git-filter-repo[`filter-repo`].
 
 
 The easy case
@@ -863,7 +893,7 @@ NOTE: While an "easy case recovery" sometimes appears to be successful
       --interactive` will be **resurrected**!
 
 The idea is to manually tell 'git rebase' "where the old 'subsystem'
-ended and your 'topic' began", that is, what the old merge-base
+ended and your 'topic' began", that is, what the old merge base
 between them was.  You will have to find a way to name the last commit
 of the old 'subsystem', for example:
 
@@ -1020,11 +1050,11 @@ merge cmake
 
 BUGS
 ----
-The todo list presented by `--preserve-merges --interactive` does not
-represent the topology of the revision graph.  Editing commits and
-rewording their commit messages should work fine, but attempts to
-reorder commits tend to produce counterintuitive results. Use
-`--rebase-merges` in such scenarios instead.
+The todo list presented by the deprecated `--preserve-merges --interactive`
+does not represent the topology of the revision graph (use `--rebase-merges`
+instead).  Editing commits and rewording their commit messages should work
+fine, but attempts to reorder commits tend to produce counterintuitive results.
+Use `--rebase-merges` in such scenarios instead.
 
 For example, an attempt to rearrange
 ------------

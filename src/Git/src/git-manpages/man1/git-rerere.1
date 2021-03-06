@@ -2,12 +2,12 @@
 .\"     Title: git-rerere
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GIT\-RERERE" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GIT\-RERERE" "1" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -53,7 +53,7 @@ This command assists the developer in this process by recording conflicted autom
 .ps -1
 .br
 .sp
-You need to set the configuration variable rerere\&.enabled in order to enable this command\&.
+You need to set the configuration variable \fBrerere\&.enabled\fR in order to enable this command\&.
 .sp .5v
 .RE
 .SH "COMMANDS"
@@ -122,7 +122,7 @@ For such a test, you need to merge master and topic somehow\&. One way to do it 
 .RS 4
 .\}
 .nf
-        $ git checkout topic
+        $ git switch topic
         $ git merge master
 
               o\-\-\-*\-\-\-o\-\-\-+ topic
@@ -142,10 +142,10 @@ After this test merge, there are two ways to continue your work on the topic\&. 
 .RS 4
 .\}
 .nf
-        $ git checkout topic
+        $ git switch topic
         $ git merge master
         $ \&.\&.\&. work on both topic and master branches
-        $ git checkout master
+        $ git switch master
         $ git merge topic
 
               o\-\-\-*\-\-\-o\-\-\-+\-\-\-o\-\-\-o topic
@@ -165,11 +165,11 @@ As an alternative, to keep the topic branch clean of test merges, you could blow
 .RS 4
 .\}
 .nf
-        $ git checkout topic
+        $ git switch topic
         $ git merge master
         $ git reset \-\-hard HEAD^ ;# rewind the test merge
         $ \&.\&.\&. work on both topic and master branches
-        $ git checkout master
+        $ git switch master
         $ git merge topic
 
               o\-\-\-*\-\-\-o\-\-\-\-\-\-\-o\-\-\-o topic

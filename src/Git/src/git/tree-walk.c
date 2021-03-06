@@ -87,13 +87,15 @@ int init_tree_desc_gently(struct tree_desc *desc, const void *buffer, unsigned l
 	return result;
 }
 
-void *fill_tree_descriptor(struct tree_desc *desc, const struct object_id *oid)
+void *fill_tree_descriptor(struct repository *r,
+			   struct tree_desc *desc,
+			   const struct object_id *oid)
 {
 	unsigned long size = 0;
 	void *buf = NULL;
 
 	if (oid) {
-		buf = read_object_with_reference(oid, tree_type, &size, NULL);
+		buf = read_object_with_reference(r, oid, tree_type, &size, NULL);
 		if (!buf)
 			die("unable to read tree %s", oid_to_hex(oid));
 	}
@@ -174,38 +176,59 @@ int tree_entry_gently(struct tree_desc *desc, struct name_entry *entry)
 
 void setup_traverse_info(struct traverse_info *info, const char *base)
 {
-	int pathlen = strlen(base);
+	size_t pathlen = strlen(base);
 	static struct traverse_info dummy;
 
 	memset(info, 0, sizeof(*info));
 	if (pathlen && base[pathlen-1] == '/')
 		pathlen--;
 	info->pathlen = pathlen ? pathlen + 1 : 0;
-	info->name.path = base;
-	info->name.pathlen = pathlen;
-	if (pathlen) {
-		hashcpy(info->name.oid.hash, (const unsigned char *)base + pathlen + 1);
+	info->name = base;
+	info->namelen = pathlen;
+	if (pathlen)
 		info->prev = &dummy;
-	}
 }
 
-char *make_traverse_path(char *path, const struct traverse_info *info, const struct name_entry *n)
+char *make_traverse_path(char *path, size_t pathlen,
+			 const struct traverse_info *info,
+			 const char *name, size_t namelen)
 {
-	int len = tree_entry_len(n);
-	int pathlen = info->pathlen;
+	/* Always points to the end of the name we're about to add */
+	size_t pos = st_add(info->pathlen, namelen);
 
-	path[pathlen + len] = 0;
+	if (pos >= pathlen)
+		BUG("too small buffer passed to make_traverse_path");
+
+	path[pos] = 0;
 	for (;;) {
-		memcpy(path + pathlen, n->path, len);
-		if (!pathlen)
+		if (pos < namelen)
+			BUG("traverse_info pathlen does not match strings");
+		pos -= namelen;
+		memcpy(path + pos, name, namelen);
+
+		if (!pos)
 			break;
-		path[--pathlen] = '/';
-		n = &info->name;
-		len = tree_entry_len(n);
+		path[--pos] = '/';
+
+		if (!info)
+			BUG("traverse_info ran out of list items");
+		name = info->name;
+		namelen = info->namelen;
 		info = info->prev;
-		pathlen -= len;
 	}
 	return path;
+}
+
+void strbuf_make_traverse_path(struct strbuf *out,
+			       const struct traverse_info *info,
+			       const char *name, size_t namelen)
+{
+	size_t len = traverse_path_len(info, namelen);
+
+	strbuf_grow(out, len);
+	make_traverse_path(out->buf + out->len, out->alloc - out->len,
+			   info, name, namelen);
+	strbuf_setlen(out, out->len + len);
 }
 
 struct tree_desc_skip {
@@ -404,13 +427,12 @@ int traverse_trees(struct index_state *istate,
 		tx[i].d = t[i];
 
 	if (info->prev) {
-		strbuf_grow(&base, info->pathlen);
-		make_traverse_path(base.buf, info->prev, &info->name);
-		base.buf[info->pathlen-1] = '/';
-		strbuf_setlen(&base, info->pathlen);
-		traverse_path = xstrndup(base.buf, info->pathlen);
+		strbuf_make_traverse_path(&base, info->prev,
+					  info->name, info->namelen);
+		strbuf_addch(&base, '/');
+		traverse_path = xstrndup(base.buf, base.len);
 	} else {
-		traverse_path = xstrndup(info->name.path, info->pathlen);
+		traverse_path = xstrndup(info->name, info->pathlen);
 	}
 	info->traverse_path = traverse_path;
 	for (;;) {
@@ -506,7 +528,9 @@ struct dir_state {
 	struct object_id oid;
 };
 
-static int find_tree_entry(struct tree_desc *t, const char *name, struct object_id *result, unsigned *mode)
+static int find_tree_entry(struct repository *r, struct tree_desc *t,
+			   const char *name, struct object_id *result,
+			   unsigned short *mode)
 {
 	int namelen = strlen(name);
 	while (t->size) {
@@ -536,19 +560,23 @@ static int find_tree_entry(struct tree_desc *t, const char *name, struct object_
 			oidcpy(result, &oid);
 			return 0;
 		}
-		return get_tree_entry(&oid, name + entrylen, result, mode);
+		return get_tree_entry(r, &oid, name + entrylen, result, mode);
 	}
 	return -1;
 }
 
-int get_tree_entry(const struct object_id *tree_oid, const char *name, struct object_id *oid, unsigned *mode)
+int get_tree_entry(struct repository *r,
+		   const struct object_id *tree_oid,
+		   const char *name,
+		   struct object_id *oid,
+		   unsigned short *mode)
 {
 	int retval;
 	void *tree;
 	unsigned long size;
 	struct object_id root;
 
-	tree = read_object_with_reference(tree_oid, tree_type, &size, &root);
+	tree = read_object_with_reference(r, tree_oid, tree_type, &size, &root);
 	if (!tree)
 		return -1;
 
@@ -563,7 +591,7 @@ int get_tree_entry(const struct object_id *tree_oid, const char *name, struct ob
 	} else {
 		struct tree_desc t;
 		init_tree_desc(&t, tree, size);
-		retval = find_tree_entry(&t, name, oid, mode);
+		retval = find_tree_entry(r, &t, name, oid, mode);
 	}
 	free(tree);
 	return retval;
@@ -591,7 +619,10 @@ int get_tree_entry(const struct object_id *tree_oid, const char *name, struct ob
  * See the code for enum get_oid_result for a description of
  * the return values.
  */
-enum get_oid_result get_tree_entry_follow_symlinks(struct object_id *tree_oid, const char *name, struct object_id *result, struct strbuf *result_path, unsigned *mode)
+enum get_oid_result get_tree_entry_follow_symlinks(struct repository *r,
+		struct object_id *tree_oid, const char *name,
+		struct object_id *result, struct strbuf *result_path,
+		unsigned short *mode)
 {
 	int retval = MISSING_OBJECT;
 	struct dir_state *parents = NULL;
@@ -615,7 +646,8 @@ enum get_oid_result get_tree_entry_follow_symlinks(struct object_id *tree_oid, c
 			void *tree;
 			struct object_id root;
 			unsigned long size;
-			tree = read_object_with_reference(&current_tree_oid,
+			tree = read_object_with_reference(r,
+							  &current_tree_oid,
 							  tree_type, &size,
 							  &root);
 			if (!tree)
@@ -684,7 +716,7 @@ enum get_oid_result get_tree_entry_follow_symlinks(struct object_id *tree_oid, c
 		}
 
 		/* Look up the first (or only) path component in the tree. */
-		find_result = find_tree_entry(&t, namebuf.buf,
+		find_result = find_tree_entry(r, &t, namebuf.buf,
 					      &current_tree_oid, mode);
 		if (find_result) {
 			goto done;
@@ -728,7 +760,8 @@ enum get_oid_result get_tree_entry_follow_symlinks(struct object_id *tree_oid, c
 			 */
 			retval = DANGLING_SYMLINK;
 
-			contents = read_object_file(&current_tree_oid, &type,
+			contents = repo_read_object_file(r,
+						    &current_tree_oid, &type,
 						    &link_len);
 
 			if (!contents)

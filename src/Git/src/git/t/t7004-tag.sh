@@ -932,6 +932,27 @@ test_expect_success GPG \
 	test_cmp expect actual
 '
 
+get_tag_header gpgsign-enabled $commit commit $time >expect
+echo "A message" >>expect
+echo '-----BEGIN PGP SIGNATURE-----' >>expect
+test_expect_success GPG \
+	'git tag configured tag.gpgsign enables GPG sign' \
+	'test_config tag.gpgsign true &&
+	git tag -m "A message" gpgsign-enabled &&
+	get_tag_msg gpgsign-enabled>actual &&
+	test_cmp expect actual
+'
+
+get_tag_header no-sign $commit commit $time >expect
+echo "A message" >>expect
+test_expect_success GPG \
+	'git tag --no-sign configured tag.gpgsign skip GPG sign' \
+	'test_config tag.gpgsign true &&
+	git tag -a --no-sign -m "A message" no-sign &&
+	get_tag_msg no-sign>actual &&
+	test_cmp expect actual
+'
+
 test_expect_success GPG \
 	'trying to create a signed tag with non-existing -F file should fail' '
 	! test -f nonexistingfile &&
@@ -1698,6 +1719,17 @@ test_expect_success '--points-at finds annotated tags of tags' '
 	EOF
 	git tag --points-at=annotated-v4.0 >actual &&
 	test_cmp expect actual
+'
+
+test_expect_success 'recursive tagging should give advice' '
+	sed -e "s/|$//" <<-EOF >expect &&
+	hint: You have created a nested tag. The object referred to by your new tag is
+	hint: already a tag. If you meant to tag the object that it points to, use:
+	hint: |
+	hint: 	git tag -f nested annotated-v4.0^{}
+	EOF
+	git tag -m nested nested annotated-v4.0 2>actual &&
+	test_i18ncmp expect actual
 '
 
 test_expect_success 'multiple --points-at are OR-ed together' '

@@ -8,6 +8,7 @@
 #include "pkt-line.h"
 #include "sub-process.h"
 #include "utf8.h"
+#include "ll-merge.h"
 
 /*
  * convert.c - convert a file when checking it out and checking it in.
@@ -289,8 +290,8 @@ static int validate_encoding(const char *path, const char *enc,
 			const char *stripped = NULL;
 			char *upper = xstrdup_toupper(enc);
 			upper[strlen(upper)-2] = '\0';
-			if (!skip_prefix(upper, "UTF-", &stripped))
-				skip_prefix(stripped, "UTF", &stripped);
+			if (skip_prefix(upper, "UTF", &stripped))
+				skip_prefix(stripped, "-", &stripped);
 			advise(advise_msg, path, stripped);
 			free(upper);
 			if (die_on_error)
@@ -309,8 +310,8 @@ static int validate_encoding(const char *path, const char *enc,
 				"working-tree-encoding.");
 			const char *stripped = NULL;
 			char *upper = xstrdup_toupper(enc);
-			if (!skip_prefix(upper, "UTF-", &stripped))
-				skip_prefix(stripped, "UTF", &stripped);
+			if (skip_prefix(upper, "UTF", &stripped))
+				skip_prefix(stripped, "-", &stripped);
 			advise(advise_msg, path, stripped, stripped);
 			free(upper);
 			if (die_on_error)
@@ -731,7 +732,7 @@ static int apply_single_file_filter(const char *path, const char *src, size_t le
 	if (start_async(&async))
 		return 0;	/* error was already reported */
 
-	if (strbuf_read(&nbuf, async.out, len) < 0) {
+	if (strbuf_read(&nbuf, async.out, 0) < 0) {
 		err = error(_("read from external filter '%s' failed"), cmd);
 	}
 	if (close(async.out)) {
@@ -1293,10 +1294,11 @@ struct conv_attrs {
 	const char *working_tree_encoding; /* Supported encoding or default encoding if NULL */
 };
 
+static struct attr_check *check;
+
 static void convert_attrs(const struct index_state *istate,
 			  struct conv_attrs *ca, const char *path)
 {
-	static struct attr_check *check;
 	struct attr_check_item *ccheck = NULL;
 
 	if (!check) {
@@ -1337,6 +1339,23 @@ static void convert_attrs(const struct index_state *istate,
 		ca->crlf_action = CRLF_AUTO_CRLF;
 	if (ca->crlf_action == CRLF_UNDEFINED && auto_crlf == AUTO_CRLF_INPUT)
 		ca->crlf_action = CRLF_AUTO_INPUT;
+}
+
+void reset_parsed_attributes(void)
+{
+	struct convert_driver *drv, *next;
+
+	attr_check_free(check);
+	check = NULL;
+	reset_merge_attributes();
+
+	for (drv = user_convert; drv; drv = next) {
+		next = drv->next;
+		free((void *)drv->name);
+		free(drv);
+	}
+	user_convert = NULL;
+	user_convert_tail = NULL;
 }
 
 int would_convert_to_git_filter_fd(const struct index_state *istate, const char *path)

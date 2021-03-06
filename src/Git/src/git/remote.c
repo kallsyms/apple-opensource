@@ -111,13 +111,15 @@ struct remotes_hash_key {
 };
 
 static int remotes_hash_cmp(const void *unused_cmp_data,
-			    const void *entry,
-			    const void *entry_or_key,
+			    const struct hashmap_entry *eptr,
+			    const struct hashmap_entry *entry_or_key,
 			    const void *keydata)
 {
-	const struct remote *a = entry;
-	const struct remote *b = entry_or_key;
+	const struct remote *a, *b;
 	const struct remotes_hash_key *key = keydata;
+
+	a = container_of(eptr, const struct remote, ent);
+	b = container_of(entry_or_key, const struct remote, ent);
 
 	if (key)
 		return strncmp(a->name, key->str, key->len) || a->name[key->len];
@@ -135,7 +137,7 @@ static struct remote *make_remote(const char *name, int len)
 {
 	struct remote *ret, *replaced;
 	struct remotes_hash_key lookup;
-	struct hashmap_entry lookup_entry;
+	struct hashmap_entry lookup_entry, *e;
 
 	if (!len)
 		len = strlen(name);
@@ -145,8 +147,9 @@ static struct remote *make_remote(const char *name, int len)
 	lookup.len = len;
 	hashmap_entry_init(&lookup_entry, memhash(name, len));
 
-	if ((ret = hashmap_get(&remotes_hash, &lookup_entry, &lookup)) != NULL)
-		return ret;
+	e = hashmap_get(&remotes_hash, &lookup_entry, &lookup);
+	if (e)
+		return container_of(e, struct remote, ent);
 
 	ret = xcalloc(1, sizeof(struct remote));
 	ret->prune = -1;  /* unspecified */
@@ -158,8 +161,8 @@ static struct remote *make_remote(const char *name, int len)
 	ALLOC_GROW(remotes, remotes_nr + 1, remotes_alloc);
 	remotes[remotes_nr++] = ret;
 
-	hashmap_entry_init(ret, lookup_entry.hash);
-	replaced = hashmap_put(&remotes_hash, ret);
+	hashmap_entry_init(&ret->ent, lookup_entry.hash);
+	replaced = hashmap_put_entry(&remotes_hash, ret, ent);
 	assert(replaced == NULL);  /* no previous entry overwritten */
 	return ret;
 }
@@ -820,11 +823,11 @@ struct ref *copy_ref_list(const struct ref *ref)
 	return ret;
 }
 
-static void free_ref(struct ref *ref)
+void free_one_ref(struct ref *ref)
 {
 	if (!ref)
 		return;
-	free_ref(ref->peer_ref);
+	free_one_ref(ref->peer_ref);
 	free(ref->remote_status);
 	free(ref->symref);
 	free(ref);
@@ -835,7 +838,7 @@ void free_refs(struct ref *ref)
 	struct ref *next;
 	while (ref) {
 		next = ref->next;
-		free_ref(ref);
+		free_one_ref(ref);
 		ref = next;
 	}
 }
@@ -1880,36 +1883,26 @@ int resolve_remote_symref(struct ref *ref, struct ref *list)
 }
 
 /*
- * Lookup the upstream branch for the given branch and if present, optionally
- * compute the commit ahead/behind values for the pair.
+ * Compute the commit ahead/behind values for the pair branch_name, base.
  *
  * If abf is AHEAD_BEHIND_FULL, compute the full ahead/behind and return the
  * counts in *num_ours and *num_theirs.  If abf is AHEAD_BEHIND_QUICK, skip
  * the (potentially expensive) a/b computation (*num_ours and *num_theirs are
  * set to zero).
  *
- * The name of the upstream branch (or NULL if no upstream is defined) is
- * returned via *upstream_name, if it is not itself NULL.
- *
- * Returns -1 if num_ours and num_theirs could not be filled in (e.g., no
- * upstream defined, or ref does not exist).  Returns 0 if the commits are
- * identical.  Returns 1 if commits are different.
+ * Returns -1 if num_ours and num_theirs could not be filled in (e.g., ref
+ * does not exist).  Returns 0 if the commits are identical.  Returns 1 if
+ * commits are different.
  */
-int stat_tracking_info(struct branch *branch, int *num_ours, int *num_theirs,
-		       const char **upstream_name, enum ahead_behind_flags abf)
+
+static int stat_branch_pair(const char *branch_name, const char *base,
+			     int *num_ours, int *num_theirs,
+			     enum ahead_behind_flags abf)
 {
 	struct object_id oid;
 	struct commit *ours, *theirs;
 	struct rev_info revs;
-	const char *base;
 	struct argv_array argv = ARGV_ARRAY_INIT;
-
-	/* Cannot stat unless we are marked to build on top of somebody else. */
-	base = branch_get_upstream(branch, NULL);
-	if (upstream_name)
-		*upstream_name = base;
-	if (!base)
-		return -1;
 
 	/* Cannot stat if what we used to build on no longer exists */
 	if (read_ref(base, &oid))
@@ -1918,7 +1911,7 @@ int stat_tracking_info(struct branch *branch, int *num_ours, int *num_theirs,
 	if (!theirs)
 		return -1;
 
-	if (read_ref(branch->refname, &oid))
+	if (read_ref(branch_name, &oid))
 		return -1;
 	ours = lookup_commit_reference(the_repository, &oid);
 	if (!ours)
@@ -1932,7 +1925,7 @@ int stat_tracking_info(struct branch *branch, int *num_ours, int *num_theirs,
 	if (abf == AHEAD_BEHIND_QUICK)
 		return 1;
 	if (abf != AHEAD_BEHIND_FULL)
-		BUG("stat_tracking_info: invalid abf '%d'", abf);
+		BUG("stat_branch_pair: invalid abf '%d'", abf);
 
 	/* Run "rev-list --left-right ours...theirs" internally... */
 	argv_array_push(&argv, ""); /* ignored */
@@ -1967,6 +1960,42 @@ int stat_tracking_info(struct branch *branch, int *num_ours, int *num_theirs,
 }
 
 /*
+ * Lookup the tracking branch for the given branch and if present, optionally
+ * compute the commit ahead/behind values for the pair.
+ *
+ * If for_push is true, the tracking branch refers to the push branch,
+ * otherwise it refers to the upstream branch.
+ *
+ * The name of the tracking branch (or NULL if it is not defined) is
+ * returned via *tracking_name, if it is not itself NULL.
+ *
+ * If abf is AHEAD_BEHIND_FULL, compute the full ahead/behind and return the
+ * counts in *num_ours and *num_theirs.  If abf is AHEAD_BEHIND_QUICK, skip
+ * the (potentially expensive) a/b computation (*num_ours and *num_theirs are
+ * set to zero).
+ *
+ * Returns -1 if num_ours and num_theirs could not be filled in (e.g., no
+ * upstream defined, or ref does not exist).  Returns 0 if the commits are
+ * identical.  Returns 1 if commits are different.
+ */
+int stat_tracking_info(struct branch *branch, int *num_ours, int *num_theirs,
+		       const char **tracking_name, int for_push,
+		       enum ahead_behind_flags abf)
+{
+	const char *base;
+
+	/* Cannot stat unless we are marked to build on top of somebody else. */
+	base = for_push ? branch_get_push(branch, NULL) :
+		branch_get_upstream(branch, NULL);
+	if (tracking_name)
+		*tracking_name = base;
+	if (!base)
+		return -1;
+
+	return stat_branch_pair(branch->refname, base, num_ours, num_theirs, abf);
+}
+
+/*
  * Return true when there is anything to report, otherwise false.
  */
 int format_tracking_info(struct branch *branch, struct strbuf *sb,
@@ -1977,7 +2006,7 @@ int format_tracking_info(struct branch *branch, struct strbuf *sb,
 	char *base;
 	int upstream_is_gone = 0;
 
-	sti = stat_tracking_info(branch, &ours, &theirs, &full_base, abf);
+	sti = stat_tracking_info(branch, &ours, &theirs, &full_base, 0, abf);
 	if (sti < 0) {
 		if (!full_base)
 			return 0;

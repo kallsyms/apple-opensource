@@ -78,6 +78,7 @@ static int launch_specified_editor(const char *editor, const char *path,
 		p.argv = args;
 		p.env = env;
 		p.use_shell = 1;
+		p.trace2_child_class = "editor";
 		if (start_command(&p) < 0)
 			return error("unable to start editor '%s'", editor);
 
@@ -95,10 +96,10 @@ static int launch_specified_editor(const char *editor, const char *path,
 
 		if (print_waiting_for_editor && !is_terminal_dumb())
 			/*
-			 * Go back to the beginning and erase the entire line to
-			 * avoid wasting the vertical space.
+			 * Erase the entire line to avoid wasting the
+			 * vertical space.
 			 */
-			fputs("\r\033[K", stderr);
+			term_clear_line();
 	}
 
 	if (!buffer)

@@ -1194,6 +1194,18 @@ and control the current import process.  More detailed discussion
 </p>
 </dd>
 <dt class="hdlist1">
+<code>alias</code>
+</dt>
+<dd>
+<p>
+        Record that a mark refers to a given object without first
+        creating any new object.  Using --import-marks and referring
+        to missing marks will cause fast-import to fail, so aliases
+        can provide a way to set otherwise pruned commits to a valid
+        value (e.g. the nearest non-pruned ancestor).
+</p>
+</dd>
+<dt class="hdlist1">
 <code>checkpoint</code>
 </dt>
 <dd>
@@ -1286,9 +1298,10 @@ change to the project.</p></div>
         original-oid?
         ('author' (SP &lt;name&gt;)? SP LT &lt;email&gt; GT SP &lt;when&gt; LF)?
         'committer' (SP &lt;name&gt;)? SP LT &lt;email&gt; GT SP &lt;when&gt; LF
+        ('encoding' SP &lt;encoding&gt;)?
         data
         ('from' SP &lt;commit-ish&gt; LF)?
-        ('merge' SP &lt;commit-ish&gt; LF)?
+        ('merge' SP &lt;commit-ish&gt; LF)*
         (filemodify | filedelete | filecopy | filerename | filedeleteall | notemodify)*
         LF?</code></pre>
 </div></div>
@@ -1315,7 +1328,12 @@ creating the commit.  These commands may be supplied in any order.
 However it is recommended that a <code>filedeleteall</code> command precede
 all <code>filemodify</code>, <code>filecopy</code>, <code>filerename</code> and <code>notemodify</code> commands in
 the same commit, as <code>filedeleteall</code> wipes the branch clean (see below).</p></div>
-<div class="paragraph"><p>The <code>LF</code> after the command is optional (it used to be required).</p></div>
+<div class="paragraph"><p>The <code>LF</code> after the command is optional (it used to be required).  Note
+that for reasons of backward compatibility, if the commit ends with a
+<code>data</code> command (i.e. it has no <code>from</code>, <code>merge</code>, <code>filemodify</code>,
+<code>filedelete</code>, <code>filecopy</code>, <code>filerename</code>, <code>filedeleteall</code> or
+<code>notemodify</code> commands) then two <code>LF</code> commands may appear at the end of
+the command instead of just one.</p></div>
 <div class="sect3">
 <h4 id="_code_author_code"><code>author</code></h4>
 <div class="paragraph"><p>An <code>author</code> command may optionally appear, if the author information
@@ -1339,6 +1357,12 @@ of bytes, except <code>LT</code>, <code>GT</code> and <code>LF</code>.  <code>&l
 that was selected by the --date-format=&lt;fmt&gt; command-line option.
 See &#8220;Date Formats&#8221; above for the set of supported formats, and
 their syntax.</p></div>
+</div>
+<div class="sect3">
+<h4 id="_code_encoding_code"><code>encoding</code></h4>
+<div class="paragraph"><p>The optional <code>encoding</code> command indicates the encoding of the commit
+message.  Most commits are UTF-8 and the encoding is omitted, but this
+allows importing commit messages into git without first reencoding them.</p></div>
 </div>
 <div class="sect3">
 <h4 id="_code_from_code"><code>from</code></h4>
@@ -1703,6 +1727,7 @@ lightweight (non-annotated) tags see the <code>reset</code> command below.</p></
 <div class="literalblock">
 <div class="content">
 <pre><code>        'tag' SP &lt;name&gt; LF
+        mark?
         'from' SP &lt;commit-ish&gt; LF
         original-oid?
         'tagger' (SP &lt;name&gt;)? SP LT &lt;email&gt; GT SP &lt;when&gt; LF
@@ -1841,6 +1866,19 @@ a data chunk which does not have an LF as its last byte.</p></div>
 </dl></div>
 </div>
 <div class="sect2">
+<h3 id="_code_alias_code"><code>alias</code></h3>
+<div class="paragraph"><p>Record that a mark refers to a given object without first creating any
+new object.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><code>        'alias' LF
+        mark
+        'to' SP &lt;commit-ish&gt; LF
+        LF?</code></pre>
+</div></div>
+<div class="paragraph"><p>For a detailed description of <code>&lt;commit-ish&gt;</code> see above under <code>from</code>.</p></div>
+</div>
+<div class="sect2">
 <h3 id="_code_checkpoint_code"><code>checkpoint</code></h3>
 <div class="paragraph"><p>Forces fast-import to close the current packfile, start a new one, and to
 save out all current branch refs, tags and marks.</p></div>
@@ -1901,9 +1939,6 @@ might want to refer to in their commit messages.</p></div>
 <div class="content">
 <pre><code>        'get-mark' SP ':' &lt;idnum&gt; LF</code></pre>
 </div></div>
-<div class="paragraph"><p>This command can be used anywhere in the stream that comments are
-accepted.  In particular, the <code>get-mark</code> command can be used in the
-middle of a commit but not in the middle of a <code>data</code> command.</p></div>
 <div class="paragraph"><p>See &#8220;Responses To Commands&#8221; below for details about how to read
 this output safely.</p></div>
 </div>
@@ -1930,9 +1965,10 @@ ready to be written.</p></div>
 &lt;contents&gt; LF</code></pre>
 </div></div>
 </div></div>
-<div class="paragraph"><p>This command can be used anywhere in the stream that comments are
-accepted.  In particular, the <code>cat-blob</code> command can be used in the
-middle of a commit but not in the middle of a <code>data</code> command.</p></div>
+<div class="paragraph"><p>This command can be used where a <code>filemodify</code> directive can appear,
+allowing it to be used in the middle of a commit.  For a <code>filemodify</code>
+using an inline directive, it can also appear right before the <code>data</code>
+directive.</p></div>
 <div class="paragraph"><p>See &#8220;Responses To Commands&#8221; below for details about how to read
 this output safely.</p></div>
 </div>
@@ -1943,8 +1979,8 @@ previously arranged with the <code>--cat-blob-fd</code> argument.  This allows
 printing a blob from the active commit (with <code>cat-blob</code>) or copying a
 blob or tree from a previous commit for use in the current one (with
 <code>filemodify</code>).</p></div>
-<div class="paragraph"><p>The <code>ls</code> command can be used anywhere in the stream that comments are
-accepted, including the middle of a commit.</p></div>
+<div class="paragraph"><p>The <code>ls</code> command can also be used where a <code>filemodify</code> directive can
+appear, allowing it to be used in the middle of a commit.</p></div>
 <div class="dlist"><dl>
 <dt class="hdlist1">
 Reading from the active commit
@@ -2409,6 +2445,13 @@ Git to reorganize the packfiles for faster data access.  If blob
 deltas are suboptimal (see above) then also adding the <code>-f</code> option
 to force recomputation of all deltas can significantly reduce the
 final packfile size (30-50% smaller can be quite typical).</p></div>
+<div class="paragraph"><p>Instead of running <code>git repack</code> you can also run <code>git gc
+--aggressive</code>, which will also optimize other things after an import
+(e.g. pack loose refs). As noted in the "AGGRESSIVE" section in
+<a href="git-gc.html">git-gc(1)</a> the <code>--aggressive</code> option will find new deltas with
+the <code>-f</code> option to <a href="git-repack.html">git-repack(1)</a>. For the reasons elaborated
+on above using <code>--aggressive</code> after a fast-import is one of the few
+cases where it&#8217;s known to be worthwhile.</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -2512,7 +2555,7 @@ compression.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-01-04 14:31:36 PST
+ 2019-10-15 14:20:15 JST
 </div>
 </div>
 </body>

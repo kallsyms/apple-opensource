@@ -23,7 +23,7 @@ static int find_rename_dst(struct diff_filespec *two)
 	first = 0;
 	last = rename_dst_nr;
 	while (last > first) {
-		int next = (last + first) >> 1;
+		int next = first + ((last - first) >> 1);
 		struct diff_rename_dst *dst = &(rename_dst[next]);
 		int cmp = strcmp(two->path, dst->two->path);
 		if (!cmp)
@@ -83,7 +83,7 @@ static struct diff_rename_src *register_rename_src(struct diff_filepair *p)
 	first = 0;
 	last = rename_src_nr;
 	while (last > first) {
-		int next = (last + first) >> 1;
+		int next = first + ((last - first) >> 1);
 		struct diff_rename_src *src = &(rename_src[next]);
 		int cmp = strcmp(one->path, src->p->one->path);
 		if (!cmp)
@@ -266,7 +266,7 @@ static unsigned int hash_filespec(struct repository *r,
 		hash_object_file(filespec->data, filespec->size, "blob",
 				 &filespec->oid);
 	}
-	return sha1hash(filespec->oid.hash);
+	return oidhash(&filespec->oid);
 }
 
 static int find_identical_files(struct hashmap *srcs,
@@ -274,18 +274,17 @@ static int find_identical_files(struct hashmap *srcs,
 				struct diff_options *options)
 {
 	int renames = 0;
-
 	struct diff_filespec *target = rename_dst[dst_index].two;
 	struct file_similarity *p, *best = NULL;
 	int i = 100, best_score = -1;
+	unsigned int hash = hash_filespec(options->repo, target);
 
 	/*
 	 * Find the best source match for specified destination.
 	 */
-	p = hashmap_get_from_hash(srcs,
-				  hash_filespec(options->repo, target),
-				  NULL);
-	for (; p; p = hashmap_get_next(srcs, p)) {
+	p = hashmap_get_entry_from_hash(srcs, hash, NULL,
+					struct file_similarity, entry);
+	hashmap_for_each_entry_from(srcs, p, entry) {
 		int score;
 		struct diff_filespec *source = p->filespec;
 
@@ -329,8 +328,8 @@ static void insert_file_table(struct repository *r,
 	entry->index = index;
 	entry->filespec = filespec;
 
-	hashmap_entry_init(entry, hash_filespec(r, filespec));
-	hashmap_add(table, entry);
+	hashmap_entry_init(&entry->entry, hash_filespec(r, filespec));
+	hashmap_add(table, &entry->entry);
 }
 
 /*
@@ -359,7 +358,7 @@ static int find_exact_renames(struct diff_options *options)
 		renames += find_identical_files(&file_table, i, options);
 
 	/* Free the hash data structure and entries */
-	hashmap_free(&file_table, 1);
+	hashmap_free_entries(&file_table, struct file_similarity, entry);
 
 	return renames;
 }
@@ -585,7 +584,7 @@ void diffcore_rename(struct diff_options *options)
 	stop_progress(&progress);
 
 	/* cost matrix sorted by most to least similar pair */
-	QSORT(mx, dst_cnt * NUM_CANDIDATE_PER_DST, score_compare);
+	STABLE_QSORT(mx, dst_cnt * NUM_CANDIDATE_PER_DST, score_compare);
 
 	rename_count += find_renames(mx, dst_cnt, minimum_score, 0);
 	if (detect_rename == DIFF_DETECT_COPY)

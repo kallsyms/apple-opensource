@@ -77,6 +77,7 @@ void add_name_decoration(enum decoration_type type, const char *name, struct obj
 
 const struct name_decoration *get_name_decoration(const struct object *obj)
 {
+	load_ref_decorations(NULL, DECORATE_SHORT_REFS);
 	return lookup_decoration(&name_decoration, obj);
 }
 
@@ -677,9 +678,7 @@ void show_log(struct rev_info *opt)
 		raw = (opt->commit_format == CMIT_FMT_USERFORMAT);
 		format_display_notes(&commit->object.oid, &notebuf,
 				     get_log_output_encoding(), raw);
-		ctx.notes_message = notebuf.len
-			? strbuf_detach(&notebuf, NULL)
-			: xcalloc(1, 1);
+		ctx.notes_message = strbuf_detach(&notebuf, NULL);
 	}
 
 	/*
@@ -687,8 +686,7 @@ void show_log(struct rev_info *opt)
 	 */
 	if (ctx.need_8bit_cte >= 0 && opt->add_signoff)
 		ctx.need_8bit_cte =
-			has_non_ascii(fmt_name(getenv("GIT_COMMITTER_NAME"),
-					       getenv("GIT_COMMITTER_EMAIL")));
+			has_non_ascii(fmt_name(WANT_COMMITTER_IDENT));
 	ctx.date_mode = opt->date_mode;
 	ctx.date_mode_explicit = opt->date_mode_explicit;
 	ctx.abbrev = opt->diffopt.abbrev;

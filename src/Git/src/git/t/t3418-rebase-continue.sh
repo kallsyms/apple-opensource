@@ -120,6 +120,20 @@ test_expect_success REBASE_P 'rebase passes merge strategy options correctly' '
 	git rebase --continue
 '
 
+test_expect_success 'rebase -r passes merge strategy options correctly' '
+	rm -fr .git/rebase-* &&
+	git reset --hard commit-new-file-F3-on-topic-branch &&
+	test_commit merge-theirs &&
+	git reset --hard HEAD^ &&
+	test_commit some-other-commit &&
+	test_tick &&
+	git merge --no-ff merge-theirs &&
+	FAKE_LINES="1 3 edit 4 5 7 8 9" git rebase -i -f -r -m \
+		-s recursive --strategy-option=theirs HEAD~2 &&
+	test_commit force-change-ours &&
+	git rebase --continue
+'
+
 test_expect_success '--skip after failed fixup cleans commit message' '
 	test_when_finished "test_might_fail git rebase --abort" &&
 	git checkout -b with-conflicting-fixup &&
@@ -263,6 +277,14 @@ test_expect_success '--reschedule-failed-exec' '
 		rebase -x false HEAD^ 2>err &&
 	grep "^exec false" .git/rebase-merge/git-rebase-todo &&
 	test_i18ngrep "has been rescheduled" err
+'
+
+test_expect_success 'rebase.reschedulefailedexec only affects `rebase -i`' '
+	test_config rebase.reschedulefailedexec true &&
+	test_must_fail git rebase -x false HEAD^ &&
+	grep "^exec false" .git/rebase-merge/git-rebase-todo &&
+	git rebase --abort &&
+	git rebase HEAD^
 '
 
 test_done

@@ -1,3 +1,6 @@
+#ifndef WIN32_PATH_UTILS_H
+#define WIN32_PATH_UTILS_H
+
 int win32_has_dos_drive_prefix(const char *path);
 #define has_dos_drive_prefix win32_has_dos_drive_prefix
 
@@ -19,3 +22,5 @@ static inline char *win32_find_last_dir_sep(const char *path)
 #define find_last_dir_sep win32_find_last_dir_sep
 int win32_offset_1st_component(const char *path);
 #define offset_1st_component win32_offset_1st_component
+
+#endif

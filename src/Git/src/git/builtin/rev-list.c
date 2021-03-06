@@ -18,7 +18,6 @@
 #include "reflog-walk.h"
 #include "oidset.h"
 #include "packfile.h"
-#include "object-store.h"
 
 static const char rev_list_usage[] =
 "git rev-list [OPTION] <commit-id>... [ -- paths... ]\n"
@@ -49,6 +48,7 @@ static const char rev_list_usage[] =
 "    --objects | --objects-edge\n"
 "    --unpacked\n"
 "    --header | --pretty\n"
+"    --[no-]object-names\n"
 "    --abbrev=<n> | --no-abbrev\n"
 "    --abbrev-commit\n"
 "    --left-right\n"
@@ -75,9 +75,12 @@ enum missing_action {
 };
 static enum missing_action arg_missing_action;
 
+/* display only the oid of each object encountered */
+static int arg_show_object_names = 1;
+
 #define DEFAULT_OIDSET_SIZE     (16*1024)
 
-static void finish_commit(struct commit *commit, void *data);
+static void finish_commit(struct commit *commit);
 static void show_commit(struct commit *commit, void *data)
 {
 	struct rev_list_info *info = data;
@@ -86,7 +89,7 @@ static void show_commit(struct commit *commit, void *data)
 	display_progress(progress, ++progress_counter);
 
 	if (info->flags & REV_LIST_QUIET) {
-		finish_commit(commit, data);
+		finish_commit(commit);
 		return;
 	}
 
@@ -99,7 +102,7 @@ static void show_commit(struct commit *commit, void *data)
 			revs->count_left++;
 		else
 			revs->count_right++;
-		finish_commit(commit, data);
+		finish_commit(commit);
 		return;
 	}
 
@@ -188,10 +191,10 @@ static void show_commit(struct commit *commit, void *data)
 			putchar('\n');
 	}
 	maybe_flush_or_die(stdout, "stdout");
-	finish_commit(commit, data);
+	finish_commit(commit);
 }
 
-static void finish_commit(struct commit *commit, void *data)
+static void finish_commit(struct commit *commit)
 {
 	if (commit->parents) {
 		free_commit_list(commit->parents);
@@ -238,7 +241,7 @@ static inline void finish_object__ma(struct object *obj)
 static int finish_object(struct object *obj, const char *name, void *cb_data)
 {
 	struct rev_list_info *info = cb_data;
-	if (!has_object_file(&obj->oid)) {
+	if (oid_object_info_extended(the_repository, &obj->oid, NULL, 0) < 0) {
 		finish_object__ma(obj);
 		return 1;
 	}
@@ -255,7 +258,10 @@ static void show_object(struct object *obj, const char *name, void *cb_data)
 	display_progress(progress, ++progress_counter);
 	if (info->flags & REV_LIST_QUIET)
 		return;
-	show_object_with_name(stdout, obj, name);
+	if (arg_show_object_names)
+		show_object_with_name(stdout, obj, name);
+	else
+		printf("%s\n", oid_to_hex(&obj->oid));
 }
 
 static void show_edge(struct commit *commit)
@@ -379,7 +385,6 @@ int cmd_rev_list(int argc, const char **argv, const char *prefix)
 	repo_init_revisions(the_repository, &revs, prefix);
 	revs.abbrev = DEFAULT_ABBREV;
 	revs.commit_format = CMIT_FMT_UNSPECIFIED;
-	revs.do_not_die_on_missing_tree = 1;
 
 	/*
 	 * Scan the argument list before invoking setup_revisions(), so that we
@@ -408,6 +413,9 @@ int cmd_rev_list(int argc, const char **argv, const char *prefix)
 				break;
 		}
 	}
+
+	if (arg_missing_action)
+		revs.do_not_die_on_missing_tree = 1;
 
 	argc = setup_revisions(argc, argv, &revs, &s_r_opt);
 
@@ -462,10 +470,6 @@ int cmd_rev_list(int argc, const char **argv, const char *prefix)
 			parse_list_objects_filter(&filter_options, arg);
 			if (filter_options.choice && !revs.blob_objects)
 				die(_("object filtering requires --objects"));
-			if (filter_options.choice == LOFC_SPARSE_OID &&
-			    !filter_options.sparse_oid_value)
-				die(_("invalid sparse value '%s'"),
-				    filter_options.filter_spec);
 			continue;
 		}
 		if (!strcmp(arg, ("--no-" CL_ARG__FILTER))) {
@@ -481,6 +485,16 @@ int cmd_rev_list(int argc, const char **argv, const char *prefix)
 			continue; /* already handled above */
 		if (skip_prefix(arg, "--missing=", &arg))
 			continue; /* already handled above */
+
+		if (!strcmp(arg, ("--no-object-names"))) {
+			arg_show_object_names = 0;
+			continue;
+		}
+
+		if (!strcmp(arg, ("--object-names"))) {
+			arg_show_object_names = 1;
+			continue;
+		}
 
 		usage(rev_list_usage);
 

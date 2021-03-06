@@ -82,6 +82,10 @@ static int list_replace_refs(const char *pattern, const char *format)
 		data.format = REPLACE_FORMAT_MEDIUM;
 	else if (!strcmp(format, "long"))
 		data.format = REPLACE_FORMAT_LONG;
+	/*
+	 * Please update _git_replace() in git-completion.bash when
+	 * you add new format
+	 */
 	else
 		return error(_("invalid replace format '%s'\n"
 			       "valid formats are 'short', 'medium' and 'long'"),
@@ -268,7 +272,7 @@ static int import_object(struct object_id *oid, enum object_type type,
 			return error(_("unable to spawn mktree"));
 		}
 
-		if (strbuf_read(&result, cmd.out, 41) < 0) {
+		if (strbuf_read(&result, cmd.out, the_hash_algo->hexsz + 1) < 0) {
 			error_errno(_("unable to read from mktree"));
 			close(fd);
 			close(cmd.out);
@@ -354,28 +358,32 @@ static int replace_parents(struct strbuf *buf, int argc, const char **argv)
 	struct strbuf new_parents = STRBUF_INIT;
 	const char *parent_start, *parent_end;
 	int i;
+	const unsigned hexsz = the_hash_algo->hexsz;
 
 	/* find existing parents */
 	parent_start = buf->buf;
-	parent_start += GIT_SHA1_HEXSZ + 6; /* "tree " + "hex sha1" + "\n" */
+	parent_start += hexsz + 6; /* "tree " + "hex sha1" + "\n" */
 	parent_end = parent_start;
 
 	while (starts_with(parent_end, "parent "))
-		parent_end += 48; /* "parent " + "hex sha1" + "\n" */
+		parent_end += hexsz + 8; /* "parent " + "hex sha1" + "\n" */
 
 	/* prepare new parents */
 	for (i = 0; i < argc; i++) {
 		struct object_id oid;
+		struct commit *commit;
+
 		if (get_oid(argv[i], &oid) < 0) {
 			strbuf_release(&new_parents);
 			return error(_("not a valid object name: '%s'"),
 				     argv[i]);
 		}
-		if (!lookup_commit_reference(the_repository, &oid)) {
+		commit = lookup_commit_reference(the_repository, &oid);
+		if (!commit) {
 			strbuf_release(&new_parents);
-			return error(_("could not parse %s"), argv[i]);
+			return error(_("could not parse %s as a commit"), argv[i]);
 		}
-		strbuf_addf(&new_parents, "parent %s\n", oid_to_hex(&oid));
+		strbuf_addf(&new_parents, "parent %s\n", oid_to_hex(&commit->object.oid));
 	}
 
 	/* replace existing parents with new ones */
@@ -414,7 +422,7 @@ static int check_one_mergetag(struct commit *commit,
 		if (get_oid(mergetag_data->argv[i], &oid) < 0)
 			return error(_("not a valid object name: '%s'"),
 				     mergetag_data->argv[i]);
-		if (oideq(&tag->tagged->oid, &oid))
+		if (oideq(get_tagged_oid(tag), &oid))
 			return 0; /* found */
 	}
 
@@ -474,15 +482,18 @@ static int create_graft(int argc, const char **argv, int force, int gentle)
 
 	strbuf_release(&buf);
 
-	if (oideq(&old_oid, &new_oid)) {
+	if (oideq(&commit->object.oid, &new_oid)) {
 		if (gentle) {
-			warning(_("graft for '%s' unnecessary"), oid_to_hex(&old_oid));
+			warning(_("graft for '%s' unnecessary"),
+				oid_to_hex(&commit->object.oid));
 			return 0;
 		}
-		return error(_("new commit is the same as the old one: '%s'"), oid_to_hex(&old_oid));
+		return error(_("new commit is the same as the old one: '%s'"),
+			     oid_to_hex(&commit->object.oid));
 	}
 
-	return replace_object_oid(old_ref, &old_oid, "replacement", &new_oid, force);
+	return replace_object_oid(old_ref, &commit->object.oid,
+				  "replacement", &new_oid, force);
 }
 
 static int convert_graft_file(int force)

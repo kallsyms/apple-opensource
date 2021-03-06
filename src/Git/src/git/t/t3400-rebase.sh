@@ -59,6 +59,14 @@ test_expect_success 'rebase against master' '
 	git rebase master
 '
 
+test_expect_success 'rebase sets ORIG_HEAD to pre-rebase state' '
+	git checkout -b orig-head topic &&
+	pre="$(git rev-parse --verify HEAD)" &&
+	git rebase master &&
+	test_cmp_rev "$pre" ORIG_HEAD &&
+	! test_cmp_rev "$pre" HEAD
+'
+
 test_expect_success 'rebase, with <onto> and <upstream> specified as :/quuxery' '
 	test_when_finished "git branch -D torebase" &&
 	git checkout -b torebase my-topic-branch^ &&
@@ -277,7 +285,7 @@ EOF
 	test_cmp From_.msg out
 '
 
-test_expect_success 'rebase--am.sh and --show-current-patch' '
+test_expect_success 'rebase --am and --show-current-patch' '
 	test_create_repo conflict-apply &&
 	(
 		cd conflict-apply &&
@@ -287,9 +295,45 @@ test_expect_success 'rebase--am.sh and --show-current-patch' '
 		echo two >>init.t &&
 		git commit -a -m two &&
 		git tag two &&
-		test_must_fail git rebase --onto init HEAD^ &&
+		test_must_fail git rebase -f --onto init HEAD^ &&
 		GIT_TRACE=1 git rebase --show-current-patch >/dev/null 2>stderr &&
 		grep "show.*$(git rev-parse two)" stderr
+	)
+'
+
+test_expect_success 'rebase --am and .gitattributes' '
+	test_create_repo attributes &&
+	(
+		cd attributes &&
+		test_commit init &&
+		git config filter.test.clean "sed -e '\''s/smudged/clean/g'\''" &&
+		git config filter.test.smudge "sed -e '\''s/clean/smudged/g'\''" &&
+
+		test_commit second &&
+		git checkout -b test HEAD^ &&
+
+		echo "*.txt filter=test" >.gitattributes &&
+		git add .gitattributes &&
+		test_commit third &&
+
+		echo "This text is smudged." >a.txt &&
+		git add a.txt &&
+		test_commit fourth &&
+
+		git checkout -b removal HEAD^ &&
+		git rm .gitattributes &&
+		git add -u &&
+		test_commit fifth &&
+		git cherry-pick test &&
+
+		git checkout test &&
+		git rebase master &&
+		grep "smudged" a.txt &&
+
+		git checkout removal &&
+		git reset --hard &&
+		git rebase master &&
+		grep "clean" a.txt
 	)
 '
 
@@ -309,6 +353,22 @@ test_expect_success 'rebase--merge.sh and --show-current-patch' '
 		grep "show.*REBASE_HEAD" stderr &&
 		test "$(git rev-parse REBASE_HEAD)" = "$(git rev-parse two)"
 	)
+'
+
+test_expect_success 'rebase -c rebase.useBuiltin=false warning' '
+	expected="rebase.useBuiltin support has been removed" &&
+
+	# Only warn when the legacy rebase is requested...
+	test_must_fail git -c rebase.useBuiltin=false rebase 2>err &&
+	test_i18ngrep "$expected" err &&
+	test_must_fail env GIT_TEST_REBASE_USE_BUILTIN=false git rebase 2>err &&
+	test_i18ngrep "$expected" err &&
+
+	# ...not when we would have used the built-in anyway
+	test_must_fail git -c rebase.useBuiltin=true rebase 2>err &&
+	test_must_be_empty err &&
+	test_must_fail env GIT_TEST_REBASE_USE_BUILTIN=true git rebase 2>err &&
+	test_must_be_empty err
 '
 
 test_done

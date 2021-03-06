@@ -915,6 +915,10 @@ static enum protocol parse_connect_url(const char *url_orig, char **ret_host,
 
 	if (protocol == PROTO_LOCAL)
 		path = end;
+	else if (protocol == PROTO_FILE && *host != '/' &&
+		 !has_dos_drive_prefix(host) &&
+		 offset_1st_component(host - 2) > 1)
+		path = host - 2; /* include the leading "//" */
 	else if (protocol == PROTO_FILE && has_dos_drive_prefix(end))
 		path = end; /* "file://$(pwd)" may be "file://C:/projects/repo" */
 	else
@@ -1248,6 +1252,7 @@ struct child_process *git_connect(int fd[2], const char *url,
 		conn = NULL;
 	} else if (protocol == PROTO_GIT) {
 		conn = git_connect_git(fd, hostandport, path, prog, version, flags);
+		conn->trace2_child_class = "transport/git";
 	} else {
 		struct strbuf cmd = STRBUF_INIT;
 		const char *const *var;
@@ -1290,9 +1295,11 @@ struct child_process *git_connect(int fd[2], const char *url,
 				strbuf_release(&cmd);
 				return NULL;
 			}
+			conn->trace2_child_class = "transport/ssh";
 			fill_ssh_args(conn, ssh_host, port, version, flags);
 		} else {
 			transport_check_allowed("file");
+			conn->trace2_child_class = "transport/file";
 			if (version > 0) {
 				argv_array_pushf(&conn->env_array, GIT_PROTOCOL_ENVIRONMENT "=version=%d",
 						 version);

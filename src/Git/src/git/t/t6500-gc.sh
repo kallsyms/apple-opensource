@@ -71,6 +71,8 @@ test_expect_success 'gc --keep-largest-pack' '
 		git gc --keep-largest-pack &&
 		( cd .git/objects/pack && ls *.pack ) >pack-list &&
 		test_line_count = 2 pack-list &&
+		awk "/^P /{print \$2}" <.git/objects/info/packs >pack-info &&
+		test_line_count = 2 pack-info &&
 		test_path_is_file $BASE_PACK &&
 		git fsck
 	)
@@ -120,6 +122,25 @@ test_expect_success 'gc --quiet' '
 	test_must_be_empty stderr
 '
 
+test_expect_success 'gc.reflogExpire{Unreachable,}=never skips "expire" via "gc"' '
+	test_config gc.reflogExpire never &&
+	test_config gc.reflogExpireUnreachable never &&
+
+	GIT_TRACE=$(pwd)/trace.out git gc &&
+
+	# Check that git-pack-refs is run as a sanity check (done via
+	# gc_before_repack()) but that git-expire is not.
+	grep -E "^trace: (built-in|exec|run_command): git pack-refs --" trace.out &&
+	! grep -E "^trace: (built-in|exec|run_command): git reflog expire --" trace.out
+'
+
+test_expect_success 'one of gc.reflogExpire{Unreachable,}=never does not skip "expire" via "gc"' '
+	>trace.out &&
+	test_config gc.reflogExpire never &&
+	GIT_TRACE=$(pwd)/trace.out git gc &&
+	grep -E "^trace: (built-in|exec|run_command): git reflog expire --" trace.out
+'
+
 run_and_wait_for_auto_gc () {
 	# We read stdout from gc for the side effect of waiting until the
 	# background gc process exits, closing its fd 9.  Furthermore, the
@@ -162,7 +183,15 @@ test_expect_success 'background auto gc respects lock for all operations' '
 	# now fake a concurrent gc that holds the lock; we can use our
 	# shell pid so that it looks valid.
 	hostname=$(hostname || echo unknown) &&
-	printf "$$ %s" "$hostname" >.git/gc.pid &&
+	shell_pid=$$ &&
+	if test_have_prereq MINGW && test -f /proc/$shell_pid/winpid
+	then
+		# In Git for Windows, Bash (actually, the MSYS2 runtime) has a
+		# different idea of PIDs than git.exe (actually Windows). Use
+		# the Windows PID in this case.
+		shell_pid=$(cat /proc/$shell_pid/winpid)
+	fi &&
+	printf "%d %s" "$shell_pid" "$hostname" >.git/gc.pid &&
 
 	# our gc should exit zero without doing anything
 	run_and_wait_for_auto_gc &&

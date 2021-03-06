@@ -47,7 +47,12 @@ test_expect_success 'no empty path components' '
 	cd "$ROOT_PATH" &&
 	git clone $HTTPD_URL/smart/test_repo.git/ test_repo_clone &&
 
-	check_access_log exp
+	# NEEDSWORK: If the overspecification of the expected result is reduced, we
+	# might be able to run this test in all protocol versions.
+	if test -z "$GIT_TEST_PROTOCOL_VERSION"
+	then
+		check_access_log exp
+	fi
 '
 
 test_expect_success 'clone remote repository' '
@@ -128,7 +133,12 @@ GET  /smart/test_repo.git/info/refs?service=git-receive-pack HTTP/1.1 200
 POST /smart/test_repo.git/git-receive-pack HTTP/1.1 200
 EOF
 test_expect_success 'used receive-pack service' '
-	check_access_log exp
+	# NEEDSWORK: If the overspecification of the expected result is reduced, we
+	# might be able to run this test in all protocol versions.
+	if test -z "$GIT_TEST_PROTOCOL_VERSION"
+	then
+		check_access_log exp
+	fi
 '
 
 test_http_push_nonff "$HTTPD_DOCUMENT_ROOT_PATH"/test_repo.git \
@@ -165,6 +175,91 @@ test_expect_success 'push (chunked)' '
 	grep "POST git-receive-pack (chunked)" err &&
 	(cd "$HTTPD_DOCUMENT_ROOT_PATH"/test_repo.git &&
 	 test $HEAD = $(git rev-parse --verify HEAD))
+'
+
+test_expect_success 'push --atomic also prevents branch creation, reports collateral' '
+	# Setup upstream repo - empty for now
+	d=$HTTPD_DOCUMENT_ROOT_PATH/atomic-branches.git &&
+	git init --bare "$d" &&
+	test_config -C "$d" http.receivepack true &&
+	up="$HTTPD_URL"/smart/atomic-branches.git &&
+
+	# Tell "$up" about three branches for now
+	test_commit atomic1 &&
+	test_commit atomic2 &&
+	git branch collateral &&
+	git branch other &&
+	git push "$up" master collateral other &&
+
+	# collateral is a valid push, but should be failed by atomic push
+	git checkout collateral &&
+	test_commit collateral1 &&
+
+	# Make master incompatible with upstream to provoke atomic
+	git checkout master &&
+	git reset --hard HEAD^ &&
+
+	# Add a new branch which should be failed by atomic push. This is a
+	# regression case.
+	git branch atomic &&
+
+	# --atomic should cause entire push to be rejected
+	test_must_fail git push --atomic "$up" master atomic collateral 2>output &&
+
+	# the new branch should not have been created upstream
+	test_must_fail git -C "$d" show-ref --verify refs/heads/atomic &&
+
+	# upstream should still reflect atomic2, the last thing we pushed
+	# successfully
+	git rev-parse atomic2 >expected &&
+	# on master...
+	git -C "$d" rev-parse refs/heads/master >actual &&
+	test_cmp expected actual &&
+	# ...and collateral.
+	git -C "$d" rev-parse refs/heads/collateral >actual &&
+	test_cmp expected actual &&
+
+	# the failed refs should be indicated to the user
+	grep "^ ! .*rejected.* master -> master" output &&
+
+	# the collateral failure refs should be indicated to the user
+	grep "^ ! .*rejected.* atomic -> atomic .*atomic push failed" output &&
+	grep "^ ! .*rejected.* collateral -> collateral .*atomic push failed" output
+'
+
+test_expect_success 'push --atomic fails on server-side errors' '
+	# Use previously set up repository
+	d=$HTTPD_DOCUMENT_ROOT_PATH/atomic-branches.git &&
+	test_config -C "$d" http.receivepack true &&
+	up="$HTTPD_URL"/smart/atomic-branches.git &&
+
+	# break ref updates for other on the remote site
+	mkdir "$d/refs/heads/other.lock" &&
+
+	# add the new commit to other
+	git branch -f other collateral &&
+
+	# --atomic should cause entire push to be rejected
+	test_must_fail git push --atomic "$up" atomic other 2>output  &&
+
+	# the new branch should not have been created upstream
+	test_must_fail git -C "$d" show-ref --verify refs/heads/atomic &&
+
+	# upstream should still reflect atomic2, the last thing we pushed
+	# successfully
+	git rev-parse atomic2 >expected &&
+	# ...to other.
+	git -C "$d" rev-parse refs/heads/other >actual &&
+	test_cmp expected actual &&
+
+	# the new branch should not have been created upstream
+	test_must_fail git -C "$d" show-ref --verify refs/heads/atomic &&
+
+	# the failed refs should be indicated to the user
+	grep "^ ! .*rejected.* other -> other .*atomic transaction failed" output &&
+
+	# the collateral failure refs should be indicated to the user
+	grep "^ ! .*rejected.* atomic -> atomic .*atomic transaction failed" output
 '
 
 test_expect_success 'push --all can push to empty repo' '
@@ -373,5 +468,4 @@ test_expect_success 'colorize errors/hints' '
 	test_i18ngrep ! "^hint: " decoded
 '
 
-stop_httpd
 test_done

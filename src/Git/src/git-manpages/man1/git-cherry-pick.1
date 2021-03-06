@@ -2,12 +2,12 @@
 .\"     Title: git-cherry-pick
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GIT\-CHERRY\-PICK" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GIT\-CHERRY\-PICK" "1" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -34,9 +34,7 @@ git-cherry-pick \- Apply the changes introduced by some existing commits
 .nf
 \fIgit cherry\-pick\fR [\-\-edit] [\-n] [\-m parent\-number] [\-s] [\-x] [\-\-ff]
                   [\-S[<keyid>]] <commit>\&...
-\fIgit cherry\-pick\fR \-\-continue
-\fIgit cherry\-pick\fR \-\-quit
-\fIgit cherry\-pick\fR \-\-abort
+\fIgit cherry\-pick\fR (\-\-continue | \-\-skip | \-\-abort | \-\-quit)
 .fi
 .sp
 .SH "DESCRIPTION"
@@ -128,6 +126,18 @@ With this option,
 will let you edit the commit message prior to committing\&.
 .RE
 .PP
+\-\-cleanup=<mode>
+.RS 4
+This option determines how the commit message will be cleaned up before being passed on to the commit machinery\&. See
+\fBgit-commit\fR(1)
+for more details\&. In particular, if the
+\fI<mode>\fR
+is given a value of
+\fBscissors\fR, scissors will be appended to
+\fBMERGE_MSG\fR
+before being passed on in the case of a conflict\&.
+.RE
+.PP
 \-x
 .RS 4
 When recording the commit, append a line that says "(cherry picked from commit \&...)" to the original commit message in order to indicate which commit this change was cherry\-picked from\&. This is done only for cherry picks without conflicts\&. Do not use this option if you are cherry\-picking from your private branch because the information is useless to the recipient\&. If on the other hand you are cherry\-picking between two publicly visible branches (e\&.g\&. backporting a fix to a maintenance branch for an older release from a development branch), adding this information can be useful\&.
@@ -209,12 +219,22 @@ Pass the merge strategy\-specific option through to the merge strategy\&. See
 \fBgit-merge\fR(1)
 for details\&.
 .RE
+.PP
+\-\-rerere\-autoupdate, \-\-no\-rerere\-autoupdate
+.RS 4
+Allow the rerere mechanism to update the index with the result of auto\-conflict resolution if possible\&.
+.RE
 .SH "SEQUENCER SUBCOMMANDS"
 .PP
 \-\-continue
 .RS 4
 Continue the operation in progress using the information in
-\fI\&.git/sequencer\fR\&. Can be used to continue after resolving conflicts in a failed cherry\-pick or revert\&.
+\fB\&.git/sequencer\fR\&. Can be used to continue after resolving conflicts in a failed cherry\-pick or revert\&.
+.RE
+.PP
+\-\-skip
+.RS 4
+Skip the current commit and continue with the rest of the sequence\&.
 .RE
 .PP
 \-\-quit

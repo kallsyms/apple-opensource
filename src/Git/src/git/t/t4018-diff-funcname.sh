@@ -31,6 +31,7 @@ diffpatterns="
 	cpp
 	csharp
 	css
+	dts
 	fortran
 	fountain
 	golang
@@ -43,6 +44,7 @@ diffpatterns="
 	php
 	python
 	ruby
+	rust
 	tex
 	custom1
 	custom2

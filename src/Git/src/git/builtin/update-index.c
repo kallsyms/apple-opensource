@@ -280,7 +280,7 @@ static int add_one_path(const struct cache_entry *old, const char *path, int len
 	memcpy(ce->name, path, len);
 	ce->ce_flags = create_ce_flags(0);
 	ce->ce_namelen = len;
-	fill_stat_cache_info(ce, st);
+	fill_stat_cache_info(&the_index, ce, st);
 	ce->ce_mode = ce_mode_from_stat(old, st->st_mode);
 
 	if (index_path(&the_index, &ce->oid, path, st,
@@ -597,11 +597,11 @@ static struct cache_entry *read_one_ent(const char *which,
 					struct object_id *ent, const char *path,
 					int namelen, int stage)
 {
-	unsigned mode;
+	unsigned short mode;
 	struct object_id oid;
 	struct cache_entry *ce;
 
-	if (get_tree_entry(ent, path, &oid, &mode)) {
+	if (get_tree_entry(the_repository, ent, path, &oid, &mode)) {
 		if (which)
 			error("%s: not in %s branch.", path, which);
 		return NULL;
@@ -724,7 +724,7 @@ static int do_unresolve(int ac, const char **av,
 }
 
 static int do_reupdate(int ac, const char **av,
-		       const char *prefix, int prefix_length)
+		       const char *prefix)
 {
 	/* Read HEAD and run update-index on paths that are
 	 * merged and already different between index and HEAD.
@@ -848,14 +848,16 @@ static int parse_new_style_cacheinfo(const char *arg,
 	return 0;
 }
 
-static int cacheinfo_callback(struct parse_opt_ctx_t *ctx,
-				const struct option *opt, int unset)
+static enum parse_opt_result cacheinfo_callback(
+	struct parse_opt_ctx_t *ctx, const struct option *opt,
+	const char *arg, int unset)
 {
 	struct object_id oid;
 	unsigned int mode;
 	const char *path;
 
 	BUG_ON_OPT_NEG(unset);
+	BUG_ON_OPT_ARG(arg);
 
 	if (!parse_new_style_cacheinfo(ctx->argv[1], &mode, &oid, &path)) {
 		if (add_cacheinfo(mode, &oid, path, 0))
@@ -874,12 +876,14 @@ static int cacheinfo_callback(struct parse_opt_ctx_t *ctx,
 	return 0;
 }
 
-static int stdin_cacheinfo_callback(struct parse_opt_ctx_t *ctx,
-			      const struct option *opt, int unset)
+static enum parse_opt_result stdin_cacheinfo_callback(
+	struct parse_opt_ctx_t *ctx, const struct option *opt,
+	const char *arg, int unset)
 {
 	int *nul_term_line = opt->value;
 
 	BUG_ON_OPT_NEG(unset);
+	BUG_ON_OPT_ARG(arg);
 
 	if (ctx->argc != 1)
 		return error("option '%s' must be the last argument", opt->long_name);
@@ -888,12 +892,14 @@ static int stdin_cacheinfo_callback(struct parse_opt_ctx_t *ctx,
 	return 0;
 }
 
-static int stdin_callback(struct parse_opt_ctx_t *ctx,
-				const struct option *opt, int unset)
+static enum parse_opt_result stdin_callback(
+	struct parse_opt_ctx_t *ctx, const struct option *opt,
+	const char *arg, int unset)
 {
 	int *read_from_stdin = opt->value;
 
 	BUG_ON_OPT_NEG(unset);
+	BUG_ON_OPT_ARG(arg);
 
 	if (ctx->argc != 1)
 		return error("option '%s' must be the last argument", opt->long_name);
@@ -901,13 +907,15 @@ static int stdin_callback(struct parse_opt_ctx_t *ctx,
 	return 0;
 }
 
-static int unresolve_callback(struct parse_opt_ctx_t *ctx,
-				const struct option *opt, int unset)
+static enum parse_opt_result unresolve_callback(
+	struct parse_opt_ctx_t *ctx, const struct option *opt,
+	const char *arg, int unset)
 {
 	int *has_errors = opt->value;
 	const char *prefix = startup_info->prefix;
 
 	BUG_ON_OPT_NEG(unset);
+	BUG_ON_OPT_ARG(arg);
 
 	/* consume remaining arguments. */
 	*has_errors = do_unresolve(ctx->argc, ctx->argv,
@@ -920,18 +928,19 @@ static int unresolve_callback(struct parse_opt_ctx_t *ctx,
 	return 0;
 }
 
-static int reupdate_callback(struct parse_opt_ctx_t *ctx,
-				const struct option *opt, int unset)
+static enum parse_opt_result reupdate_callback(
+	struct parse_opt_ctx_t *ctx, const struct option *opt,
+	const char *arg, int unset)
 {
 	int *has_errors = opt->value;
 	const char *prefix = startup_info->prefix;
 
 	BUG_ON_OPT_NEG(unset);
+	BUG_ON_OPT_ARG(arg);
 
 	/* consume remaining arguments. */
 	setup_work_tree();
-	*has_errors = do_reupdate(ctx->argc, ctx->argv,
-				prefix, prefix ? strlen(prefix) : 0);
+	*has_errors = do_reupdate(ctx->argc, ctx->argv, prefix);
 	if (*has_errors)
 		active_cache_changed = 0;
 
@@ -957,6 +966,7 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 	struct parse_opt_ctx_t ctx;
 	strbuf_getline_fn getline_fn;
 	int parseopt_state = PARSE_OPT_UNKNOWN;
+	struct repository *r = the_repository;
 	struct option options[] = {
 		OPT_BIT('q', NULL, &refresh_args.flags,
 			N_("continue refresh even when index needs update"),
@@ -986,7 +996,8 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 			N_("add the specified entry to the index"),
 			PARSE_OPT_NOARG | /* disallow --cacheinfo=<mode> form */
 			PARSE_OPT_NONEG | PARSE_OPT_LITERAL_ARGHELP,
-			(parse_opt_cb *) cacheinfo_callback},
+			NULL, 0,
+			cacheinfo_callback},
 		{OPTION_CALLBACK, 0, "chmod", &set_executable_bit, "(+|-)x",
 			N_("override the executable bit of the listed files"),
 			PARSE_OPT_NONEG,
@@ -1012,19 +1023,19 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 		{OPTION_LOWLEVEL_CALLBACK, 0, "stdin", &read_from_stdin, NULL,
 			N_("read list of paths to be updated from standard input"),
 			PARSE_OPT_NONEG | PARSE_OPT_NOARG,
-			(parse_opt_cb *) stdin_callback},
+			NULL, 0, stdin_callback},
 		{OPTION_LOWLEVEL_CALLBACK, 0, "index-info", &nul_term_line, NULL,
 			N_("add entries from standard input to the index"),
 			PARSE_OPT_NONEG | PARSE_OPT_NOARG,
-			(parse_opt_cb *) stdin_cacheinfo_callback},
+			NULL, 0, stdin_cacheinfo_callback},
 		{OPTION_LOWLEVEL_CALLBACK, 0, "unresolve", &has_errors, NULL,
 			N_("repopulate stages #2 and #3 for the listed paths"),
 			PARSE_OPT_NONEG | PARSE_OPT_NOARG,
-			(parse_opt_cb *) unresolve_callback},
+			NULL, 0, unresolve_callback},
 		{OPTION_LOWLEVEL_CALLBACK, 'g', "again", &has_errors, NULL,
 			N_("only update entries that differ from HEAD"),
 			PARSE_OPT_NONEG | PARSE_OPT_NOARG,
-			(parse_opt_cb *) reupdate_callback},
+			NULL, 0, reupdate_callback},
 		OPT_BIT(0, "ignore-missing", &refresh_args.flags,
 			N_("ignore files missing from worktree"),
 			REFRESH_IGNORE_MISSING),
@@ -1070,6 +1081,8 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 	entries = read_cache();
 	if (entries < 0)
 		die("cache corrupted");
+
+	the_index.updated_skipworktree = 1;
 
 	/*
 	 * Custom copy of parse_options() because we want to handle
@@ -1168,11 +1181,12 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 		remove_split_index(&the_index);
 	}
 
+	prepare_repo_settings(r);
 	switch (untracked_cache) {
 	case UC_UNSPECIFIED:
 		break;
 	case UC_DISABLE:
-		if (git_config_get_untracked_cache() == 1)
+		if (r->settings.core_untracked_cache == UNTRACKED_CACHE_WRITE)
 			warning(_("core.untrackedCache is set to true; "
 				  "remove or change it, if you really want to "
 				  "disable the untracked cache"));
@@ -1184,7 +1198,7 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 		return !test_if_untracked_cache_is_supported();
 	case UC_ENABLE:
 	case UC_FORCE:
-		if (git_config_get_untracked_cache() == 0)
+		if (r->settings.core_untracked_cache == UNTRACKED_CACHE_REMOVE)
 			warning(_("core.untrackedCache is set to false; "
 				  "remove or change it, if you really want to "
 				  "enable the untracked cache"));

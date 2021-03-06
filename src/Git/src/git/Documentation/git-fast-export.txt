@@ -17,9 +17,9 @@ This program dumps the given revisions in a form suitable to be piped
 into 'git fast-import'.
 
 You can use it as a human-readable bundle replacement (see
-linkgit:git-bundle[1]), or as a kind of an interactive
-'git filter-branch'.
-
+linkgit:git-bundle[1]), or as a format that can be edited before being
+fed to 'git fast-import' in order to do history rewrites (an ability
+relied on by tools like 'git filter-repo').
 
 OPTIONS
 -------
@@ -75,11 +75,20 @@ produced incorrect results if you gave these options.
 	Before processing any input, load the marks specified in
 	<file>.  The input file must exist, must be readable, and
 	must use the same format as produced by --export-marks.
+
+--mark-tags::
+	In addition to labelling blobs and commits with mark ids, also
+	label tags.  This is useful in conjunction with
+	`--export-marks` and `--import-marks`, and is also useful (and
+	necessary) for exporting of nested tags.  It does not hurt
+	other cases and would be the default, but many fast-import
+	frontends are not prepared to accept tags with mark
+	identifiers.
 +
-Any commits that have already been marked will not be exported again.
-If the backend uses a similar --import-marks file, this allows for
-incremental bidirectional exporting of the repository by keeping the
-marks the same across runs.
+Any commits (or tags) that have already been marked will not be
+exported again.  If the backend uses a similar --import-marks file,
+this allows for incremental bidirectional exporting of the repository
+by keeping the marks the same across runs.
 
 --fake-missing-tagger::
 	Some old repositories have tags without a tagger.  The
@@ -116,7 +125,7 @@ marks the same across runs.
 	and will make master{tilde}4 no longer have master{tilde}5 as
 	a parent (though both the old master{tilde}4 and new
 	master{tilde}4 will have all the same files).  Use
-	--reference-excluded-parents to instead have the the stream
+	--reference-excluded-parents to instead have the stream
 	refer to commits in the excluded range of history by their
 	sha1sum.  Note that the resulting stream can only be used by a
 	repository which already contains the necessary parent
@@ -128,6 +137,13 @@ marks the same across runs.
 	ignored by importers such as git-fast-import, it may be useful
 	for intermediary filters (e.g. for rewriting commit messages
 	which refer to older commits, or for stripping blobs by id).
+
+--reencode=(yes|no|abort)::
+	Specify how to handle `encoding` header in commit objects.  When
+	asking to 'abort' (which is the default), this program will die
+	when encountering such a commit object.  With 'yes', the commit
+	message will be reencoded into UTF-8.  With 'no', the original
+	encoding will be preserved.
 
 --refspec::
 	Apply the specified refspec to each ref exported. Multiple of them can

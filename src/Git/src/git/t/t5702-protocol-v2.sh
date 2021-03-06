@@ -182,6 +182,13 @@ test_expect_success 'server-options are sent when using ls-remote' '
 	grep "server-option=world" log
 '
 
+test_expect_success 'warn if using server-option with ls-remote with legacy protocol' '
+	test_must_fail env GIT_TEST_PROTOCOL_VERSION=0 git -c protocol.version=0 \
+		ls-remote -o hello -o world "file://$(pwd)/file_parent" master 2>err &&
+
+	test_i18ngrep "see protocol.version in" err &&
+	test_i18ngrep "server options require protocol version 2 or later" err
+'
 
 test_expect_success 'clone with file:// using protocol v2' '
 	test_when_finished "rm -f log" &&
@@ -249,6 +256,40 @@ test_expect_success 'server-options are sent when fetching' '
 
 	grep "server-option=hello" log &&
 	grep "server-option=world" log
+'
+
+test_expect_success 'warn if using server-option with fetch with legacy protocol' '
+	test_when_finished "rm -rf temp_child" &&
+
+	git init temp_child &&
+
+	test_must_fail env GIT_TEST_PROTOCOL_VERSION=0 git -C temp_child -c protocol.version=0 \
+		fetch -o hello -o world "file://$(pwd)/file_parent" master 2>err &&
+
+	test_i18ngrep "see protocol.version in" err &&
+	test_i18ngrep "server options require protocol version 2 or later" err
+'
+
+test_expect_success 'server-options are sent when cloning' '
+	test_when_finished "rm -rf log myclone" &&
+
+	GIT_TRACE_PACKET="$(pwd)/log" git -c protocol.version=2 \
+		clone --server-option=hello --server-option=world \
+		"file://$(pwd)/file_parent" myclone &&
+
+	grep "server-option=hello" log &&
+	grep "server-option=world" log
+'
+
+test_expect_success 'warn if using server-option with clone with legacy protocol' '
+	test_when_finished "rm -rf myclone" &&
+
+	test_must_fail env GIT_TEST_PROTOCOL_VERSION=0 git -c protocol.version=0 \
+		clone --server-option=hello --server-option=world \
+		"file://$(pwd)/file_parent" myclone 2>err &&
+
+	test_i18ngrep "see protocol.version in" err &&
+	test_i18ngrep "server options require protocol version 2 or later" err
 '
 
 test_expect_success 'upload-pack respects config using protocol v2' '
@@ -359,12 +400,13 @@ test_expect_success 'even with handcrafted request, filter does not work if not 
 	0000
 	EOF
 
-	test_must_fail git -C server serve --stateless-rpc <in >/dev/null 2>err &&
+	test_must_fail test-tool -C server serve-v2 --stateless-rpc \
+		<in >/dev/null 2>err &&
 	grep "unexpected line: .filter blob:none." err &&
 
 	# Exercise to ensure that if advertised, filter works
 	git -C server config uploadpack.allowfilter 1 &&
-	git -C server serve --stateless-rpc <in >/dev/null
+	test-tool -C server serve-v2 --stateless-rpc <in >/dev/null
 '
 
 test_expect_success 'default refspec is used to filter ref when fetchcing' '
@@ -457,10 +499,7 @@ test_expect_success 'upload-pack respects client shallows' '
 
 	# Add extra commits to the client so that the whole fetch takes more
 	# than 1 request (due to negotiation)
-	for i in $(test_seq 1 32)
-	do
-		test_commit -C client c$i
-	done &&
+	test_commit_bulk -C client --id=c 32 &&
 
 	git -C server checkout -b newbranch base &&
 	test_commit -C server client_wants &&
@@ -542,7 +581,38 @@ test_expect_success 'clone with http:// using protocol v2' '
 	# Client requested to use protocol v2
 	grep "Git-Protocol: version=2" log &&
 	# Server responded using protocol v2
-	grep "git< version 2" log
+	grep "git< version 2" log &&
+	# Verify that the chunked encoding sending codepath is NOT exercised
+	! grep "Send header: Transfer-Encoding: chunked" log
+'
+
+test_expect_success 'clone big repository with http:// using protocol v2' '
+	test_when_finished "rm -f log" &&
+
+	git init "$HTTPD_DOCUMENT_ROOT_PATH/big" &&
+	# Ensure that the list of wants is greater than http.postbuffer below
+	for i in $(test_seq 1 1500)
+	do
+		# do not use here-doc, because it requires a process
+		# per loop iteration
+		echo "commit refs/heads/too-many-refs-$i" &&
+		echo "committer git <git@example.com> $i +0000" &&
+		echo "data 0" &&
+		echo "M 644 inline bla.txt" &&
+		echo "data 4" &&
+		echo "bla"
+	done | git -C "$HTTPD_DOCUMENT_ROOT_PATH/big" fast-import &&
+
+	GIT_TRACE_PACKET="$(pwd)/log" GIT_TRACE_CURL="$(pwd)/log" git \
+		-c protocol.version=2 -c http.postbuffer=65536 \
+		clone "$HTTPD_URL/smart/big" big_child &&
+
+	# Client requested to use protocol v2
+	grep "Git-Protocol: version=2" log &&
+	# Server responded using protocol v2
+	grep "git< version 2" log &&
+	# Verify that the chunked encoding sending codepath is exercised
+	grep "Send header: Transfer-Encoding: chunked" log
 '
 
 test_expect_success 'fetch with http:// using protocol v2' '
@@ -559,6 +629,19 @@ test_expect_success 'fetch with http:// using protocol v2' '
 
 	# Server responded using protocol v2
 	grep "git< version 2" log
+'
+
+test_expect_success 'fetch with http:// by hash without tag following with protocol v2 does not list refs' '
+	test_when_finished "rm -f log" &&
+
+	test_commit -C "$HTTPD_DOCUMENT_ROOT_PATH/http_parent" two_a &&
+	git -C "$HTTPD_DOCUMENT_ROOT_PATH/http_parent" rev-parse two_a >two_a_hash &&
+
+	GIT_TRACE_PACKET="$(pwd)/log" git -C http_child -c protocol.version=2 \
+		fetch --no-tags origin $(cat two_a_hash) &&
+
+	grep "fetch< version 2" log &&
+	! grep "fetch> command=ls-refs" log
 '
 
 test_expect_success 'fetch from namespaced repo respects namespaces' '
@@ -638,10 +721,7 @@ test_expect_success 'when server does not send "ready", expect FLUSH' '
 	# Create many commits to extend the negotiation phase across multiple
 	# requests, so that the server does not send "ready" in the first
 	# request.
-	for i in $(test_seq 1 32)
-	do
-		test_commit -C http_child c$i
-	done &&
+	test_commit_bulk -C http_child --id=c 32 &&
 
 	# After the acknowledgments section, pretend that a DELIM
 	# (0001) was sent instead of a FLUSH (0000).
@@ -656,6 +736,7 @@ test_expect_success 'when server does not send "ready", expect FLUSH' '
 	test_i18ngrep "expected no other sections to be sent after no .ready." err
 '
 
-stop_httpd
+# DO NOT add non-httpd-specific tests here, because the last part of this
+# test script is only executed when httpd is available and enabled.
 
 test_done

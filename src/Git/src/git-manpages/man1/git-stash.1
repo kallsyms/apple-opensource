@@ -2,12 +2,12 @@
 .\"     Title: git-stash
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GIT\-STASH" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GIT\-STASH" "1" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -33,7 +33,7 @@ git-stash \- Stash the changes in a dirty working directory away
 .sp
 .nf
 \fIgit stash\fR list [<options>]
-\fIgit stash\fR show [<stash>]
+\fIgit stash\fR show [<options>] [<stash>]
 \fIgit stash\fR drop [\-q|\-\-quiet] [<stash>]
 \fIgit stash\fR ( pop | apply ) [\-\-index] [\-q|\-\-quiet] [<stash>]
 \fIgit stash\fR branch <branchname> [<stash>]
@@ -100,7 +100,7 @@ to override this\&.
 save [\-p|\-\-patch] [\-k|\-\-[no\-]keep\-index] [\-u|\-\-include\-untracked] [\-a|\-\-all] [\-q|\-\-quiet] [<message>]
 .RS 4
 This option is deprecated in favour of
-\fIgit stash push\fR\&. It differs from "stash push" in that it cannot take pathspecs, and any non\-option arguments form the message\&.
+\fIgit stash push\fR\&. It differs from "stash push" in that it cannot take pathspecs\&. Instead, all non\-option arguments are concatenated to form the stash message\&.
 .RE
 .PP
 list [<options>]
@@ -130,7 +130,7 @@ command to control what is shown and how\&. See
 \fBgit-log\fR(1)\&.
 .RE
 .PP
-show [<stash>]
+show [<options>] [<stash>]
 .RS 4
 Show the changes recorded in the stash entry as a diff between the stashed contents and the commit back when the stash entry was first created\&. When no
 \fB<stash>\fR
@@ -285,12 +285,12 @@ When you are in the middle of something, your boss comes in and demands that you
 .\}
 .nf
 # \&.\&.\&. hack hack hack \&.\&.\&.
-$ git checkout \-b my_wip
+$ git switch \-c my_wip
 $ git commit \-a \-m "WIP"
-$ git checkout master
+$ git switch master
 $ edit emergency fix
 $ git commit \-a \-m "Fix in a hurry"
-$ git checkout my_wip
+$ git switch my_wip
 $ git reset \-\-soft HEAD^
 # \&.\&.\&. continue hacking \&.\&.\&.
 .fi
@@ -364,7 +364,7 @@ xargs git log \-\-merges \-\-no\-walk \-\-grep=WIP
 .RE
 .SH "SEE ALSO"
 .sp
-\fBgit-checkout\fR(1), \fBgit-commit\fR(1), \fBgit-reflog\fR(1), \fBgit-reset\fR(1)
+\fBgit-checkout\fR(1), \fBgit-commit\fR(1), \fBgit-reflog\fR(1), \fBgit-reset\fR(1), \fBgit-switch\fR(1)
 .SH "GIT"
 .sp
 Part of the \fBgit\fR(1) suite

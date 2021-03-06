@@ -112,11 +112,11 @@ static void print_debug(const struct cache_entry *ce)
 	if (debug_mode) {
 		const struct stat_data *sd = &ce->ce_stat_data;
 
-		printf("  ctime: %d:%d\n", sd->sd_ctime.sec, sd->sd_ctime.nsec);
-		printf("  mtime: %d:%d\n", sd->sd_mtime.sec, sd->sd_mtime.nsec);
-		printf("  dev: %d\tino: %d\n", sd->sd_dev, sd->sd_ino);
-		printf("  uid: %d\tgid: %d\n", sd->sd_uid, sd->sd_gid);
-		printf("  size: %d\tflags: %x\n", sd->sd_size, ce->ce_flags);
+		printf("  ctime: %u:%u\n", sd->sd_ctime.sec, sd->sd_ctime.nsec);
+		printf("  mtime: %u:%u\n", sd->sd_mtime.sec, sd->sd_mtime.nsec);
+		printf("  dev: %u\tino: %u\n", sd->sd_dev, sd->sd_ino);
+		printf("  uid: %u\tgid: %u\n", sd->sd_uid, sd->sd_gid);
+		printf("  size: %u\tflags: %x\n", sd->sd_size, ce->ce_flags);
 	}
 }
 
@@ -373,7 +373,7 @@ static void prune_index(struct index_state *istate,
 	first = pos;
 	last = istate->cache_nr;
 	while (last > first) {
-		int next = (last + first) >> 1;
+		int next = first + ((last - first) >> 1);
 		const struct cache_entry *ce = istate->cache[next];
 		if (!strncmp(ce->name, prefix, prefixlen)) {
 			first = next+1;
@@ -492,7 +492,7 @@ static int option_parse_exclude_from(const struct option *opt,
 	BUG_ON_OPT_NEG(unset);
 
 	exc_given = 1;
-	add_excludes_from_file(dir, arg);
+	add_patterns_from_file(dir, arg);
 
 	return 0;
 }
@@ -516,7 +516,7 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 	int require_work_tree = 0, show_tag = 0, i;
 	const char *max_prefix;
 	struct dir_struct dir;
-	struct exclude_list *el;
+	struct pattern_list *pl;
 	struct string_list exclude_list = STRING_LIST_INIT_NODUP;
 	struct option builtin_ls_files_options[] = {
 		/* Think twice before adding "--nul" synonym to this */
@@ -594,9 +594,9 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 
 	argc = parse_options(argc, argv, prefix, builtin_ls_files_options,
 			ls_files_usage, 0);
-	el = add_exclude_list(&dir, EXC_CMDL, "--exclude option");
+	pl = add_pattern_list(&dir, EXC_CMDL, "--exclude option");
 	for (i = 0; i < exclude_list.nr; i++) {
-		add_exclude(exclude_list.items[i].string, "", 0, el, --exclude_args);
+		add_pattern(exclude_list.items[i].string, "", 0, pl, --exclude_args);
 	}
 	if (show_tag || show_valid_bit || show_fsmonitor_bit) {
 		tag_cached = "H ";
@@ -680,7 +680,7 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 
 	if (ps_matched) {
 		int bad;
-		bad = report_path_error(ps_matched, &pathspec, prefix);
+		bad = report_path_error(ps_matched, &pathspec);
 		if (bad)
 			fprintf(stderr, "Did you forget to 'git add'?\n");
 

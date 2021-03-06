@@ -751,9 +751,7 @@ git-cherry-pick(1) Manual Page
 <div class="verseblock">
 <pre class="content"><em>git cherry-pick</em> [--edit] [-n] [-m parent-number] [-s] [-x] [--ff]
                   [-S[&lt;keyid&gt;]] &lt;commit&gt;&#8230;
-<em>git cherry-pick</em> --continue
-<em>git cherry-pick</em> --quit
-<em>git cherry-pick</em> --abort</pre>
+<em>git cherry-pick</em> (--continue | --skip | --abort | --quit)</pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -833,6 +831,18 @@ conflicts.</p></div>
 <p>
         With this option, <em>git cherry-pick</em> will let you edit the commit
         message prior to committing.
+</p>
+</dd>
+<dt class="hdlist1">
+--cleanup=&lt;mode&gt;
+</dt>
+<dd>
+<p>
+        This option determines how the commit message will be cleaned up before
+        being passed on to the commit machinery. See <a href="git-commit.html">git-commit(1)</a> for more
+        details. In particular, if the <em>&lt;mode&gt;</em> is given a value of <code>scissors</code>,
+        scissors will be appended to <code>MERGE_MSG</code> before being passed on in the case
+        of a conflict.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -995,6 +1005,18 @@ effect to your index in a row.</p></div>
         merge strategy.  See <a href="git-merge.html">git-merge(1)</a> for details.
 </p>
 </dd>
+<dt class="hdlist1">
+--rerere-autoupdate
+</dt>
+<dt class="hdlist1">
+--no-rerere-autoupdate
+</dt>
+<dd>
+<p>
+        Allow the rerere mechanism to update the index with the
+        result of auto-conflict resolution if possible.
+</p>
+</dd>
 </dl></div>
 </div>
 </div>
@@ -1008,8 +1030,17 @@ effect to your index in a row.</p></div>
 <dd>
 <p>
         Continue the operation in progress using the information in
-        <em>.git/sequencer</em>.  Can be used to continue after resolving
+        <code>.git/sequencer</code>.  Can be used to continue after resolving
         conflicts in a failed cherry-pick or revert.
+</p>
+</dd>
+<dt class="hdlist1">
+--skip
+</dt>
+<dd>
+<p>
+        Skip the current commit and continue with the rest of the
+        sequence.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1176,7 +1207,7 @@ try to apply the change introduced by <code>topic^</code> again,
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-02-05 15:33:20 PST
+ 2019-07-20 04:46:47 JST
 </div>
 </div>
 </body>

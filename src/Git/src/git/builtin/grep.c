@@ -403,7 +403,7 @@ static int grep_tree(struct grep_opt *opt, const struct pathspec *pathspec,
 static int grep_submodule(struct grep_opt *opt,
 			  const struct pathspec *pathspec,
 			  const struct object_id *oid,
-			  const char *filename, const char *path)
+			  const char *filename, const char *path, int cached)
 {
 	struct repository subrepo;
 	struct repository *superproject = opt->repo;
@@ -458,7 +458,8 @@ static int grep_submodule(struct grep_opt *opt,
 		object = parse_object_or_die(oid, oid_to_hex(oid));
 
 		grep_read_lock();
-		data = read_object_with_reference(&object->oid, tree_type,
+		data = read_object_with_reference(&subrepo,
+						  &object->oid, tree_type,
 						  &size, NULL);
 		grep_read_unlock();
 
@@ -474,7 +475,7 @@ static int grep_submodule(struct grep_opt *opt,
 		strbuf_release(&base);
 		free(data);
 	} else {
-		hit = grep_cache(&subopt, pathspec, 1);
+		hit = grep_cache(&subopt, pathspec, cached);
 	}
 
 	repo_clear(&subrepo);
@@ -522,7 +523,8 @@ static int grep_cache(struct grep_opt *opt,
 			}
 		} else if (recurse_submodules && S_ISGITLINK(ce->ce_mode) &&
 			   submodule_path_match(repo->index, pathspec, name.buf, NULL)) {
-			hit |= grep_submodule(opt, pathspec, NULL, ce->name, ce->name);
+			hit |= grep_submodule(opt, pathspec, NULL, ce->name,
+					      ce->name, cached);
 		} else {
 			continue;
 		}
@@ -597,7 +599,8 @@ static int grep_tree(struct grep_opt *opt, const struct pathspec *pathspec,
 			free(data);
 		} else if (recurse_submodules && S_ISGITLINK(entry.mode)) {
 			hit |= grep_submodule(opt, pathspec, &entry.oid,
-					      base->buf, base->buf + tn_len);
+					      base->buf, base->buf + tn_len,
+					      1); /* ignored */
 		}
 
 		strbuf_setlen(base, old_baselen);
@@ -623,7 +626,8 @@ static int grep_object(struct grep_opt *opt, const struct pathspec *pathspec,
 		int hit, len;
 
 		grep_read_lock();
-		data = read_object_with_reference(&obj->oid, tree_type,
+		data = read_object_with_reference(opt->repo,
+						  &obj->oid, tree_type,
 						  &size, NULL);
 		grep_read_unlock();
 
@@ -1106,8 +1110,8 @@ int cmd_grep(int argc, const char **argv, const char *prefix)
 			strbuf_addf(&buf, "+/%s%s",
 					strcmp("less", pager) ? "" : "*",
 					opt.pattern_list->pattern);
-			string_list_append(&path_list, buf.buf);
-			strbuf_detach(&buf, NULL);
+			string_list_append(&path_list,
+					   strbuf_detach(&buf, NULL));
 		}
 	}
 
@@ -1143,5 +1147,6 @@ int cmd_grep(int argc, const char **argv, const char *prefix)
 		run_pager(&opt, prefix);
 	clear_pathspec(&pathspec);
 	free_grep_patterns(&opt);
+	grep_destroy();
 	return !hit;
 }

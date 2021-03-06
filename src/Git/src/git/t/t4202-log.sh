@@ -352,7 +352,7 @@ test_expect_success 'log with grep.patternType configuration and command line' '
 	test_cmp expect actual
 '
 
-test_expect_success 'log with various grep.patternType configurations & command-lines' '
+test_expect_success !FAIL_PREREQS 'log with various grep.patternType configurations & command-lines' '
 	git init pattern-type &&
 	(
 		cd pattern-type &&
@@ -834,6 +834,21 @@ test_expect_success 'decorate-refs and decorate-refs-exclude' '
 	git log -n6 --decorate=short --pretty="tformat:%f%d" \
 		--decorate-refs="heads/*" \
 		--decorate-refs-exclude="heads/oc*" >actual &&
+	test_cmp expect.decorate actual
+'
+
+test_expect_success 'decorate-refs-exclude and simplify-by-decoration' '
+	cat >expect.decorate <<-\EOF &&
+	Merge-tag-reach (HEAD -> master)
+	reach (tag: reach, reach)
+	seventh (tag: seventh)
+	Merge-branch-tangle
+	Merge-branch-side-early-part-into-tangle (tangle)
+	tangle-a (tag: tangle-a)
+	EOF
+	git log -n6 --decorate=short --pretty="tformat:%f%d" \
+		--decorate-refs-exclude="*octopus*" \
+		--simplify-by-decoration >actual &&
 	test_cmp expect.decorate actual
 '
 
@@ -1705,6 +1720,13 @@ test_expect_success 'log --source paints symmetric ranges' '
 
 test_expect_success '--exclude-promisor-objects does not BUG-crash' '
 	test_must_fail git log --exclude-promisor-objects source-a
+'
+
+test_expect_success 'log --end-of-options' '
+       git update-ref refs/heads/--source HEAD &&
+       git log --end-of-options --source >actual &&
+       git log >expect &&
+       test_cmp expect actual
 '
 
 test_done

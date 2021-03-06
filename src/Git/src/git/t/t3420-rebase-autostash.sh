@@ -30,13 +30,13 @@ test_expect_success setup '
 	echo conflicting-change >file2 &&
 	git add . &&
 	test_tick &&
-	git commit -m "related commit"
+	git commit -m "related commit" &&
+	remove_progress_re="$(printf "s/.*\\r//")"
 '
 
 create_expected_success_am () {
 	cat >expected <<-EOF
 	$(grep "^Created autostash: [0-9a-f][0-9a-f]*\$" actual)
-	HEAD is now at $(git rev-parse --short feature-branch) third commit
 	First, rewinding head to replay your work on top of it...
 	Applying: second commit
 	Applying: third commit
@@ -47,8 +47,7 @@ create_expected_success_am () {
 create_expected_success_interactive () {
 	q_to_cr >expected <<-EOF
 	$(grep "^Created autostash: [0-9a-f][0-9a-f]*\$" actual)
-	HEAD is now at $(git rev-parse --short feature-branch) third commit
-	Rebasing (1/2)QRebasing (2/2)QApplied autostash.
+	Applied autostash.
 	Successfully rebased and updated refs/heads/rebased-feature-branch.
 	EOF
 }
@@ -56,7 +55,6 @@ create_expected_success_interactive () {
 create_expected_failure_am () {
 	cat >expected <<-EOF
 	$(grep "^Created autostash: [0-9a-f][0-9a-f]*\$" actual)
-	HEAD is now at $(git rev-parse --short feature-branch) third commit
 	First, rewinding head to replay your work on top of it...
 	Applying: second commit
 	Applying: third commit
@@ -67,10 +65,9 @@ create_expected_failure_am () {
 }
 
 create_expected_failure_interactive () {
-	q_to_cr >expected <<-EOF
+	cat >expected <<-EOF
 	$(grep "^Created autostash: [0-9a-f][0-9a-f]*\$" actual)
-	HEAD is now at $(git rev-parse --short feature-branch) third commit
-	Rebasing (1/2)QRebasing (2/2)QApplying autostash resulted in conflicts.
+	Applying autostash resulted in conflicts.
 	Your changes are safe in the stash.
 	You can run "git stash pop" or "git stash drop" at any time.
 	Successfully rebased and updated refs/heads/rebased-feature-branch.
@@ -109,7 +106,8 @@ testrebase () {
 			suffix=interactive
 		fi &&
 		create_expected_success_$suffix &&
-		test_i18ncmp expected actual
+		sed "$remove_progress_re" <actual >actual2 &&
+		test_i18ncmp expected actual2
 	'
 
 	test_expect_success "rebase$type: dirty index, non-conflicting rebase" '
@@ -209,7 +207,8 @@ testrebase () {
 			suffix=interactive
 		fi &&
 		create_expected_failure_$suffix &&
-		test_i18ncmp expected actual
+		sed "$remove_progress_re" <actual >actual2 &&
+		test_i18ncmp expected actual2
 	'
 }
 
@@ -301,6 +300,14 @@ test_expect_success 'branch is left alone when possible' '
 	git rebase --autostash unchanged-branch &&
 	test changed = "$(cat file0)" &&
 	test unchanged-branch = "$(git rev-parse --abbrev-ref HEAD)"
+'
+
+test_expect_success 'never change active branch' '
+	git checkout -b not-the-feature-branch unrelated-onto-branch &&
+	test_when_finished "git reset --hard && git checkout master" &&
+	echo changed >file0 &&
+	git rebase --autostash not-the-feature-branch feature-branch &&
+	test_cmp_rev not-the-feature-branch unrelated-onto-branch
 '
 
 test_done

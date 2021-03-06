@@ -99,6 +99,32 @@ All the `git commit` hooks are invoked with the environment
 variable `GIT_EDITOR=:` if the command will not bring up an editor
 to modify the commit message.
 
+The default 'pre-commit' hook, when enabled--and with the
+`hooks.allownonascii` config option unset or set to false--prevents
+the use of non-ASCII filenames.
+
+pre-merge-commit
+~~~~~~~~~~~~~~~~
+
+This hook is invoked by linkgit:git-merge[1], and can be bypassed
+with the `--no-verify` option.  It takes no parameters, and is
+invoked after the merge has been carried out successfully and before
+obtaining the proposed commit log message to
+make a commit.  Exiting with a non-zero status from this script
+causes the `git merge` command to abort before creating a commit.
+
+The default 'pre-merge-commit' hook, when enabled, runs the
+'pre-commit' hook, if the latter is enabled.
+
+This hook is invoked with the environment variable
+`GIT_EDITOR=:` if the command will not bring up an editor
+to modify the commit message.
+
+If the merge cannot be carried out automatically, the conflicts
+need to be resolved and the result committed separately (see
+linkgit:git-merge[1]). At that point, this hook will not be executed,
+but the 'pre-commit' hook will, if it is enabled.
+
 prepare-commit-msg
 ~~~~~~~~~~~~~~~~~~
 
@@ -161,12 +187,13 @@ rebased, and is not set when rebasing the current branch.
 post-checkout
 ~~~~~~~~~~~~~
 
-This hook is invoked when a linkgit:git-checkout[1] is run after having updated the
+This hook is invoked when a linkgit:git-checkout[1] or
+linkgit:git-switch[1] is run after having updated the
 worktree.  The hook is given three parameters: the ref of the previous HEAD,
 the ref of the new HEAD (which may or may not have changed), and a flag
 indicating whether the checkout was a branch checkout (changing branches,
 flag=1) or a file checkout (retrieving a file from the index, flag=0).
-This hook cannot affect the outcome of `git checkout`.
+This hook cannot affect the outcome of `git switch` or `git checkout`.
 
 It is also run after linkgit:git-clone[1], unless the `--no-checkout` (`-n`) option is
 used. The first parameter given to the hook is the null-ref, the second the
@@ -402,7 +429,8 @@ exit with a zero status.
 For example, the hook can simply run `git read-tree -u -m HEAD "$1"`
 in order to emulate `git fetch` that is run in the reverse direction
 with `git push`, as the two-tree form of `git read-tree -u -m` is
-essentially the same as `git checkout` that switches branches while
+essentially the same as `git switch` or `git checkout`
+that switches branches while
 keeping the local changes in the working tree that do not interfere
 with the difference between the branches.
 
@@ -419,10 +447,12 @@ post-rewrite
 
 This hook is invoked by commands that rewrite commits
 (linkgit:git-commit[1] when called with `--amend` and
-linkgit:git-rebase[1]; currently `git filter-branch` does 'not' call
-it!).  Its first argument denotes the command it was invoked by:
-currently one of `amend` or `rebase`.  Further command-dependent
-arguments may be passed in the future.
+linkgit:git-rebase[1]; however, full-history (re)writing tools like
+linkgit:git-fast-import[1] or
+https://github.com/newren/git-filter-repo[git-filter-repo] typically
+do not call it!).  Its first argument denotes the command it was
+invoked by: currently one of `amend` or `rebase`.  Further
+command-dependent arguments may be passed in the future.
 
 The hook receives a list of the rewritten commits on stdin, in the
 format
@@ -491,6 +521,24 @@ p4-pre-submit
 This hook is invoked by `git-p4 submit`. It takes no parameters and nothing
 from standard input. Exiting with non-zero status from this script prevent
 `git-p4 submit` from launching. Run `git-p4 submit --help` for details.
+
+post-index-change
+~~~~~~~~~~~~~~~~~
+
+This hook is invoked when the index is written in read-cache.c
+do_write_locked_index.
+
+The first parameter passed to the hook is the indicator for the
+working directory being updated.  "1" meaning working directory
+was updated or "0" when the working directory was not updated.
+
+The second parameter passed to the hook is the indicator for whether
+or not the index was updated and the skip-worktree bit could have
+changed.  "1" meaning skip-worktree bits could have been updated
+and "0" meaning they were not.
+
+Only one parameter should be set to "1" when the hook runs.  The hook
+running passing "1", "1" should not be possible.
 
 GIT
 ---

@@ -5,7 +5,7 @@
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
 <meta name="generator" content="AsciiDoc 8.6.10" />
-<title>gitremote-helpers(1)</title>
+<title>gitremote-helpers(7)</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -735,7 +735,7 @@ asciidoc.install();
 <body class="manpage">
 <div id="header">
 <h1>
-gitremote-helpers(1) Manual Page
+gitremote-helpers(7) Manual Page
 </h1>
 <h2>NAME</h2>
 <div class="sectionbody">
@@ -1128,9 +1128,13 @@ the remote repository.</p></div>
         same batch are complete. Only objects which were reported
         in the output of <em>list</em> with a sha1 may be fetched this way.
 </p>
-<div class="paragraph"><p>Optionally may output a <em>lock &lt;file&gt;</em> line indicating a file under
-GIT_DIR/objects/pack which is keeping a pack until refs can be
-suitably updated.</p></div>
+<div class="paragraph"><p>Optionally may output a <em>lock &lt;file&gt;</em> line indicating the full path of
+a file under <code>$GIT_DIR/objects/pack</code> which is keeping a pack until
+refs can be suitably updated.  The path must end with <code>.keep</code>. This is
+a mechanism to name a &lt;pack,idx,keep&gt; tuple by giving only the keep
+component.  The kept pack will not be deleted by a concurrent repack,
+even though its objects may not be referenced until the fetch completes.
+The <code>.keep</code> file will be deleted at the conclusion of the fetch.</p></div>
 <div class="paragraph"><p>If option <em>check-connectivity</em> is requested, the helper must output
 <em>connectivity-ok</em> if the clone is self-contained and connected.</p></div>
 <div class="paragraph"><p>Supported if the helper has the "fetch" capability.</p></div>
@@ -1437,6 +1441,16 @@ set by Git if the remote helper has the <em>option</em> capability.</p></div>
         their dependents.
 </p>
 </dd>
+<dt class="hdlist1">
+<em>option atomic</em> {<em>true</em>|<em>false</em>}
+</dt>
+<dd>
+<p>
+        When pushing, request the remote server to update refs in a single atomic
+        transaction.  If successful, all refs will be updated, or none will.  If the
+        remote side does not support this capability, the push will fail.
+</p>
+</dd>
 </dl></div>
 </div>
 </div>
@@ -1446,7 +1460,6 @@ set by Git if the remote helper has the <em>option</em> capability.</p></div>
 <div class="paragraph"><p><a href="git-remote.html">git-remote(1)</a></p></div>
 <div class="paragraph"><p><a href="git-remote-ext.html">git-remote-ext(1)</a></p></div>
 <div class="paragraph"><p><a href="git-remote-fd.html">git-remote-fd(1)</a></p></div>
-<div class="paragraph"><p><a href="git-remote-testgit.html">git-remote-testgit(1)</a></p></div>
 <div class="paragraph"><p><a href="git-fast-import.html">git-fast-import(1)</a></p></div>
 </div>
 </div>
@@ -1461,7 +1474,7 @@ set by Git if the remote helper has the <em>option</em> capability.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2018-05-08 00:51:20 PDT
+ 2019-10-23 15:00:51 JST
 </div>
 </div>
 </body>

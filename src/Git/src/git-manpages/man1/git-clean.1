@@ -2,12 +2,12 @@
 .\"     Title: git-clean
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GIT\-CLEAN" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GIT\-CLEAN" "1" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -46,14 +46,15 @@ If any optional \fB<path>\&.\&.\&.\fR arguments are given, only those paths are 
 .PP
 \-d
 .RS 4
-Remove untracked directories in addition to untracked files\&. If an untracked directory is managed by a different Git repository, it is not removed by default\&. Use \-f option twice if you really want to remove such a directory\&.
+Normally, when no <path> is specified, git clean will not recurse into untracked directories to avoid removing too much\&. Specify \-d to have it recurse into such directories as well\&. If any paths are specified, \-d is irrelevant; all untracked files matching the specified paths (with exceptions for nested git directories mentioned under
+\fB\-\-force\fR) will be removed\&.
 .RE
 .PP
 \-f, \-\-force
 .RS 4
 If the Git configuration variable clean\&.requireForce is not set to false,
 \fIgit clean\fR
-will refuse to delete files or directories unless given \-f, \-n or \-i\&. Git will refuse to delete directories with \&.git sub directory or file unless a second \-f is given\&.
+will refuse to delete files or directories unless given \-f or \-i\&. Git will refuse to modify untracked nested git repositories (directories with a \&.git subdirectory) unless a second \-f is given\&.
 .RE
 .PP
 \-i, \-\-interactive
@@ -73,14 +74,18 @@ Be quiet, only report errors, but not the files that are successfully removed\&.
 .PP
 \-e <pattern>, \-\-exclude=<pattern>
 .RS 4
-In addition to those found in \&.gitignore (per directory) and $GIT_DIR/info/exclude, also consider these patterns to be in the set of the ignore rules in effect\&.
+Use the given exclude pattern in addition to the standard ignore rules (see
+\fBgitignore\fR(5))\&.
 .RE
 .PP
 \-x
 .RS 4
-Don\(cqt use the standard ignore rules read from \&.gitignore (per directory) and $GIT_DIR/info/exclude, but do still use the ignore rules given with
+Don\(cqt use the standard ignore rules (see
+\fBgitignore\fR(5)), but still use the ignore rules given with
 \fB\-e\fR
-options\&. This allows removing all untracked files, including build products\&. This can be used (possibly in conjunction with
+options from the command line\&. This allows removing all untracked files, including build products\&. This can be used (possibly in conjunction with
+\fIgit restore\fR
+or
 \fIgit reset\fR) to create a pristine working directory to test a clean build\&.
 .RE
 .PP

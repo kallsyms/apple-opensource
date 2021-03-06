@@ -750,11 +750,10 @@ git-merge(1) Manual Page
 <div class="sectionbody">
 <div class="verseblock">
 <pre class="content"><em>git merge</em> [-n] [--stat] [--no-commit] [--squash] [--[no-]edit]
-        [-s &lt;strategy&gt;] [-X &lt;strategy-option&gt;] [-S[&lt;keyid&gt;]]
+        [--no-verify] [-s &lt;strategy&gt;] [-X &lt;strategy-option&gt;] [-S[&lt;keyid&gt;]]
         [--[no-]allow-unrelated-histories]
         [--[no-]rerere-autoupdate] [-m &lt;msg&gt;] [-F &lt;file&gt;] [&lt;commit&gt;&#8230;]
-<em>git merge</em> --abort
-<em>git merge</em> --continue</pre>
+<em>git merge</em> (--continue | --abort | --quit)</pre>
 <div class="attribution">
 </div></div>
 </div>
@@ -815,9 +814,13 @@ merge has resulted in conflicts.</p></div>
         Perform the merge and commit the result. This option can
         be used to override --no-commit.
 </p>
-<div class="paragraph"><p>With --no-commit perform the merge but pretend the merge
-failed and do not autocommit, to give the user a chance to
-inspect and further tweak the merge result before committing.</p></div>
+<div class="paragraph"><p>With --no-commit perform the merge and stop just before creating
+a merge commit, to give the user a chance to inspect and further
+tweak the merge result before committing.</p></div>
+<div class="paragraph"><p>Note that fast-forward updates do not create a merge commit and
+therefore there is no way to stop those merges with --no-commit.
+Thus, if you want to ensure your branch is not changed or updated
+by the merge command, use --no-ff with --no-commit.</p></div>
 </dd>
 <dt class="hdlist1">
 --edit
@@ -846,35 +849,42 @@ updated behaviour, the environment variable <code>GIT_MERGE_AUTOEDIT</code> can 
 set to <code>no</code> at the beginning of them.</p></div>
 </dd>
 <dt class="hdlist1">
---ff
+--cleanup=&lt;mode&gt;
 </dt>
 <dd>
 <p>
-        When the merge resolves as a fast-forward, only update the branch
-        pointer, without creating a merge commit.  This is the default
-        behavior.
+        This option determines how the merge message will be cleaned up before
+        commiting. See <a href="git-commit.html">git-commit(1)</a> for more details. In addition, if
+        the <em>&lt;mode&gt;</em> is given a value of <code>scissors</code>, scissors will be appended
+        to <code>MERGE_MSG</code> before being passed on to the commit machinery in the
+        case of a merge conflict.
 </p>
 </dd>
 <dt class="hdlist1">
+--ff
+</dt>
+<dt class="hdlist1">
 --no-ff
 </dt>
-<dd>
-<p>
-        Create a merge commit even when the merge resolves as a
-        fast-forward.  This is the default behaviour when merging an
-        annotated (and possibly signed) tag that is not stored in
-        its natural place in <em>refs/tags/</em> hierarchy.
-</p>
-</dd>
 <dt class="hdlist1">
 --ff-only
 </dt>
 <dd>
 <p>
-        Refuse to merge and exit with a non-zero status unless the
-        current <code>HEAD</code> is already up to date or the merge can be
-        resolved as a fast-forward.
+        Specifies how a merge is handled when the merged-in history is
+        already a descendant of the current history.  <code>--ff</code> is the
+        default unless merging an annotated (and possibly signed) tag
+        that is not stored in its natural place in the <code>refs/tags/</code>
+        hierarchy, in which case <code>--no-ff</code> is assumed.
 </p>
+<div class="paragraph"><p>With <code>--ff</code>, when possible resolve the merge as a fast-forward (only
+update the branch pointer to match the merged branch; do not create a
+merge commit).  When not possible (when the merged-in history is not a
+descendant of the current history), create a merge commit.</p></div>
+<div class="paragraph"><p>With <code>--no-ff</code>, create a merge commit in all cases, even when the merge
+could instead be resolved as a fast-forward.</p></div>
+<div class="paragraph"><p>With <code>--ff-only</code>, resolve the merge as a fast-forward when possible.
+When not possible, refuse to merge and exit with a non-zero status.</p></div>
 </dd>
 <dt class="hdlist1">
 -S[&lt;keyid&gt;]
@@ -956,6 +966,16 @@ merge.</p></div>
 </p>
 <div class="paragraph"><p>With --no-squash perform the merge and commit the result. This
 option can be used to override --squash.</p></div>
+<div class="paragraph"><p>With --squash, --commit is not allowed, and will fail.</p></div>
+</dd>
+<dt class="hdlist1">
+--no-verify
+</dt>
+<dd>
+<p>
+        This option bypasses the pre-merge and commit-msg hooks.
+        See also <a href="githooks.html">githooks(5)</a>.
+</p>
 </dd>
 <dt class="hdlist1">
 -s &lt;strategy&gt;
@@ -1089,12 +1109,27 @@ invocations. The automated message can include the branch description.</p></div>
 will be appended to the specified message.</p></div>
 </dd>
 <dt class="hdlist1">
---[no-]rerere-autoupdate
+--rerere-autoupdate
+</dt>
+<dt class="hdlist1">
+--no-rerere-autoupdate
 </dt>
 <dd>
 <p>
         Allow the rerere mechanism to update the index with the
         result of auto-conflict resolution if possible.
+</p>
+</dd>
+<dt class="hdlist1">
+--overwrite-ignore
+</dt>
+<dt class="hdlist1">
+--no-overwrite-ignore
+</dt>
+<dd>
+<p>
+        Silently overwrite ignored files from the merge result. This
+        is the default behavior. Use <code>--no-overwrite-ignore</code> to abort.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1111,6 +1146,15 @@ reconstruct these changes. It is therefore recommended to always
 commit or stash your changes before running <em>git merge</em>.</p></div>
 <div class="paragraph"><p><em>git merge --abort</em> is equivalent to <em>git reset --merge</em> when
 <code>MERGE_HEAD</code> is present.</p></div>
+</dd>
+<dt class="hdlist1">
+--quit
+</dt>
+<dd>
+<p>
+        Forget about the current merge in progress. Leave the index
+        and the working tree as-is.
+</p>
 </dd>
 <dt class="hdlist1">
 --continue
@@ -1734,9 +1778,27 @@ merge.renames
 </dt>
 <dd>
 <p>
-        Whether and how Git detects renames.  If set to "false",
-        rename detection is disabled. If set to "true", basic rename
-        detection is enabled.  Defaults to the value of diff.renames.
+        Whether Git detects renames.  If set to "false", rename detection
+        is disabled. If set to "true", basic rename detection is enabled.
+        Defaults to the value of diff.renames.
+</p>
+</dd>
+<dt class="hdlist1">
+merge.directoryRenames
+</dt>
+<dd>
+<p>
+        Whether Git detects directory renames, affecting what happens at
+        merge time to new files added to a directory on one side of
+        history when that directory was renamed on the other side of
+        history.  If merge.directoryRenames is set to "false", directory
+        rename detection is disabled, meaning that such new files will be
+        left behind in the old directory.  If set to "true", directory
+        rename detection is enabled, meaning that such new files will be
+        moved into the new directory.  If set to "conflict", a conflict
+        will be reported for such paths.  If merge.renames is false,
+        merge.directoryRenames is ignored and treated as false.  Defaults
+        to "conflict".
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1877,6 +1939,11 @@ p4merge
 </li>
 <li>
 <p>
+smerge
+</p>
+</li>
+<li>
+<p>
 tkdiff
 </p>
 </li>
@@ -1988,7 +2055,7 @@ branch.&lt;name&gt;.mergeOptions
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2018-11-13 06:05:48 PST
+ 2019-09-19 04:25:17 JST
 </div>
 </div>
 </body>

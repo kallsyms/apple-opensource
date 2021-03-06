@@ -12,7 +12,6 @@
 #include "object.h"
 #include "remote.h"
 #include "connect.h"
-#include "transport.h"
 #include "string-list.h"
 #include "sha1-array.h"
 #include "connected.h"
@@ -418,24 +417,22 @@ static int copy_to_sideband(int in, int out, void *arg)
 	return 0;
 }
 
-#define HMAC_BLOCK_SIZE 64
-
-static void hmac_sha1(unsigned char *out,
+static void hmac(unsigned char *out,
 		      const char *key_in, size_t key_len,
 		      const char *text, size_t text_len)
 {
-	unsigned char key[HMAC_BLOCK_SIZE];
-	unsigned char k_ipad[HMAC_BLOCK_SIZE];
-	unsigned char k_opad[HMAC_BLOCK_SIZE];
+	unsigned char key[GIT_MAX_BLKSZ];
+	unsigned char k_ipad[GIT_MAX_BLKSZ];
+	unsigned char k_opad[GIT_MAX_BLKSZ];
 	int i;
-	git_SHA_CTX ctx;
+	git_hash_ctx ctx;
 
 	/* RFC 2104 2. (1) */
-	memset(key, '\0', HMAC_BLOCK_SIZE);
-	if (HMAC_BLOCK_SIZE < key_len) {
-		git_SHA1_Init(&ctx);
-		git_SHA1_Update(&ctx, key_in, key_len);
-		git_SHA1_Final(key, &ctx);
+	memset(key, '\0', GIT_MAX_BLKSZ);
+	if (the_hash_algo->blksz < key_len) {
+		the_hash_algo->init_fn(&ctx);
+		the_hash_algo->update_fn(&ctx, key_in, key_len);
+		the_hash_algo->final_fn(key, &ctx);
 	} else {
 		memcpy(key, key_in, key_len);
 	}
@@ -447,29 +444,29 @@ static void hmac_sha1(unsigned char *out,
 	}
 
 	/* RFC 2104 2. (3) & (4) */
-	git_SHA1_Init(&ctx);
-	git_SHA1_Update(&ctx, k_ipad, sizeof(k_ipad));
-	git_SHA1_Update(&ctx, text, text_len);
-	git_SHA1_Final(out, &ctx);
+	the_hash_algo->init_fn(&ctx);
+	the_hash_algo->update_fn(&ctx, k_ipad, sizeof(k_ipad));
+	the_hash_algo->update_fn(&ctx, text, text_len);
+	the_hash_algo->final_fn(out, &ctx);
 
 	/* RFC 2104 2. (6) & (7) */
-	git_SHA1_Init(&ctx);
-	git_SHA1_Update(&ctx, k_opad, sizeof(k_opad));
-	git_SHA1_Update(&ctx, out, GIT_SHA1_RAWSZ);
-	git_SHA1_Final(out, &ctx);
+	the_hash_algo->init_fn(&ctx);
+	the_hash_algo->update_fn(&ctx, k_opad, sizeof(k_opad));
+	the_hash_algo->update_fn(&ctx, out, the_hash_algo->rawsz);
+	the_hash_algo->final_fn(out, &ctx);
 }
 
 static char *prepare_push_cert_nonce(const char *path, timestamp_t stamp)
 {
 	struct strbuf buf = STRBUF_INIT;
-	unsigned char sha1[GIT_SHA1_RAWSZ];
+	unsigned char hash[GIT_MAX_RAWSZ];
 
 	strbuf_addf(&buf, "%s:%"PRItime, path, stamp);
-	hmac_sha1(sha1, buf.buf, buf.len, cert_nonce_seed, strlen(cert_nonce_seed));
+	hmac(hash, buf.buf, buf.len, cert_nonce_seed, strlen(cert_nonce_seed));
 	strbuf_release(&buf);
 
 	/* RFC 2104 5. HMAC-SHA1-80 */
-	strbuf_addf(&buf, "%"PRItime"-%.*s", stamp, GIT_SHA1_HEXSZ, sha1_to_hex(sha1));
+	strbuf_addf(&buf, "%"PRItime"-%.*s", stamp, (int)the_hash_algo->hexsz, hash_to_hex(hash));
 	return strbuf_detach(&buf, NULL);
 }
 
@@ -694,6 +691,8 @@ static int run_and_feed_hook(const char *hook_name, feed_fn feed,
 	proc.argv = argv;
 	proc.in = -1;
 	proc.stdout_to_stderr = 1;
+	proc.trace2_hook_name = hook_name;
+
 	if (feed_state->push_options) {
 		int i;
 		for (i = 0; i < feed_state->push_options->nr; i++)
@@ -807,6 +806,7 @@ static int run_update_hook(struct command *cmd)
 	proc.stdout_to_stderr = 1;
 	proc.err = use_sideband ? -1 : 0;
 	proc.argv = argv;
+	proc.trace2_hook_name = "update";
 
 	code = start_command(&proc);
 	if (code)
@@ -968,7 +968,7 @@ static const char *push_to_deploy(unsigned char *sha1,
 	if (run_command(&child))
 		return "Working directory has staged changes";
 
-	read_tree[3] = sha1_to_hex(sha1);
+	read_tree[3] = hash_to_hex(sha1);
 	child_process_init(&child);
 	child.argv = read_tree;
 	child.env = env->argv;
@@ -985,13 +985,13 @@ static const char *push_to_deploy(unsigned char *sha1,
 
 static const char *push_to_checkout_hook = "push-to-checkout";
 
-static const char *push_to_checkout(unsigned char *sha1,
+static const char *push_to_checkout(unsigned char *hash,
 				    struct argv_array *env,
 				    const char *work_tree)
 {
 	argv_array_pushf(env, "GIT_WORK_TREE=%s", absolute_path(work_tree));
 	if (run_hook_le(env->argv, push_to_checkout_hook,
-			sha1_to_hex(sha1), NULL))
+			hash_to_hex(hash), NULL))
 		return "push-to-checkout hook declined";
 	else
 		return NULL;
@@ -1190,6 +1190,7 @@ static void run_update_post_hook(struct command *commands)
 	proc.no_stdin = 1;
 	proc.stdout_to_stderr = 1;
 	proc.err = use_sideband ? -1 : 0;
+	proc.trace2_hook_name = "post-update";
 
 	if (!start_command(&proc)) {
 		if (use_sideband)
@@ -1198,17 +1199,12 @@ static void run_update_post_hook(struct command *commands)
 	}
 }
 
-static void check_aliased_update(struct command *cmd, struct string_list *list)
+static void check_aliased_update_internal(struct command *cmd,
+					  struct string_list *list,
+					  const char *dst_name, int flag)
 {
-	struct strbuf buf = STRBUF_INIT;
-	const char *dst_name;
 	struct string_list_item *item;
 	struct command *dst_cmd;
-	int flag;
-
-	strbuf_addf(&buf, "%s%s", get_git_namespace(), cmd->ref_name);
-	dst_name = resolve_ref_unsafe(buf.buf, 0, NULL, &flag);
-	strbuf_release(&buf);
 
 	if (!(flag & REF_ISSYMREF))
 		return;
@@ -1245,6 +1241,18 @@ static void check_aliased_update(struct command *cmd, struct string_list *list)
 
 	cmd->error_string = dst_cmd->error_string =
 		"inconsistent aliased update";
+}
+
+static void check_aliased_update(struct command *cmd, struct string_list *list)
+{
+	struct strbuf buf = STRBUF_INIT;
+	const char *dst_name;
+	int flag;
+
+	strbuf_addf(&buf, "%s%s", get_git_namespace(), cmd->ref_name);
+	dst_name = resolve_ref_unsafe(buf.buf, 0, NULL, &flag);
+	check_aliased_update_internal(cmd, list, dst_name, flag);
+	strbuf_release(&buf);
 }
 
 static void check_aliased_updates(struct command *commands)
@@ -1798,8 +1806,7 @@ static const char *unpack_with_sideband(struct shallow_info *si)
 	return ret;
 }
 
-static void prepare_shallow_update(struct command *commands,
-				   struct shallow_info *si)
+static void prepare_shallow_update(struct shallow_info *si)
 {
 	int i, j, k, bitmap_size = DIV_ROUND_UP(si->ref->nr, 32);
 
@@ -1865,7 +1872,7 @@ static void update_shallow_info(struct command *commands,
 	si->ref = ref;
 
 	if (shallow_update) {
-		prepare_shallow_update(commands, si);
+		prepare_shallow_update(si);
 		return;
 	}
 
@@ -2032,7 +2039,7 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 			proc.git_cmd = 1;
 			proc.argv = argv_gc_auto;
 
-			close_all_packs(the_repository->objects);
+			close_object_store(the_repository->objects);
 			if (!start_command(&proc)) {
 				if (use_sideband)
 					copy_to_sideband(proc.err, -1, NULL);

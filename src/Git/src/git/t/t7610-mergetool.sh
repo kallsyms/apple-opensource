@@ -130,18 +130,71 @@ test_expect_success 'custom mergetool' '
 	test_when_finished "git reset --hard" &&
 	git checkout -b test$test_count branch1 &&
 	git submodule update -N &&
-	test_must_fail git merge master >/dev/null 2>&1 &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool file1 file1 ) &&
-	( yes "" | git mergetool file2 "spaced name" >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file12 >/dev/null 2>&1 ) &&
-	( yes "l" | git mergetool submod >/dev/null 2>&1 ) &&
-	test "$(cat file1)" = "master updated" &&
-	test "$(cat file2)" = "master new" &&
-	test "$(cat subdir/file3)" = "master new sub" &&
-	test "$(cat submod/bar)" = "branch1 submodule" &&
+	test_must_fail git merge master &&
+	yes "" | git mergetool both &&
+	yes "" | git mergetool file1 file1 &&
+	yes "" | git mergetool file2 "spaced name" &&
+	yes "" | git mergetool subdir/file3 &&
+	yes "d" | git mergetool file11 &&
+	yes "d" | git mergetool file12 &&
+	yes "l" | git mergetool submod &&
+	echo "master updated" >expect &&
+	test_cmp expect file1 &&
+	echo "master new" >expect &&
+	test_cmp expect file2 &&
+	echo "master new sub" >expect &&
+	test_cmp expect subdir/file3 &&
+	echo "branch1 submodule" >expect &&
+	test_cmp expect submod/bar &&
+	git commit -m "branch1 resolved with mergetool"
+'
+
+test_expect_success 'gui mergetool' '
+	test_config merge.guitool myguitool &&
+	test_config mergetool.myguitool.cmd "(printf \"gui \" && cat \"\$REMOTE\") >\"\$MERGED\"" &&
+	test_config mergetool.myguitool.trustExitCode true &&
+	test_when_finished "git reset --hard" &&
+	git checkout -b test$test_count branch1 &&
+	git submodule update -N &&
+	test_must_fail git merge master &&
+	yes "" | git mergetool --gui both &&
+	yes "" | git mergetool -g file1 file1 &&
+	yes "" | git mergetool --gui file2 "spaced name" &&
+	yes "" | git mergetool --gui subdir/file3 &&
+	yes "d" | git mergetool --gui file11 &&
+	yes "d" | git mergetool --gui file12 &&
+	yes "l" | git mergetool --gui submod &&
+	echo "gui master updated" >expect &&
+	test_cmp expect file1 &&
+	echo "gui master new" >expect &&
+	test_cmp expect file2 &&
+	echo "gui master new sub" >expect &&
+	test_cmp expect subdir/file3 &&
+	echo "branch1 submodule" >expect &&
+	test_cmp expect submod/bar &&
+	git commit -m "branch1 resolved with mergetool"
+'
+
+test_expect_success 'gui mergetool without merge.guitool set falls back to merge.tool' '
+	test_when_finished "git reset --hard" &&
+	git checkout -b test$test_count branch1 &&
+	git submodule update -N &&
+	test_must_fail git merge master &&
+	yes "" | git mergetool --gui both &&
+	yes "" | git mergetool -g file1 file1 &&
+	yes "" | git mergetool --gui file2 "spaced name" &&
+	yes "" | git mergetool --gui subdir/file3 &&
+	yes "d" | git mergetool --gui file11 &&
+	yes "d" | git mergetool --gui file12 &&
+	yes "l" | git mergetool --gui submod &&
+	echo "master updated" >expect &&
+	test_cmp expect file1 &&
+	echo "master new" >expect &&
+	test_cmp expect file2 &&
+	echo "master new sub" >expect &&
+	test_cmp expect subdir/file3 &&
+	echo "branch1 submodule" >expect &&
+	test_cmp expect submod/bar &&
 	git commit -m "branch1 resolved with mergetool"
 '
 
@@ -153,20 +206,21 @@ test_expect_success 'mergetool crlf' '
 	# test_when_finished is LIFO.)
 	test_config core.autocrlf true &&
 	git checkout -b test$test_count branch1 &&
-	test_must_fail git merge master >/dev/null 2>&1 &&
-	( yes "" | git mergetool file1 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool file2 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool "spaced name" >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file12 >/dev/null 2>&1 ) &&
-	( yes "r" | git mergetool submod >/dev/null 2>&1 ) &&
+	test_must_fail git merge master &&
+	yes "" | git mergetool file1 &&
+	yes "" | git mergetool file2 &&
+	yes "" | git mergetool "spaced name" &&
+	yes "" | git mergetool both &&
+	yes "" | git mergetool subdir/file3 &&
+	yes "d" | git mergetool file11 &&
+	yes "d" | git mergetool file12 &&
+	yes "r" | git mergetool submod &&
 	test "$(printf x | cat file1 -)" = "$(printf "master updated\r\nx")" &&
 	test "$(printf x | cat file2 -)" = "$(printf "master new\r\nx")" &&
 	test "$(printf x | cat subdir/file3 -)" = "$(printf "master new sub\r\nx")" &&
 	git submodule update -N &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	git commit -m "branch1 resolved with mergetool - autocrlf"
 '
 
@@ -176,9 +230,10 @@ test_expect_success 'mergetool in subdir' '
 	git submodule update -N &&
 	(
 		cd subdir &&
-		test_must_fail git merge master >/dev/null 2>&1 &&
-		( yes "" | git mergetool file3 >/dev/null 2>&1 ) &&
-		test "$(cat file3)" = "master new sub"
+		test_must_fail git merge master &&
+		yes "" | git mergetool file3 &&
+		echo "master new sub" >expect &&
+		test_cmp expect file3
 	)
 '
 
@@ -188,17 +243,20 @@ test_expect_success 'mergetool on file in parent dir' '
 	git submodule update -N &&
 	(
 		cd subdir &&
-		test_must_fail git merge master >/dev/null 2>&1 &&
-		( yes "" | git mergetool file3 >/dev/null 2>&1 ) &&
-		( yes "" | git mergetool ../file1 >/dev/null 2>&1 ) &&
-		( yes "" | git mergetool ../file2 ../spaced\ name >/dev/null 2>&1 ) &&
-		( yes "" | git mergetool ../both >/dev/null 2>&1 ) &&
-		( yes "d" | git mergetool ../file11 >/dev/null 2>&1 ) &&
-		( yes "d" | git mergetool ../file12 >/dev/null 2>&1 ) &&
-		( yes "l" | git mergetool ../submod >/dev/null 2>&1 ) &&
-		test "$(cat ../file1)" = "master updated" &&
-		test "$(cat ../file2)" = "master new" &&
-		test "$(cat ../submod/bar)" = "branch1 submodule" &&
+		test_must_fail git merge master &&
+		yes "" | git mergetool file3 &&
+		yes "" | git mergetool ../file1 &&
+		yes "" | git mergetool ../file2 ../spaced\ name &&
+		yes "" | git mergetool ../both &&
+		yes "d" | git mergetool ../file11 &&
+		yes "d" | git mergetool ../file12 &&
+		yes "l" | git mergetool ../submod &&
+		echo "master updated" >expect &&
+		test_cmp expect ../file1 &&
+		echo "master new" >expect &&
+		test_cmp expect ../file2 &&
+		echo "branch1 submodule" >expect &&
+		test_cmp expect ../submod/bar &&
 		git commit -m "branch1 resolved with mergetool - subdir"
 	)
 '
@@ -209,9 +267,9 @@ test_expect_success 'mergetool skips autoresolved' '
 	git submodule update -N &&
 	test_must_fail git merge master &&
 	test -n "$(git ls-files -u)" &&
-	( yes "d" | git mergetool file11 >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file12 >/dev/null 2>&1 ) &&
-	( yes "l" | git mergetool submod >/dev/null 2>&1 ) &&
+	yes "d" | git mergetool file11 &&
+	yes "d" | git mergetool file12 &&
+	yes "l" | git mergetool submod &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging"
 '
@@ -223,13 +281,17 @@ test_expect_success 'mergetool merges all from subdir (rerere disabled)' '
 	(
 		cd subdir &&
 		test_must_fail git merge master &&
-		( yes "r" | git mergetool ../submod ) &&
-		( yes "d" "d" | git mergetool --no-prompt ) &&
-		test "$(cat ../file1)" = "master updated" &&
-		test "$(cat ../file2)" = "master new" &&
-		test "$(cat file3)" = "master new sub" &&
+		yes "r" | git mergetool ../submod &&
+		yes "d" "d" | git mergetool --no-prompt &&
+		echo "master updated" >expect &&
+		test_cmp expect ../file1 &&
+		echo "master new" >expect &&
+		test_cmp expect ../file2 &&
+		echo "master new sub" >expect &&
+		test_cmp expect file3 &&
 		( cd .. && git submodule update -N ) &&
-		test "$(cat ../submod/bar)" = "master submodule" &&
+		echo "master submodule" >expect &&
+		test_cmp expect ../submod/bar &&
 		git commit -m "branch2 resolved by mergetool from subdir"
 	)
 '
@@ -242,13 +304,17 @@ test_expect_success 'mergetool merges all from subdir (rerere enabled)' '
 	(
 		cd subdir &&
 		test_must_fail git merge master &&
-		( yes "r" | git mergetool ../submod ) &&
-		( yes "d" "d" | git mergetool --no-prompt ) &&
-		test "$(cat ../file1)" = "master updated" &&
-		test "$(cat ../file2)" = "master new" &&
-		test "$(cat file3)" = "master new sub" &&
+		yes "r" | git mergetool ../submod &&
+		yes "d" "d" | git mergetool --no-prompt &&
+		echo "master updated" >expect &&
+		test_cmp expect ../file1 &&
+		echo "master new" >expect &&
+		test_cmp expect ../file2 &&
+		echo "master new sub" >expect &&
+		test_cmp expect file3 &&
 		( cd .. && git submodule update -N ) &&
-		test "$(cat ../submod/bar)" = "master submodule" &&
+		echo "master submodule" >expect &&
+		test_cmp expect ../submod/bar &&
 		git commit -m "branch2 resolved by mergetool from subdir"
 	)
 '
@@ -259,9 +325,9 @@ test_expect_success 'mergetool skips resolved paths when rerere is active' '
 	rm -rf .git/rr-cache &&
 	git checkout -b test$test_count branch1 &&
 	git submodule update -N &&
-	test_must_fail git merge master >/dev/null 2>&1 &&
-	( yes "l" | git mergetool --no-prompt submod >/dev/null 2>&1 ) &&
-	( yes "d" "d" | git mergetool --no-prompt >/dev/null 2>&1 ) &&
+	test_must_fail git merge master &&
+	yes "l" | git mergetool --no-prompt submod &&
+	yes "d" "d" | git mergetool --no-prompt &&
 	git submodule update -N &&
 	output="$(yes "n" | git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging"
@@ -302,9 +368,10 @@ test_expect_success 'mergetool takes partial path' '
 	git submodule update -N &&
 	test_must_fail git merge master &&
 
-	( yes "" | git mergetool subdir ) &&
+	yes "" | git mergetool subdir &&
 
-	test "$(cat subdir/file3)" = "master new sub"
+	echo "master new sub" >expect &&
+	test_cmp expect subdir/file3
 '
 
 test_expect_success 'mergetool delete/delete conflict' '
@@ -369,14 +436,16 @@ test_expect_success 'deleted vs modified submodule' '
 	git checkout -b test$test_count.a test$test_count &&
 	test_must_fail git merge master &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "r" | git mergetool submod ) &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "r" | git mergetool submod &&
 	rmdir submod && mv submod-movedaside submod &&
-	test "$(cat submod/bar)" = "branch1 submodule" &&
+	echo "branch1 submodule" >expect &&
+	test_cmp expect submod/bar &&
 	git submodule update -N &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging" &&
 	git commit -m "Merge resolved by keeping module" &&
@@ -386,10 +455,10 @@ test_expect_success 'deleted vs modified submodule' '
 	git submodule update -N &&
 	test_must_fail git merge master &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "l" | git mergetool submod ) &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "l" | git mergetool submod &&
 	test ! -e submod &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging" &&
@@ -400,10 +469,10 @@ test_expect_success 'deleted vs modified submodule' '
 	git submodule update -N &&
 	test_must_fail git merge test$test_count &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "r" | git mergetool submod ) &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "r" | git mergetool submod &&
 	test ! -e submod &&
 	test -d submod.orig &&
 	git submodule update -N &&
@@ -416,13 +485,15 @@ test_expect_success 'deleted vs modified submodule' '
 	git submodule update -N &&
 	test_must_fail git merge test$test_count &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "l" | git mergetool submod ) &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "l" | git mergetool submod &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	git submodule update -N &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging" &&
 	git commit -m "Merge resolved by keeping module"
@@ -440,14 +511,16 @@ test_expect_success 'file vs modified submodule' '
 	git checkout -b test$test_count.a branch1 &&
 	test_must_fail git merge master &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "r" | git mergetool submod ) &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "r" | git mergetool submod &&
 	rmdir submod && mv submod-movedaside submod &&
-	test "$(cat submod/bar)" = "branch1 submodule" &&
+	echo "branch1 submodule" >expect &&
+	test_cmp expect submod/bar &&
 	git submodule update -N &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging" &&
 	git commit -m "Merge resolved by keeping module" &&
@@ -456,12 +529,13 @@ test_expect_success 'file vs modified submodule' '
 	git checkout -b test$test_count.b test$test_count &&
 	test_must_fail git merge master &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "l" | git mergetool submod ) &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "l" | git mergetool submod &&
 	git submodule update -N &&
-	test "$(cat submod)" = "not a submodule" &&
+	echo "not a submodule" >expect &&
+	test_cmp expect submod &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging" &&
 	git commit -m "Merge resolved by keeping file" &&
@@ -472,13 +546,14 @@ test_expect_success 'file vs modified submodule' '
 	git submodule update -N &&
 	test_must_fail git merge test$test_count &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both >/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "r" | git mergetool submod ) &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "r" | git mergetool submod &&
 	test -d submod.orig &&
 	git submodule update -N &&
-	test "$(cat submod)" = "not a submodule" &&
+	echo "not a submodule" >expect &&
+	test_cmp expect submod &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging" &&
 	git commit -m "Merge resolved by keeping file" &&
@@ -488,13 +563,15 @@ test_expect_success 'file vs modified submodule' '
 	git submodule update -N &&
 	test_must_fail git merge test$test_count &&
 	test -n "$(git ls-files -u)" &&
-	( yes "" | git mergetool file1 file2 spaced\ name subdir/file3 >/dev/null 2>&1 ) &&
-	( yes "" | git mergetool both>/dev/null 2>&1 ) &&
-	( yes "d" | git mergetool file11 file12 >/dev/null 2>&1 ) &&
-	( yes "l" | git mergetool submod ) &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	yes "" | git mergetool file1 file2 spaced\ name subdir/file3 &&
+	yes "" | git mergetool both &&
+	yes "d" | git mergetool file11 file12 &&
+	yes "l" | git mergetool submod &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	git submodule update -N &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	output="$(git mergetool --no-prompt)" &&
 	test "$output" = "No files need merging" &&
 	git commit -m "Merge resolved by keeping module"
@@ -543,22 +620,26 @@ test_expect_success 'submodule in subdirectory' '
 	git add subdir/subdir_module &&
 	git commit -m "change submodule in subdirectory on test$test_count.b" &&
 
-	test_must_fail git merge test$test_count.a >/dev/null 2>&1 &&
+	test_must_fail git merge test$test_count.a &&
 	(
 		cd subdir &&
-		( yes "l" | git mergetool subdir_module )
+		yes "l" | git mergetool subdir_module
 	) &&
-	test "$(cat subdir/subdir_module/file15)" = "test$test_count.b" &&
+	echo "test$test_count.b" >expect &&
+	test_cmp expect subdir/subdir_module/file15 &&
 	git submodule update -N &&
-	test "$(cat subdir/subdir_module/file15)" = "test$test_count.b" &&
+	echo "test$test_count.b" >expect &&
+	test_cmp expect subdir/subdir_module/file15 &&
 	git reset --hard &&
 	git submodule update -N &&
 
-	test_must_fail git merge test$test_count.a >/dev/null 2>&1 &&
-	( yes "r" | git mergetool subdir/subdir_module ) &&
-	test "$(cat subdir/subdir_module/file15)" = "test$test_count.b" &&
+	test_must_fail git merge test$test_count.a &&
+	yes "r" | git mergetool subdir/subdir_module &&
+	echo "test$test_count.b" >expect &&
+	test_cmp expect subdir/subdir_module/file15 &&
 	git submodule update -N &&
-	test "$(cat subdir/subdir_module/file15)" = "test$test_count.a" &&
+	echo "test$test_count.a" >expect &&
+	test_cmp expect subdir/subdir_module/file15 &&
 	git commit -m "branch1 resolved with mergetool"
 '
 
@@ -574,22 +655,25 @@ test_expect_success 'directory vs modified submodule' '
 
 	test_must_fail git merge master &&
 	test -n "$(git ls-files -u)" &&
-	( yes "l" | git mergetool submod ) &&
-	test "$(cat submod/file16)" = "not a submodule" &&
+	yes "l" | git mergetool submod &&
+	echo "not a submodule" >expect &&
+	test_cmp expect submod/file16 &&
 	rm -rf submod.orig &&
 
 	git reset --hard &&
 	test_must_fail git merge master &&
 	test -n "$(git ls-files -u)" &&
 	test ! -e submod.orig &&
-	( yes "r" | git mergetool submod ) &&
+	yes "r" | git mergetool submod &&
 	test -d submod.orig &&
-	test "$(cat submod.orig/file16)" = "not a submodule" &&
+	echo "not a submodule" >expect &&
+	test_cmp expect submod.orig/file16 &&
 	rm -r submod.orig &&
 	mv submod-movedaside/.git submod &&
 	( cd submod && git clean -f && git reset --hard ) &&
 	git submodule update -N &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 	git reset --hard &&
 	rm -rf submod-movedaside &&
 
@@ -597,17 +681,19 @@ test_expect_success 'directory vs modified submodule' '
 	git submodule update -N &&
 	test_must_fail git merge test$test_count &&
 	test -n "$(git ls-files -u)" &&
-	( yes "l" | git mergetool submod ) &&
+	yes "l" | git mergetool submod &&
 	git submodule update -N &&
-	test "$(cat submod/bar)" = "master submodule" &&
+	echo "master submodule" >expect &&
+	test_cmp expect submod/bar &&
 
 	git reset --hard &&
 	git submodule update -N &&
 	test_must_fail git merge test$test_count &&
 	test -n "$(git ls-files -u)" &&
 	test ! -e submod.orig &&
-	( yes "r" | git mergetool submod ) &&
-	test "$(cat submod/file16)" = "not a submodule" &&
+	yes "r" | git mergetool submod &&
+	echo "not a submodule" >expect &&
+	test_cmp expect submod/file16 &&
 
 	git reset --hard master &&
 	( cd submod && git clean -f && git reset --hard ) &&
@@ -641,7 +727,7 @@ test_expect_success 'filenames seen by tools start with ./' '
 	test_config mergetool.myecho.trustExitCode true &&
 	test_must_fail git merge master &&
 	git mergetool --no-prompt --tool myecho -- both >actual &&
-	grep ^\./both_LOCAL_ actual >/dev/null
+	grep ^\./both_LOCAL_ actual
 '
 
 test_lazy_prereq MKTEMP '
@@ -658,8 +744,8 @@ test_expect_success MKTEMP 'temporary filenames are used with mergetool.writeToT
 	test_config mergetool.myecho.trustExitCode true &&
 	test_must_fail git merge master &&
 	git mergetool --no-prompt --tool myecho -- both >actual &&
-	! grep ^\./both_LOCAL_ actual >/dev/null &&
-	grep /both_LOCAL_ actual >/dev/null
+	! grep ^\./both_LOCAL_ actual &&
+	grep /both_LOCAL_ actual
 '
 
 test_expect_success 'diff.orderFile configuration is honored' '

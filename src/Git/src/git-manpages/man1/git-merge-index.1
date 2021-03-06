@@ -2,12 +2,12 @@
 .\"     Title: git-merge-index
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GIT\-MERGE\-INDEX" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GIT\-MERGE\-INDEX" "1" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -75,14 +75,15 @@ Examples:
 .\}
 .nf
 torvalds@ppc970:~/merge\-test> git merge\-index cat MM
-This is MM from the original tree\&.                    # original
-This is modified MM in the branch A\&.                  # merge1
-This is modified MM in the branch B\&.                  # merge2
-This is modified MM in the branch B\&.                  # current contents
+This is MM from the original tree\&.              # original
+This is modified MM in the branch A\&.            # merge1
+This is modified MM in the branch B\&.            # merge2
+This is modified MM in the branch B\&.            # current contents
 .fi
 .if n \{\
 .RE
 .\}
+.sp
 .sp
 or
 .sp
@@ -100,6 +101,7 @@ fatal: merge program failed
 .if n \{\
 .RE
 .\}
+.sp
 .sp
 where the latter example shows how \fIgit merge\-index\fR will stop trying to merge once anything has returned an error (i\&.e\&., \fBcat\fR returned an error for the AA file, because it didn\(cqt exist in the original, and thus \fIgit merge\-index\fR didn\(cqt even try to merge the MM thing)\&.
 .SH "GIT"

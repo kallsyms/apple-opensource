@@ -346,4 +346,31 @@ test_expect_success UNTRACKED_CACHE 'ignore .git changes when invalidating UNTR'
 	test_cmp before after
 '
 
+test_expect_success 'discard_index() also discards fsmonitor info' '
+	test_config core.fsmonitor "$TEST_DIRECTORY/t7519/fsmonitor-all" &&
+	test_might_fail git update-index --refresh &&
+	test-tool read-cache --print-and-refresh=tracked 2 >actual &&
+	printf "tracked is%s up to date\n" "" " not" >expect &&
+	test_cmp expect actual
+'
+
+# Test unstaging entries that:
+#  - Are not flagged with CE_FSMONITOR_VALID
+#  - Have a position in the index >= the number of entries present in the index
+#    after unstaging.
+test_expect_success 'status succeeds after staging/unstaging' '
+	test_create_repo fsmonitor-stage-unstage &&
+	(
+		cd fsmonitor-stage-unstage &&
+		test_commit initial &&
+		git update-index --fsmonitor &&
+		removed=$(test_seq 1 100 | sed "s/^/z/") &&
+		touch $removed &&
+		git add $removed &&
+		git config core.fsmonitor "$TEST_DIRECTORY/t7519/fsmonitor-env" &&
+		FSMONITOR_LIST="$removed" git restore -S $removed &&
+		FSMONITOR_LIST="$removed" git status
+	)
+'
+
 test_done

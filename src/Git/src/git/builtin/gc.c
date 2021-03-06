@@ -27,6 +27,7 @@
 #include "pack-objects.h"
 #include "blob.h"
 #include "tree.h"
+#include "promisor-remote.h"
 
 #define FAILED_RUN "failed to run %s"
 
@@ -41,7 +42,6 @@ static int aggressive_depth = 50;
 static int aggressive_window = 250;
 static int gc_auto_threshold = 6700;
 static int gc_auto_pack_limit = 50;
-static int gc_write_commit_graph;
 static int detach_auto = 1;
 static timestamp_t gc_log_expire_time;
 static const char *gc_log_expire = "1.day.ago";
@@ -116,6 +116,19 @@ static void process_log_file_on_signal(int signo)
 	raise(signo);
 }
 
+static int gc_config_is_timestamp_never(const char *var)
+{
+	const char *value;
+	timestamp_t expire;
+
+	if (!git_config_get_value(var, &value) && value) {
+		if (parse_expiry_date(value, &expire))
+			die(_("failed to parse '%s' value '%s'"), var, value);
+		return expire == 0;
+	}
+	return 0;
+}
+
 static void gc_config(void)
 {
 	const char *value;
@@ -127,11 +140,14 @@ static void gc_config(void)
 			pack_refs = git_config_bool("gc.packrefs", value);
 	}
 
+	if (gc_config_is_timestamp_never("gc.reflogexpire") &&
+	    gc_config_is_timestamp_never("gc.reflogexpireunreachable"))
+		prune_reflogs = 0;
+
 	git_config_get_int("gc.aggressivewindow", &aggressive_window);
 	git_config_get_int("gc.aggressivedepth", &aggressive_depth);
 	git_config_get_int("gc.auto", &gc_auto_threshold);
 	git_config_get_int("gc.autopacklimit", &gc_auto_pack_limit);
-	git_config_get_bool("gc.writecommitgraph", &gc_write_commit_graph);
 	git_config_get_bool("gc.autodetach", &detach_auto);
 	git_config_get_expiry("gc.pruneexpire", &prune_expire);
 	git_config_get_expiry("gc.worktreepruneexpire", &prune_worktrees_expire);
@@ -156,9 +172,7 @@ static int too_many_loose_objects(void)
 	int auto_threshold;
 	int num_loose = 0;
 	int needed = 0;
-
-	if (gc_auto_threshold <= 0)
-		return 0;
+	const unsigned hexsz_loose = the_hash_algo->hexsz - 2;
 
 	dir = opendir(git_path("objects/17"));
 	if (!dir)
@@ -166,8 +180,8 @@ static int too_many_loose_objects(void)
 
 	auto_threshold = DIV_ROUND_UP(gc_auto_threshold, 256);
 	while ((ent = readdir(dir)) != NULL) {
-		if (strspn(ent->d_name, "0123456789abcdef") != 38 ||
-		    ent->d_name[38] != '\0')
+		if (strspn(ent->d_name, "0123456789abcdef") != hexsz_loose ||
+		    ent->d_name[hexsz_loose] != '\0')
 			continue;
 		if (++num_loose > auto_threshold) {
 			needed = 1;
@@ -491,14 +505,20 @@ done:
 
 static void gc_before_repack(void)
 {
+	/*
+	 * We may be called twice, as both the pre- and
+	 * post-daemonized phases will call us, but running these
+	 * commands more than once is pointless and wasteful.
+	 */
+	static int done = 0;
+	if (done++)
+		return;
+
 	if (pack_refs && run_command_v_opt(pack_refs_cmd.argv, RUN_GIT_CMD))
 		die(FAILED_RUN, pack_refs_cmd.argv[0]);
 
 	if (prune_reflogs && run_command_v_opt(reflog.argv, RUN_GIT_CMD))
 		die(FAILED_RUN, reflog.argv[0]);
-
-	pack_refs = 0;
-	prune_reflogs = 0;
 }
 
 int cmd_gc(int argc, const char **argv, const char *prefix)
@@ -632,7 +652,7 @@ int cmd_gc(int argc, const char **argv, const char *prefix)
 	gc_before_repack();
 
 	if (!repository_format_precious_objects) {
-		close_all_packs(the_repository->objects);
+		close_object_store(the_repository->objects);
 		if (run_command_v_opt(repack.argv, RUN_GIT_CMD))
 			die(FAILED_RUN, repack.argv[0]);
 
@@ -640,7 +660,7 @@ int cmd_gc(int argc, const char **argv, const char *prefix)
 			argv_array_push(&prune, prune_expire);
 			if (quiet)
 				argv_array_push(&prune, "--no-progress");
-			if (repository_format_partial_clone)
+			if (has_promisor_remote())
 				argv_array_push(&prune,
 						"--exclude-promisor-objects");
 			if (run_command_v_opt(prune.argv, RUN_GIT_CMD))
@@ -660,13 +680,15 @@ int cmd_gc(int argc, const char **argv, const char *prefix)
 	report_garbage = report_pack_garbage;
 	reprepare_packed_git(the_repository);
 	if (pack_garbage.nr > 0) {
-		close_all_packs(the_repository->objects);
+		close_object_store(the_repository->objects);
 		clean_pack_garbage();
 	}
 
-	if (gc_write_commit_graph)
-		write_commit_graph_reachable(get_object_directory(), 0,
-					     !quiet && !daemonized);
+	prepare_repo_settings(the_repository);
+	if (the_repository->settings.gc_write_commit_graph == 1)
+		write_commit_graph_reachable(get_object_directory(),
+					     !quiet && !daemonized ? COMMIT_GRAPH_WRITE_PROGRESS : 0,
+					     NULL);
 
 	if (auto_gc && too_many_loose_objects())
 		warning(_("There are too many unreachable loose objects; "

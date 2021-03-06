@@ -48,6 +48,26 @@ test_expect_success 'rev-list --objects with pathspecs and copied files' '
 	! grep one output
 '
 
+test_expect_success 'rev-list --objects --no-object-names has no space/names' '
+	git rev-list --objects --no-object-names HEAD >output &&
+	! grep wanted_file output &&
+	! grep unwanted_file output &&
+	! grep " " output
+'
+
+test_expect_success 'rev-list --objects --no-object-names works with cat-file' '
+	git rev-list --objects --no-object-names --all >list-output &&
+	git cat-file --batch-check <list-output >cat-output &&
+	! grep missing cat-output
+'
+
+test_expect_success '--no-object-names and --object-names are last-one-wins' '
+	git rev-list --objects --no-object-names --object-names --all >output &&
+	grep wanted_file output &&
+	git rev-list --objects --object-names --no-object-names --all >output &&
+	! grep wanted_file output
+'
+
 test_expect_success 'rev-list A..B and rev-list ^A B are the same' '
 	git commit --allow-empty -m another &&
 	git tag -a -m "annotated" v1.0 &&
@@ -117,6 +137,14 @@ test_expect_success '--header shows a NUL after each commit' '
 	Q$(git rev-parse HEAD~1)
 	Q
 	EOF
+	test_cmp expect actual
+'
+
+test_expect_success 'rev-list --end-of-options' '
+	git update-ref refs/heads/--output=yikes HEAD &&
+	git rev-list --end-of-options --output=yikes >actual &&
+	test_path_is_missing yikes &&
+	git rev-list HEAD >expect &&
 	test_cmp expect actual
 '
 

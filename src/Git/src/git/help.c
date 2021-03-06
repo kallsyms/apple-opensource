@@ -375,13 +375,6 @@ void list_cmds_by_config(struct string_list *list)
 {
 	const char *cmd_list;
 
-	/*
-	 * There's no actual repository setup at this point (and even
-	 * if there is, we don't really care; only global config
-	 * matters). If we accidentally set up a repository, it's ok
-	 * too since the caller (git --list-cmds=) should exit shortly
-	 * anyway.
-	 */
 	if (git_config_get_string_const("completion.commands", &cmd_list))
 		return;
 
@@ -393,8 +386,8 @@ void list_cmds_by_config(struct string_list *list)
 		const char *p = strchrnul(cmd_list, ' ');
 
 		strbuf_add(&sb, cmd_list, p - cmd_list);
-		if (*cmd_list == '-')
-			string_list_remove(list, cmd_list + 1, 0);
+		if (sb.buf[0] == '-')
+			string_list_remove(list, sb.buf + 1, 0);
 		else
 			string_list_insert(list, sb.buf);
 		strbuf_release(&sb);
@@ -761,19 +754,19 @@ static int append_similar_ref(const char *refname, const struct object_id *oid,
 {
 	struct similar_ref_cb *cb = (struct similar_ref_cb *)(cb_data);
 	char *branch = strrchr(refname, '/') + 1;
-	const char *remote;
 
 	/* A remote branch of the same name is deemed similar */
-	if (skip_prefix(refname, "refs/remotes/", &remote) &&
+	if (starts_with(refname, "refs/remotes/") &&
 	    !strcmp(branch, cb->base_ref))
-		string_list_append(cb->similar_refs, remote);
+		string_list_append_nodup(cb->similar_refs,
+					 shorten_unambiguous_ref(refname, 1));
 	return 0;
 }
 
 static struct string_list guess_refs(const char *ref)
 {
 	struct similar_ref_cb ref_cb;
-	struct string_list similar_refs = STRING_LIST_INIT_NODUP;
+	struct string_list similar_refs = STRING_LIST_INIT_DUP;
 
 	ref_cb.base_ref = ref;
 	ref_cb.similar_refs = &similar_refs;
@@ -781,7 +774,8 @@ static struct string_list guess_refs(const char *ref)
 	return similar_refs;
 }
 
-void help_unknown_ref(const char *ref, const char *cmd, const char *error)
+NORETURN void help_unknown_ref(const char *ref, const char *cmd,
+			       const char *error)
 {
 	int i;
 	struct string_list suggested_refs = guess_refs(ref);

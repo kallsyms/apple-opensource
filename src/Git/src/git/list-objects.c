@@ -18,8 +18,7 @@ struct traversal_context {
 	show_object_fn show_object;
 	show_commit_fn show_commit;
 	void *show_data;
-	filter_object_fn filter_fn;
-	void *filter_data;
+	struct filter *filter;
 };
 
 static void process_blob(struct traversal_context *ctx,
@@ -29,7 +28,7 @@ static void process_blob(struct traversal_context *ctx,
 {
 	struct object *obj = &blob->object;
 	size_t pathlen;
-	enum list_objects_filter_result r = LOFR_MARK_SEEN | LOFR_DO_SHOW;
+	enum list_objects_filter_result r;
 
 	if (!ctx->revs->blob_objects)
 		return;
@@ -54,11 +53,10 @@ static void process_blob(struct traversal_context *ctx,
 
 	pathlen = path->len;
 	strbuf_addstr(path, name);
-	if ((obj->flags & NOT_USER_GIVEN) && ctx->filter_fn)
-		r = ctx->filter_fn(ctx->revs->repo,
-				   LOFS_BLOB, obj,
-				   path->buf, &path->buf[pathlen],
-				   ctx->filter_data);
+	r = list_objects_filter__filter_object(ctx->revs->repo,
+					       LOFS_BLOB, obj,
+					       path->buf, &path->buf[pathlen],
+					       ctx->filter);
 	if (r & LOFR_MARK_SEEN)
 		obj->flags |= SEEN;
 	if (r & LOFR_DO_SHOW)
@@ -125,6 +123,11 @@ static void process_tree_contents(struct traversal_context *ctx,
 
 		if (S_ISDIR(entry.mode)) {
 			struct tree *t = lookup_tree(ctx->revs->repo, &entry.oid);
+			if (!t) {
+				die(_("entry '%s' in tree %s has tree mode, "
+				      "but is not a tree"),
+				    entry.path, oid_to_hex(&tree->object.oid));
+			}
 			t->object.flags |= NOT_USER_GIVEN;
 			process_tree(ctx, t, base, entry.path);
 		}
@@ -133,6 +136,11 @@ static void process_tree_contents(struct traversal_context *ctx,
 					base, entry.path);
 		else {
 			struct blob *b = lookup_blob(ctx->revs->repo, &entry.oid);
+			if (!b) {
+				die(_("entry '%s' in tree %s has blob mode, "
+				      "but is not a blob"),
+				    entry.path, oid_to_hex(&tree->object.oid));
+			}
 			b->object.flags |= NOT_USER_GIVEN;
 			process_blob(ctx, b, base, entry.path);
 		}
@@ -147,7 +155,7 @@ static void process_tree(struct traversal_context *ctx,
 	struct object *obj = &tree->object;
 	struct rev_info *revs = ctx->revs;
 	int baselen = base->len;
-	enum list_objects_filter_result r = LOFR_MARK_SEEN | LOFR_DO_SHOW;
+	enum list_objects_filter_result r;
 	int failed_parse;
 
 	if (!revs->tree_objects)
@@ -176,11 +184,10 @@ static void process_tree(struct traversal_context *ctx,
 	}
 
 	strbuf_addstr(base, name);
-	if ((obj->flags & NOT_USER_GIVEN) && ctx->filter_fn)
-		r = ctx->filter_fn(ctx->revs->repo,
-				   LOFS_BEGIN_TREE, obj,
-				   base->buf, &base->buf[baselen],
-				   ctx->filter_data);
+	r = list_objects_filter__filter_object(ctx->revs->repo,
+					       LOFS_BEGIN_TREE, obj,
+					       base->buf, &base->buf[baselen],
+					       ctx->filter);
 	if (r & LOFR_MARK_SEEN)
 		obj->flags |= SEEN;
 	if (r & LOFR_DO_SHOW)
@@ -193,16 +200,14 @@ static void process_tree(struct traversal_context *ctx,
 	else if (!failed_parse)
 		process_tree_contents(ctx, tree, base);
 
-	if ((obj->flags & NOT_USER_GIVEN) && ctx->filter_fn) {
-		r = ctx->filter_fn(ctx->revs->repo,
-				   LOFS_END_TREE, obj,
-				   base->buf, &base->buf[baselen],
-				   ctx->filter_data);
-		if (r & LOFR_MARK_SEEN)
-			obj->flags |= SEEN;
-		if (r & LOFR_DO_SHOW)
-			ctx->show_object(obj, base->buf, ctx->show_data);
-	}
+	r = list_objects_filter__filter_object(ctx->revs->repo,
+					       LOFS_END_TREE, obj,
+					       base->buf, &base->buf[baselen],
+					       ctx->filter);
+	if (r & LOFR_MARK_SEEN)
+		obj->flags |= SEEN;
+	if (r & LOFR_DO_SHOW)
+		ctx->show_object(obj, base->buf, ctx->show_data);
 
 	strbuf_setlen(base, baselen);
 	free_tree_buffer(tree);
@@ -360,10 +365,15 @@ static void do_traverse(struct traversal_context *ctx)
 		 * an uninteresting boundary commit may not have its tree
 		 * parsed yet, but we are not going to show them anyway
 		 */
-		if (get_commit_tree(commit)) {
+		if (!ctx->revs->tree_objects)
+			; /* do not bother loading tree */
+		else if (get_commit_tree(commit)) {
 			struct tree *tree = get_commit_tree(commit);
 			tree->object.flags |= NOT_USER_GIVEN;
 			add_pending_tree(ctx->revs, tree);
+		} else if (commit->object.parsed) {
+			die(_("unable to load root tree for commit %s"),
+			      oid_to_hex(&commit->object.oid));
 		}
 		ctx->show_commit(commit, ctx->show_data);
 
@@ -389,8 +399,7 @@ void traverse_commit_list(struct rev_info *revs,
 	ctx.show_commit = show_commit;
 	ctx.show_object = show_object;
 	ctx.show_data = show_data;
-	ctx.filter_fn = NULL;
-	ctx.filter_data = NULL;
+	ctx.filter = NULL;
 	do_traverse(&ctx);
 }
 
@@ -403,17 +412,12 @@ void traverse_commit_list_filtered(
 	struct oidset *omitted)
 {
 	struct traversal_context ctx;
-	filter_free_fn filter_free_fn = NULL;
 
 	ctx.revs = revs;
 	ctx.show_object = show_object;
 	ctx.show_commit = show_commit;
 	ctx.show_data = show_data;
-	ctx.filter_fn = NULL;
-
-	ctx.filter_data = list_objects_filter__init(omitted, filter_options,
-						    &ctx.filter_fn, &filter_free_fn);
+	ctx.filter = list_objects_filter__init(omitted, filter_options);
 	do_traverse(&ctx);
-	if (ctx.filter_data && filter_free_fn)
-		filter_free_fn(ctx.filter_data);
+	list_objects_filter__free(ctx.filter);
 }

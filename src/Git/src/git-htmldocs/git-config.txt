@@ -126,7 +126,7 @@ See also <<FILES>>.
 
 --local::
 	For writing options: write to the repository `.git/config` file.
-	This is	the default behavior.
+	This is the default behavior.
 +
 For reading options: read only from the repository `.git/config` rather than
 from all available files.
@@ -240,7 +240,9 @@ Valid `<type>`'s include:
 	output.  The optional `default` parameter is used instead, if
 	there is no color configured for `name`.
 +
-`--type=color [--default=<default>]` is preferred over `--get-color`.
+`--type=color [--default=<default>]` is preferred over `--get-color`
+(but note that `--get-color` will omit the trailing newline printed by
+`--type=color`).
 
 -e::
 --edit::
@@ -337,33 +339,35 @@ EXAMPLES
 
 Given a .git/config like this:
 
-	#
-	# This is the config file, and
-	# a '#' or ';' character indicates
-	# a comment
-	#
+------------
+#
+# This is the config file, and
+# a '#' or ';' character indicates
+# a comment
+#
 
-	; core variables
-	[core]
-		; Don't trust file modes
-		filemode = false
+; core variables
+[core]
+	; Don't trust file modes
+	filemode = false
 
-	; Our diff algorithm
-	[diff]
-		external = /usr/local/bin/diff-wrapper
-		renames = true
+; Our diff algorithm
+[diff]
+	external = /usr/local/bin/diff-wrapper
+	renames = true
 
-	; Proxy settings
-	[core]
-		gitproxy=proxy-command for kernel.org
-		gitproxy=default-proxy ; for all the rest
+; Proxy settings
+[core]
+	gitproxy=proxy-command for kernel.org
+	gitproxy=default-proxy ; for all the rest
 
-	; HTTP
-	[http]
-		sslVerify
-	[http "https://weak.example.com"]
-		sslVerify = false
-		cookieFile = /tmp/cookie.txt
+; HTTP
+[http]
+	sslVerify
+[http "https://weak.example.com"]
+	sslVerify = false
+	cookieFile = /tmp/cookie.txt
+------------
 
 you can set the filemode to true with
 

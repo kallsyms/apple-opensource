@@ -12,7 +12,7 @@ case "$jobname" in
 linux-clang|linux-gcc)
 	sudo apt-add-repository -y "ppa:ubuntu-toolchain-r/test"
 	sudo apt-get -q update
-	sudo apt-get -q -y install language-pack-is git-svn apache2
+	sudo apt-get -q -y install language-pack-is libsvn-perl apache2
 	case "$jobname" in
 	linux-gcc)
 		sudo apt-get -q -y install gcc-8
@@ -34,26 +34,36 @@ linux-clang|linux-gcc)
 	popd
 	;;
 osx-clang|osx-gcc)
-	brew update >/dev/null
+	export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
 	# Uncomment this if you want to run perf tests:
 	# brew install gnu-time
 	test -z "$BREW_INSTALL_PACKAGES" ||
 	brew install $BREW_INSTALL_PACKAGES
 	brew link --force gettext
+	brew cask install perforce || {
+		# Update the definitions and try again
+		git -C "$(brew --repository)"/Library/Taps/homebrew/homebrew-cask pull &&
+		brew cask install perforce
+	} ||
 	brew install caskroom/cask/perforce
 	case "$jobname" in
 	osx-gcc)
+		brew link gcc ||
 		brew link gcc@8
 		;;
 	esac
 	;;
 StaticAnalysis)
 	sudo apt-get -q update
-	sudo apt-get -q -y install coccinelle
+	sudo apt-get -q -y install coccinelle libcurl4-openssl-dev libssl-dev \
+		libexpat-dev gettext
 	;;
 Documentation)
 	sudo apt-get -q update
-	sudo apt-get -q -y install asciidoc xmlto
+	sudo apt-get -q -y install asciidoc xmlto docbook-xsl-ns
+
+	test -n "$ALREADY_HAVE_ASCIIDOCTOR" ||
+	gem install --version 1.5.8 asciidoctor
 	;;
 esac
 

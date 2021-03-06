@@ -119,33 +119,33 @@ do
 		test_cmp expected actual
 	'
 
-	test_expect_success "grep -w $L (with --column, --invert)" '
+	test_expect_success "grep -w $L (with --column, --invert-match)" '
 		{
 			echo ${HC}file:1:foo mmap bar
 			echo ${HC}file:1:foo_mmap bar
 			echo ${HC}file:1:foo_mmap bar mmap
 			echo ${HC}file:1:foo mmap bar_mmap
 		} >expected &&
-		git grep --column --invert -w -e baz $H -- file >actual &&
+		git grep --column --invert-match -w -e baz $H -- file >actual &&
 		test_cmp expected actual
 	'
 
-	test_expect_success "grep $L (with --column, --invert, extended OR)" '
+	test_expect_success "grep $L (with --column, --invert-match, extended OR)" '
 		{
 			echo ${HC}hello_world:6:HeLLo_world
 		} >expected &&
-		git grep --column --invert -e ll --or --not -e _ $H -- hello_world \
+		git grep --column --invert-match -e ll --or --not -e _ $H -- hello_world \
 			>actual &&
 		test_cmp expected actual
 	'
 
-	test_expect_success "grep $L (with --column, --invert, extended AND)" '
+	test_expect_success "grep $L (with --column, --invert-match, extended AND)" '
 		{
 			echo ${HC}hello_world:3:Hello world
 			echo ${HC}hello_world:3:Hello_world
 			echo ${HC}hello_world:6:HeLLo_world
 		} >expected &&
-		git grep --column --invert --not -e _ --and --not -e ll $H -- hello_world \
+		git grep --column --invert-match --not -e _ --and --not -e ll $H -- hello_world \
 			>actual &&
 		test_cmp expected actual
 	'
@@ -412,7 +412,7 @@ do
 		test_cmp expected actual
 	'
 
-	test_expect_success !PCRE "grep $L with grep.patterntype=perl errors without PCRE" '
+	test_expect_success !FAIL_PREREQS,!PCRE "grep $L with grep.patterntype=perl errors without PCRE" '
 		test_must_fail git -c grep.patterntype=perl grep "foo.*bar"
 	'
 
@@ -1010,7 +1010,7 @@ test_expect_success 'outside of git repository' '
 			echo ".gitignore:.*o*" &&
 			cat ../expect.full
 		} >../expect.with.ignored &&
-		git grep --no-index --no-exclude o >../actual.full &&
+		git grep --no-index --no-exclude-standard o >../actual.full &&
 		test_cmp ../expect.with.ignored ../actual.full
 	)
 '
@@ -1051,7 +1051,7 @@ test_expect_success 'outside of git repository with fallbackToNoIndex' '
 			echo ".gitignore:.*o*" &&
 			cat ../expect.full
 		} >../expect.with.ignored &&
-		git -c grep.fallbackToNoIndex grep --no-exclude o >../actual.full &&
+		git -c grep.fallbackToNoIndex grep --no-exclude-standard o >../actual.full &&
 		test_cmp ../expect.with.ignored ../actual.full
 	)
 '
@@ -1234,7 +1234,7 @@ test_expect_success PCRE 'grep --perl-regexp pattern' '
 	test_cmp expected actual
 '
 
-test_expect_success !PCRE 'grep --perl-regexp pattern errors without PCRE' '
+test_expect_success !FAIL_PREREQS,!PCRE 'grep --perl-regexp pattern errors without PCRE' '
 	test_must_fail git grep --perl-regexp "foo.*bar"
 '
 
@@ -1249,7 +1249,7 @@ test_expect_success LIBPCRE2 "grep -P with (*NO_JIT) doesn't error out" '
 
 '
 
-test_expect_success !PCRE 'grep -P pattern errors without PCRE' '
+test_expect_success !FAIL_PREREQS,!PCRE 'grep -P pattern errors without PCRE' '
 	test_must_fail git grep -P "foo.*bar"
 '
 

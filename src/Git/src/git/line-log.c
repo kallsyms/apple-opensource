@@ -496,12 +496,13 @@ static struct commit *check_single_commit(struct rev_info *revs)
 	return (struct commit *) commit;
 }
 
-static void fill_blob_sha1(struct commit *commit, struct diff_filespec *spec)
+static void fill_blob_sha1(struct repository *r, struct commit *commit,
+			   struct diff_filespec *spec)
 {
-	unsigned mode;
+	unsigned short mode;
 	struct object_id oid;
 
-	if (get_tree_entry(&commit->object.oid, spec->path, &oid, &mode))
+	if (get_tree_entry(r, &commit->object.oid, spec->path, &oid, &mode))
 		die("There is no path %s in the commit", spec->path);
 	fill_filespec(spec, &oid, 1, mode);
 
@@ -585,7 +586,7 @@ parse_lines(struct repository *r, struct commit *commit,
 					name_part);
 
 		spec = alloc_filespec(full_name);
-		fill_blob_sha1(commit, spec);
+		fill_blob_sha1(r, commit, spec);
 		fill_line_ends(r, spec, &lines, &ends);
 		cb_data.spec = spec;
 		cb_data.lines = lines;
@@ -736,6 +737,38 @@ static struct line_log_data *lookup_line_range(struct rev_info *revs,
 	return ret;
 }
 
+static int same_paths_in_pathspec_and_range(struct pathspec *pathspec,
+					    struct line_log_data *range)
+{
+	int i;
+	struct line_log_data *r;
+
+	for (i = 0, r = range; i < pathspec->nr && r; i++, r = r->next)
+		if (strcmp(pathspec->items[i].match, r->path))
+			return 0;
+	if (i < pathspec->nr || r)
+		/* different number of pathspec items and ranges */
+		return 0;
+
+	return 1;
+}
+
+static void parse_pathspec_from_ranges(struct pathspec *pathspec,
+				       struct line_log_data *range)
+{
+	struct line_log_data *r;
+	struct argv_array array = ARGV_ARRAY_INIT;
+	const char **paths;
+
+	for (r = range; r; r = r->next)
+		argv_array_push(&array, r->path);
+	paths = argv_array_detach(&array);
+
+	parse_pathspec(pathspec, 0, PATHSPEC_PREFER_FULL, "", paths);
+	/* strings are now owned by pathspec */
+	free(paths);
+}
+
 void line_log_init(struct rev_info *rev, const char *prefix, struct string_list *args)
 {
 	struct commit *commit = NULL;
@@ -745,20 +778,7 @@ void line_log_init(struct rev_info *rev, const char *prefix, struct string_list 
 	range = parse_lines(rev->diffopt.repo, commit, prefix, args);
 	add_line_range(rev, commit, range);
 
-	if (!rev->diffopt.detect_rename) {
-		struct line_log_data *r;
-		struct argv_array array = ARGV_ARRAY_INIT;
-		const char **paths;
-
-		for (r = range; r; r = r->next)
-			argv_array_push(&array, r->path);
-		paths = argv_array_detach(&array);
-
-		parse_pathspec(&rev->diffopt.pathspec, 0,
-			       PATHSPEC_PREFER_FULL, "", paths);
-		/* strings are now owned by pathspec */
-		free(paths);
-	}
+	parse_pathspec_from_ranges(&rev->diffopt.pathspec, range);
 }
 
 static void move_diff_queue(struct diff_queue_struct *dst,
@@ -816,15 +836,29 @@ static void queue_diffs(struct line_log_data *range,
 			struct diff_queue_struct *queue,
 			struct commit *commit, struct commit *parent)
 {
+	struct object_id *tree_oid, *parent_tree_oid;
+
 	assert(commit);
 
+	tree_oid = get_commit_tree_oid(commit);
+	parent_tree_oid = parent ? get_commit_tree_oid(parent) : NULL;
+
+	if (opt->detect_rename &&
+	    !same_paths_in_pathspec_and_range(&opt->pathspec, range)) {
+		clear_pathspec(&opt->pathspec);
+		parse_pathspec_from_ranges(&opt->pathspec, range);
+	}
 	DIFF_QUEUE_CLEAR(&diff_queued_diff);
-	diff_tree_oid(parent ? get_commit_tree_oid(parent) : NULL,
-		      get_commit_tree_oid(commit), "", opt);
-	if (opt->detect_rename) {
+	diff_tree_oid(parent_tree_oid, tree_oid, "", opt);
+	if (opt->detect_rename && diff_might_be_rename()) {
+		/* must look at the full tree diff to detect renames */
+		clear_pathspec(&opt->pathspec);
+		DIFF_QUEUE_CLEAR(&diff_queued_diff);
+
+		diff_tree_oid(parent_tree_oid, tree_oid, "", opt);
+
 		filter_diffs_for_paths(range, 1);
-		if (diff_might_be_rename())
-			diffcore_std(opt);
+		diffcore_std(opt);
 		filter_diffs_for_paths(range, 0);
 	}
 	move_diff_queue(queue, &diff_queued_diff);
@@ -1103,10 +1137,12 @@ static int process_all_files(struct line_log_data **range_out,
 
 int line_log_print(struct rev_info *rev, struct commit *commit)
 {
-	struct line_log_data *range = lookup_line_range(rev, commit);
 
 	show_log(rev);
-	dump_diff_hacky(rev, range);
+	if (!(rev->diffopt.output_format & DIFF_FORMAT_NO_OUTPUT)) {
+		struct line_log_data *range = lookup_line_range(rev, commit);
+		dump_diff_hacky(rev, range);
+	}
 	return 1;
 }
 

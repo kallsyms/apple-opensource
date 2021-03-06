@@ -452,6 +452,34 @@ test_expect_success 'merge-recursive d/f conflict result' '
 
 '
 
+test_expect_success SYMLINKS 'dir in working tree with symlink ancestor does not produce d/f conflict' '
+	git init sym &&
+	(
+		cd sym &&
+		ln -s . foo &&
+		mkdir bar &&
+		>bar/file &&
+		git add foo bar/file &&
+		git commit -m "foo symlink" &&
+
+		git checkout -b branch1 &&
+		git commit --allow-empty -m "empty commit" &&
+
+		git checkout master &&
+		git rm foo &&
+		mkdir foo &&
+		>foo/bar &&
+		git add foo/bar &&
+		git commit -m "replace foo symlink with real foo dir and foo/bar file" &&
+
+		git checkout branch1 &&
+
+		git cherry-pick master &&
+		test_path_is_dir foo &&
+		test_path_is_file foo/bar
+	)
+'
+
 test_expect_success 'reset and 3-way merge' '
 
 	git reset --hard "$c2" &&
@@ -667,14 +695,21 @@ test_expect_success 'merging with triple rename across D/F conflict' '
 test_expect_success 'merge-recursive remembers the names of all base trees' '
 	git reset --hard HEAD &&
 
+	# make the index match $c1 so that merge-recursive below does not
+	# fail early
+	git diff --binary HEAD $c1 -- | git apply --cached &&
+
 	# more trees than static slots used by oid_to_hex()
 	for commit in $c0 $c2 $c4 $c5 $c6 $c7
 	do
 		git rev-parse "$commit^{tree}"
 	done >trees &&
 
-	# ignore the return code -- it only fails because the input is weird
+	# ignore the return code; it only fails because the input is weird...
 	test_must_fail git -c merge.verbosity=5 merge-recursive $(cat trees) -- $c1 $c3 >out &&
+
+	# ...but make sure it fails in the expected way
+	test_i18ngrep CONFLICT.*rename/rename out &&
 
 	# merge-recursive prints in reverse order, but we do not care
 	sort <trees >expect &&

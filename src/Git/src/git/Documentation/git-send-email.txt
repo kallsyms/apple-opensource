@@ -278,6 +278,14 @@ must be used for each option.
 Automating
 ~~~~~~~~~~
 
+--no-[to|cc|bcc]::
+	Clears any list of "To:", "Cc:", "Bcc:" addresses previously
+	set via config.
+
+--no-identity::
+	Clears the previously read value of `sendemail.identity` set
+	via config, if any.
+
 --to-cmd=<command>::
 	Specify a command to execute once per patch file which
 	should generate patch file specific "To:" entries.
@@ -478,11 +486,13 @@ Use gmail as the smtp server
 To use 'git send-email' to send your patches through the GMail SMTP server,
 edit ~/.gitconfig to specify your account settings:
 
-	[sendemail]
-		smtpEncryption = tls
-		smtpServer = smtp.gmail.com
-		smtpUser = yourname@gmail.com
-		smtpServerPort = 587
+----
+[sendemail]
+	smtpEncryption = tls
+	smtpServer = smtp.gmail.com
+	smtpUser = yourname@gmail.com
+	smtpServerPort = 587
+----
 
 If you have multifactor authentication setup on your gmail account, you will
 need to generate an app-specific password for use with 'git send-email'. Visit
@@ -500,8 +510,12 @@ app-specific or your regular password as appropriate.  If you have credential
 helper configured (see linkgit:git-credential[1]), the password will be saved in
 the credential store so you won't have to type it the next time.
 
-Note: the following perl modules are required
-      Net::SMTP::SSL, MIME::Base64 and Authen::SASL
+Note: the following core Perl modules that may be installed with your
+distribution of Perl are required:
+MIME::Base64, MIME::QuotedPrint, Net::Domain and Net::SMTP.
+These additional Perl modules are also required:
+Authen::SASL and Mail::Address.
+
 
 SEE ALSO
 --------

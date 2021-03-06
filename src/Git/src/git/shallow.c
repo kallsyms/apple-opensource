@@ -12,10 +12,7 @@
 #include "diff.h"
 #include "revision.h"
 #include "commit-slab.h"
-#include "revision.h"
 #include "list-objects.h"
-#include "commit-slab.h"
-#include "repository.h"
 #include "commit-reach.h"
 
 void set_alternate_shallow_file(struct repository *r, const char *path, int override)
@@ -156,6 +153,8 @@ struct commit_list *get_shallow_commits(struct object_array *heads, int depth,
 	for (i = 0; i < depths.slab_count; i++) {
 		int j;
 
+		if (!depths.slab[i])
+			continue;
 		for (j = 0; j < depths.slab_size; j++)
 			free(depths.slab[i][j]);
 	}
@@ -248,7 +247,8 @@ static void check_shallow_file_for_update(struct repository *r)
 	if (r->parsed_objects->is_shallow == -1)
 		BUG("shallow must be initialized by now");
 
-	if (!stat_validity_check(r->parsed_objects->shallow_stat, git_path_shallow(the_repository)))
+	if (!stat_validity_check(r->parsed_objects->shallow_stat,
+				 git_path_shallow(r)))
 		die("shallow file has changed since we read it");
 }
 

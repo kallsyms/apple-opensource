@@ -85,6 +85,36 @@ test_expect_success 'A: create pack from stdin' '
 	An annotated tag that annotates a blob.
 	EOF
 
+	tag to-be-deleted
+	from :3
+	data <<EOF
+	Another annotated tag that annotates a blob.
+	EOF
+
+	reset refs/tags/to-be-deleted
+	from 0000000000000000000000000000000000000000
+
+	tag nested
+	mark :6
+	from :4
+	data <<EOF
+	Tag of our lovely commit
+	EOF
+
+	reset refs/tags/nested
+	from 0000000000000000000000000000000000000000
+
+	tag nested
+	mark :7
+	from :6
+	data <<EOF
+	Tag of tag of our lovely commit
+	EOF
+
+	alias
+	mark :8
+	to :5
+
 	INPUT_END
 	git fast-import --export-marks=marks.out <input &&
 	git whatchanged master
@@ -157,12 +187,19 @@ test_expect_success 'A: verify tag/series-A-blob' '
 	test_cmp expect actual
 '
 
+test_expect_success 'A: verify tag deletion is successful' '
+	test_must_fail git rev-parse --verify refs/tags/to-be-deleted
+'
+
 test_expect_success 'A: verify marks output' '
 	cat >expect <<-EOF &&
 	:2 $(git rev-parse --verify master:file2)
 	:3 $(git rev-parse --verify master:file3)
 	:4 $(git rev-parse --verify master:file4)
 	:5 $(git rev-parse --verify master^0)
+	:6 $(git cat-file tag nested | grep object | cut -d" " -f 2)
+	:7 $(git rev-parse --verify nested)
+	:8 $(git rev-parse --verify master^0)
 	EOF
 	test_cmp expect marks.out
 '
@@ -2811,7 +2848,6 @@ test_expect_success 'S: filemodify with garbage after mark must fail' '
 	COMMIT
 	M 100644 :403x hello.c
 	EOF
-	cat err &&
 	test_i18ngrep "space after mark" err
 '
 
@@ -2828,7 +2864,6 @@ test_expect_success 'S: filemodify with garbage after inline must fail' '
 	inline
 	BLOB
 	EOF
-	cat err &&
 	test_i18ngrep "nvalid dataref" err
 '
 
@@ -2842,7 +2877,6 @@ test_expect_success 'S: filemodify with garbage after sha1 must fail' '
 	COMMIT
 	M 100644 ${sha1}x hello.c
 	EOF
-	cat err &&
 	test_i18ngrep "space after SHA1" err
 '
 
@@ -2858,7 +2892,6 @@ test_expect_success 'S: notemodify with garbage after mark dataref must fail' '
 	COMMIT
 	N :202x :302
 	EOF
-	cat err &&
 	test_i18ngrep "space after mark" err
 '
 
@@ -2874,7 +2907,6 @@ test_expect_success 'S: notemodify with garbage after inline dataref must fail' 
 	note blob
 	BLOB
 	EOF
-	cat err &&
 	test_i18ngrep "nvalid dataref" err
 '
 
@@ -2888,7 +2920,6 @@ test_expect_success 'S: notemodify with garbage after sha1 dataref must fail' '
 	COMMIT
 	N ${sha1}x :302
 	EOF
-	cat err &&
 	test_i18ngrep "space after SHA1" err
 '
 
@@ -2904,7 +2935,6 @@ test_expect_success 'S: notemodify with garbage after mark commit-ish must fail'
 	COMMIT
 	N :202 :302x
 	EOF
-	cat err &&
 	test_i18ngrep "after mark" err
 '
 
@@ -2938,7 +2968,6 @@ test_expect_success 'S: from with garbage after mark must fail' '
 	EOF
 
 	# now evaluate the error
-	cat err &&
 	test_i18ngrep "after mark" err
 '
 
@@ -2958,7 +2987,6 @@ test_expect_success 'S: merge with garbage after mark must fail' '
 	merge :303x
 	M 100644 :403 hello.c
 	EOF
-	cat err &&
 	test_i18ngrep "after mark" err
 '
 
@@ -2974,7 +3002,6 @@ test_expect_success 'S: tag with garbage after mark must fail' '
 	tag S
 	TAG
 	EOF
-	cat err &&
 	test_i18ngrep "after mark" err
 '
 
@@ -2985,7 +3012,6 @@ test_expect_success 'S: cat-blob with garbage after mark must fail' '
 	test_must_fail git fast-import --import-marks=marks <<-EOF 2>err &&
 	cat-blob :403x
 	EOF
-	cat err &&
 	test_i18ngrep "after mark" err
 '
 
@@ -2996,7 +3022,6 @@ test_expect_success 'S: ls with garbage after mark must fail' '
 	test_must_fail git fast-import --import-marks=marks <<-EOF 2>err &&
 	ls :302x hello.c
 	EOF
-	cat err &&
 	test_i18ngrep "space after mark" err
 '
 
@@ -3005,7 +3030,6 @@ test_expect_success 'S: ls with garbage after sha1 must fail' '
 	test_must_fail git fast-import --import-marks=marks <<-EOF 2>err &&
 	ls ${sha1}x hello.c
 	EOF
-	cat err &&
 	test_i18ngrep "space after tree-ish" err
 '
 
@@ -3290,6 +3314,63 @@ test_expect_success PIPE 'V: checkpoint updates tags after tag' '
 	background_import_then_checkpoint "" input &&
 	git show-ref -d Vtag &&
 	background_import_still_running
+'
+
+###
+### series W (get-mark and empty orphan commits)
+###
+
+cat >>W-input <<-W_INPUT_END
+	commit refs/heads/W-branch
+	mark :1
+	author Full Name <user@company.tld> 1000000000 +0100
+	committer Full Name <user@company.tld> 1000000000 +0100
+	data 27
+	Intentionally empty commit
+	LFsget-mark :1
+	W_INPUT_END
+
+test_expect_success !MINGW 'W: get-mark & empty orphan commit with no newlines' '
+	sed -e s/LFs// W-input | tr L "\n" | git fast-import
+'
+
+test_expect_success !MINGW 'W: get-mark & empty orphan commit with one newline' '
+	sed -e s/LFs/L/ W-input | tr L "\n" | git fast-import
+'
+
+test_expect_success !MINGW 'W: get-mark & empty orphan commit with ugly second newline' '
+	# Technically, this should fail as it has too many linefeeds
+	# according to the grammar in fast-import.txt.  But, for whatever
+	# reason, it works.  Since using the correct number of newlines
+	# does not work with older (pre-2.22) versions of git, allow apps
+	# that used this second-newline workaround to keep working by
+	# checking it with this test...
+	sed -e s/LFs/LL/ W-input | tr L "\n" | git fast-import
+'
+
+test_expect_success !MINGW 'W: get-mark & empty orphan commit with erroneous third newline' '
+	# ...but do NOT allow more empty lines than that (see previous test).
+	sed -e s/LFs/LLL/ W-input | tr L "\n" | test_must_fail git fast-import
+'
+
+###
+### series X (other new features)
+###
+
+test_expect_success 'X: handling encoding' '
+	test_tick &&
+	cat >input <<-INPUT_END &&
+	commit refs/heads/encoding
+	committer $GIT_COMMITTER_NAME <$GIT_COMMITTER_EMAIL> $GIT_COMMITTER_DATE
+	encoding iso-8859-7
+	data <<COMMIT
+	INPUT_END
+
+	printf "Pi: \360\nCOMMIT\n" >>input &&
+
+	git fast-import <input &&
+	git cat-file -p encoding | grep $(printf "\360") &&
+	git log -1 --format=%B encoding | grep $(printf "\317\200")
 '
 
 test_done

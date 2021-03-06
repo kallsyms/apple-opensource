@@ -2,12 +2,12 @@
 .\"     Title: git-svn
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GIT\-SVN" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GIT\-SVN" "1" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1137,9 +1137,9 @@ command will not work on repositories using this, either\&. Using this conflicts
 \fIuseSvmProps\fR
 option for (hopefully) obvious reasons\&.
 .sp
-This option is NOT recommended as it makes it difficult to track down old references to SVN revision numbers in existing documentation, bug reports and archives\&. If you plan to eventually migrate from SVN to Git and are certain about dropping SVN history, consider
-\fBgit-filter-branch\fR(1)
-instead\&. filter\-branch also allows reformatting of metadata for ease\-of\-reading and rewriting authorship info for non\-"svn\&.authorsFile" users\&.
+This option is NOT recommended as it makes it difficult to track down old references to SVN revision numbers in existing documentation, bug reports, and archives\&. If you plan to eventually migrate from SVN to Git and are certain about dropping SVN history, consider
+\m[blue]\fBgit\-filter\-repo\fR\m[]\&\s-2\u[1]\d\s+2
+instead\&. filter\-repo also allows reformatting of metadata for ease\-of\-reading and rewriting authorship info for non\-"svn\&.authorsFile" users\&.
 .RE
 .PP
 svn\&.useSvmProps, svn\-remote\&.<name>\&.useSvmProps
@@ -1382,7 +1382,7 @@ In SVN, it is possible (though discouraged) to commit changes to a tag (because 
 .\}
 .sp
 .sp
-Keep in mind that the \fI*\fR (asterisk) wildcard of the local ref (right of the \fI:\fR) \fBmust\fR be the farthest right path component; however the remote wildcard may be anywhere as long as it\(cqs an independent path component (surrounded by \fI/\fR or EOL)\&. This type of configuration is not automatically created by \fIinit\fR and should be manually entered with a text\-editor or using \fIgit config\fR\&.
+Keep in mind that the \fB*\fR (asterisk) wildcard of the local ref (right of the \fB:\fR) \fBmust\fR be the farthest right path component; however the remote wildcard may be anywhere as long as it\(cqs an independent path component (surrounded by \fB/\fR or EOL)\&. This type of configuration is not automatically created by \fIinit\fR and should be manually entered with a text\-editor or using \fIgit config\fR\&.
 .sp
 Also note that only one asterisk is allowed per word\&. For example:
 .sp
@@ -1481,3 +1481,9 @@ automatically rewinds it\&.
 .SH "GIT"
 .sp
 Part of the \fBgit\fR(1) suite
+.SH "NOTES"
+.IP " 1." 4
+git-filter-repo
+.RS 4
+\%https://github.com/newren/git-filter-repo
+.RE

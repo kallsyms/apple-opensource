@@ -432,6 +432,10 @@ void handle_ignore_submodules_arg(struct diff_options *diffopt,
 		diffopt->flags.ignore_dirty_submodules = 1;
 	else if (strcmp(arg, "none"))
 		die("bad --ignore-submodules argument: %s", arg);
+	/*
+	 * Please update _git_status() in git-completion.bash when you
+	 * add new options
+	 */
 }
 
 static int prepare_submodule_summary(struct rev_info *rev, const char *path,
@@ -990,7 +994,7 @@ static int submodule_needs_pushing(struct repository *r,
 		if (start_command(&cp))
 			die("Could not run 'git rev-list <commits> --not --remotes -n 1' command in submodule %s",
 					path);
-		if (strbuf_read(&buf, cp.out, 41))
+		if (strbuf_read(&buf, cp.out, the_hash_algo->hexsz + 1))
 			needs_pushing = 1;
 		finish_command(&cp);
 		close(cp.out);
@@ -1544,6 +1548,13 @@ static int fetch_finish(int retvalue, struct strbuf *err,
 	struct oid_array *commits;
 
 	if (retvalue)
+		/*
+		 * NEEDSWORK: This indicates that the overall fetch
+		 * failed, even though there may be a subsequent fetch
+		 * by commit hash that might work. It may be a good
+		 * idea to not indicate failure in this case, and only
+		 * indicate failure if the subsequent fetch fails.
+		 */
 		spf->result = 1;
 
 	if (!task || !task->sub)
@@ -1609,11 +1620,12 @@ int fetch_populated_submodules(struct repository *r,
 
 	calculate_changed_submodule_paths(r, &spf.changed_submodule_names);
 	string_list_sort(&spf.changed_submodule_names);
-	run_processes_parallel(max_parallel_jobs,
-			       get_next_submodule,
-			       fetch_start_failure,
-			       fetch_finish,
-			       &spf);
+	run_processes_parallel_tr2(max_parallel_jobs,
+				   get_next_submodule,
+				   fetch_start_failure,
+				   fetch_finish,
+				   &spf,
+				   "submodule", "parallel/fetch");
 
 	argv_array_clear(&spf.args);
 out:
@@ -1898,7 +1910,7 @@ int submodule_move_head(const char *path,
 	if (!(flags & SUBMODULE_MOVE_HEAD_DRY_RUN)) {
 		if (old_head) {
 			if (!submodule_uses_gitfile(path))
-				absorb_git_dir_into_superproject("", path,
+				absorb_git_dir_into_superproject(path,
 					ABSORB_GITDIR_RECURSE_SUBMODULES);
 		} else {
 			char *gitdir = xstrfmt("%s/modules/%s",
@@ -2026,8 +2038,7 @@ int validate_submodule_git_dir(char *git_dir, const char *submodule_name)
  * Embeds a single submodules git directory into the superprojects git dir,
  * non recursively.
  */
-static void relocate_single_git_dir_into_superproject(const char *prefix,
-						      const char *path)
+static void relocate_single_git_dir_into_superproject(const char *path)
 {
 	char *old_git_dir = NULL, *real_old_git_dir = NULL, *real_new_git_dir = NULL;
 	char *new_git_dir;
@@ -2073,8 +2084,7 @@ static void relocate_single_git_dir_into_superproject(const char *prefix,
  * having its git directory within the working tree to the git dir nested
  * in its superprojects git dir under modules/.
  */
-void absorb_git_dir_into_superproject(const char *prefix,
-				      const char *path,
+void absorb_git_dir_into_superproject(const char *path,
 				      unsigned flags)
 {
 	int err_code;
@@ -2115,7 +2125,7 @@ void absorb_git_dir_into_superproject(const char *prefix,
 		char *real_common_git_dir = real_pathdup(get_git_common_dir(), 1);
 
 		if (!starts_with(real_sub_git_dir, real_common_git_dir))
-			relocate_single_git_dir_into_superproject(prefix, path);
+			relocate_single_git_dir_into_superproject(path);
 
 		free(real_sub_git_dir);
 		free(real_common_git_dir);

@@ -158,7 +158,6 @@ test_expect_success 'submodule update --init from and of subdirectory' '
 	test_i18ncmp expect2 actual2
 '
 
-apos="'";
 test_expect_success 'submodule update does not fetch already present commits' '
 	(cd submodule &&
 	  echo line3 >> file &&
@@ -168,7 +167,7 @@ test_expect_success 'submodule update does not fetch already present commits' '
 	) &&
 	(cd super/submodule &&
 	  head=$(git rev-parse --verify HEAD) &&
-	  echo "Submodule path ${apos}submodule$apos: checked out $apos$head$apos" > ../../expected &&
+	  echo "Submodule path ${SQ}submodule$SQ: checked out $SQ$head$SQ" > ../../expected &&
 	  git reset --hard HEAD~1
 	) &&
 	(cd super &&
@@ -959,7 +958,10 @@ test_expect_success 'submodule update clone shallow submodule outside of depth' 
 		cd super3 &&
 		sed -e "s#url = ../#url = file://$pwd/#" <.gitmodules >.gitmodules.tmp &&
 		mv -f .gitmodules.tmp .gitmodules &&
-		test_must_fail git submodule update --init --depth=1 2>actual &&
+		# Some protocol versions (e.g. 2) support fetching
+		# unadvertised objects, so restrict this test to v0.
+		test_must_fail env GIT_TEST_PROTOCOL_VERSION= \
+			git submodule update --init --depth=1 2>actual &&
 		test_i18ngrep "Direct fetching of that commit failed." actual &&
 		git -C ../submodule config uploadpack.allowReachableSHA1InWant true &&
 		git submodule update --init --depth=1 >actual &&

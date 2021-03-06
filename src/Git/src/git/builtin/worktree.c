@@ -10,7 +10,6 @@
 #include "run-command.h"
 #include "sigchain.h"
 #include "submodule.h"
-#include "refs.h"
 #include "utf8.h"
 #include "worktree.h"
 
@@ -268,13 +267,14 @@ static int add_worktree(const char *path, const char *refname,
 	struct strbuf sb_git = STRBUF_INIT, sb_repo = STRBUF_INIT;
 	struct strbuf sb = STRBUF_INIT;
 	const char *name;
-	struct stat st;
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct argv_array child_env = ARGV_ARRAY_INIT;
-	int counter = 0, len, ret;
+	unsigned int counter = 0;
+	int len, ret;
 	struct strbuf symref = STRBUF_INIT;
 	struct commit *commit = NULL;
 	int is_branch = 0;
+	struct strbuf sb_name = STRBUF_INIT;
 
 	validate_worktree_add(path, opts);
 
@@ -290,13 +290,23 @@ static int add_worktree(const char *path, const char *refname,
 		die(_("invalid reference: %s"), refname);
 
 	name = worktree_basename(path, &len);
-	git_path_buf(&sb_repo, "worktrees/%.*s", (int)(path + len - name), name);
+	strbuf_add(&sb, name, path + len - name);
+	sanitize_refname_component(sb.buf, &sb_name);
+	if (!sb_name.len)
+		BUG("How come '%s' becomes empty after sanitization?", sb.buf);
+	strbuf_reset(&sb);
+	name = sb_name.buf;
+	git_path_buf(&sb_repo, "worktrees/%s", name);
 	len = sb_repo.len;
 	if (safe_create_leading_directories_const(sb_repo.buf))
 		die_errno(_("could not create leading directories of '%s'"),
 			  sb_repo.buf);
-	while (!stat(sb_repo.buf, &st)) {
+
+	while (mkdir(sb_repo.buf, 0777)) {
 		counter++;
+		if ((errno != EEXIST) || !counter /* overflow */)
+			die_errno(_("could not create directory of '%s'"),
+				  sb_repo.buf);
 		strbuf_setlen(&sb_repo, len);
 		strbuf_addf(&sb_repo, "%d", counter);
 	}
@@ -306,8 +316,6 @@ static int add_worktree(const char *path, const char *refname,
 	atexit(remove_junk);
 	sigchain_push_common(remove_junk_on_signal);
 
-	if (mkdir(sb_repo.buf, 0777))
-		die_errno(_("could not create directory of '%s'"), sb_repo.buf);
 	junk_git_dir = xstrdup(sb_repo.buf);
 	is_junk = 1;
 
@@ -341,7 +349,7 @@ static int add_worktree(const char *path, const char *refname,
 	 */
 	strbuf_reset(&sb);
 	strbuf_addf(&sb, "%s/HEAD", sb_repo.buf);
-	write_file(sb.buf, "%s", sha1_to_hex(null_sha1));
+	write_file(sb.buf, "%s", oid_to_hex(&null_oid));
 	strbuf_reset(&sb);
 	strbuf_addf(&sb, "%s/commondir", sb_repo.buf);
 	write_file(sb.buf, "../..");
@@ -402,6 +410,7 @@ done:
 			cp.dir = path;
 			cp.env = env;
 			cp.argv = NULL;
+			cp.trace2_hook_name = "post-checkout";
 			argv_array_pushl(&cp.args, absolute_path(hook),
 					 oid_to_hex(&null_oid),
 					 oid_to_hex(&commit->object.oid),
@@ -415,6 +424,7 @@ done:
 	strbuf_release(&symref);
 	strbuf_release(&sb_repo);
 	strbuf_release(&sb_git);
+	strbuf_release(&sb_name);
 	return ret;
 }
 
@@ -869,7 +879,7 @@ static void check_clean_worktree(struct worktree *wt,
 			  original_path);
 	ret = xread(cp.out, buf, sizeof(buf));
 	if (ret)
-		die(_("'%s' is dirty, use --force to delete it"),
+		die(_("'%s' contains modified or untracked files, use --force to delete it"),
 		    original_path);
 	close(cp.out);
 	ret = finish_command(&cp);

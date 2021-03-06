@@ -157,6 +157,10 @@ test_expect_success 'verify blob:limit=1m' '
 '
 
 # Test sparse:path=<path> filter.
+# !!!!
+# NOTE: sparse:path filter support has been dropped for security reasons,
+# so the tests have been changed to make sure that using it fails.
+# !!!!
 # Use a local file containing a sparse-checkout specification to filter
 # out blobs not required for the corresponding sparse-checkout.  We do not
 # require sparse-checkout to actually be enabled.
@@ -176,37 +180,20 @@ test_expect_success 'setup r3' '
 	echo sparse1 >pattern2
 '
 
-test_expect_success 'verify sparse:path=pattern1 omits top-level files' '
-	git -C r3 ls-files -s sparse1 sparse2 >ls_files_result &&
-	awk -f print_2.awk ls_files_result |
-	sort >expected &&
-
-	git -C r3 rev-list --quiet --objects --filter-print-omitted \
-		--filter=sparse:path=../pattern1 HEAD >revs &&
-	awk -f print_1.awk revs |
-	sed "s/~//" |
-	sort >observed &&
-
-	test_cmp expected observed
+test_expect_success 'verify sparse:path=pattern1 fails' '
+	test_must_fail git -C r3 rev-list --quiet --objects \
+		--filter-print-omitted --filter=sparse:path=../pattern1 HEAD
 '
 
-test_expect_success 'verify sparse:path=pattern2 omits both sparse2 files' '
-	git -C r3 ls-files -s sparse2 dir1/sparse2 >ls_files_result &&
-	awk -f print_2.awk ls_files_result |
-	sort >expected &&
-
-	git -C r3 rev-list --quiet --objects --filter-print-omitted \
-		--filter=sparse:path=../pattern2 HEAD >revs &&
-	awk -f print_1.awk revs |
-	sed "s/~//" |
-	sort >observed &&
-
-	test_cmp expected observed
+test_expect_success 'verify sparse:path=pattern2 fails' '
+	test_must_fail git -C r3 rev-list --quiet --objects \
+		--filter-print-omitted --filter=sparse:path=../pattern2 HEAD
 '
 
 # Test sparse:oid=<oid-ish> filter.
-# Like sparse:path, but we get the sparse-checkout specification from
-# a blob rather than a file on disk.
+# Use a blob containing a sparse-checkout specification to filter
+# out blobs not required for the corresponding sparse-checkout.  We do not
+# require sparse-checkout to actually be enabled.
 
 test_expect_success 'setup r3 part 2' '
 	echo dir1/ >r3/pattern &&
@@ -291,7 +278,19 @@ test_expect_success 'verify skipping tree iteration when not collecting omits' '
 	test_line_count = 2 actual &&
 
 	# Make sure no other trees were considered besides the root.
-	! grep "Skipping contents of tree [^.]" filter_trace
+	! grep "Skipping contents of tree [^.]" filter_trace &&
+
+	# Try this again with "combine:". If both sub-filters are skipping
+	# trees, the composite filter should also skip trees. This is not
+	# important unless the user does combine:tree:X+tree:Y or another filter
+	# besides "tree:" is implemented in the future which can skip trees.
+	GIT_TRACE=1 git -C r3 rev-list \
+		--objects --filter=combine:tree:1+tree:3 HEAD 2>filter_trace &&
+
+	# Only skip the dir1/ tree, which is shared between the two commits.
+	grep "Skipping contents of tree " filter_trace >actual &&
+	test_write_lines "Skipping contents of tree dir1/..." >expected &&
+	test_cmp expected actual
 '
 
 # Test tree:# filters.
@@ -343,6 +342,148 @@ test_expect_success 'verify tree:3 includes everything expected' '
 	test_line_count = 10 actual
 '
 
+test_expect_success 'combine:... for a simple combination' '
+	git -C r3 rev-list --objects --filter=combine:tree:2+blob:none HEAD \
+		>actual &&
+
+	expect_has HEAD "" &&
+	expect_has HEAD~1 "" &&
+	expect_has HEAD dir1 &&
+
+	# There are also 2 commit objects
+	test_line_count = 5 actual &&
+
+	cp actual expected &&
+
+	# Try again using repeated --filter - this is equivalent to a manual
+	# combine with "combine:...+..."
+	git -C r3 rev-list --objects --filter=combine:tree:2 \
+		--filter=blob:none HEAD >actual &&
+
+	test_cmp expected actual
+'
+
+test_expect_success 'combine:... with URL encoding' '
+	git -C r3 rev-list --objects \
+		--filter=combine:tree%3a2+blob:%6Eon%65 HEAD >actual &&
+
+	expect_has HEAD "" &&
+	expect_has HEAD~1 "" &&
+	expect_has HEAD dir1 &&
+
+	# There are also 2 commit objects
+	test_line_count = 5 actual
+'
+
+expect_invalid_filter_spec () {
+	spec="$1" &&
+	err="$2" &&
+
+	test_must_fail git -C r3 rev-list --objects --filter="$spec" HEAD \
+		>actual 2>actual_stderr &&
+	test_must_be_empty actual &&
+	test_i18ngrep "$err" actual_stderr
+}
+
+test_expect_success 'combine:... while URL-encoding things that should not be' '
+	expect_invalid_filter_spec combine%3Atree:2+blob:none \
+		"invalid filter-spec"
+'
+
+test_expect_success 'combine: with nothing after the :' '
+	expect_invalid_filter_spec combine: "expected something after combine:"
+'
+
+test_expect_success 'parse error in first sub-filter in combine:' '
+	expect_invalid_filter_spec combine:tree:asdf+blob:none \
+		"expected .tree:<depth>."
+'
+
+test_expect_success 'combine:... with non-encoded reserved chars' '
+	expect_invalid_filter_spec combine:tree:2+sparse:@xyz \
+		"must escape char in sub-filter-spec: .@." &&
+	expect_invalid_filter_spec combine:tree:2+sparse:\` \
+		"must escape char in sub-filter-spec: .\`." &&
+	expect_invalid_filter_spec combine:tree:2+sparse:~abc \
+		"must escape char in sub-filter-spec: .\~."
+'
+
+test_expect_success 'validate err msg for "combine:<valid-filter>+"' '
+	expect_invalid_filter_spec combine:tree:2+ "expected .tree:<depth>."
+'
+
+test_expect_success 'combine:... with edge-case hex digits: Ff Aa 0 9' '
+	git -C r3 rev-list --objects --filter="combine:tree:2+bl%6Fb:n%6fne" \
+		HEAD >actual &&
+	test_line_count = 5 actual &&
+	git -C r3 rev-list --objects --filter="combine:tree%3A2+blob%3anone" \
+		HEAD >actual &&
+	test_line_count = 5 actual &&
+	git -C r3 rev-list --objects --filter="combine:tree:%30" HEAD >actual &&
+	test_line_count = 2 actual &&
+	git -C r3 rev-list --objects --filter="combine:tree:%39+blob:none" \
+		HEAD >actual &&
+	test_line_count = 5 actual
+'
+
+test_expect_success 'add sparse pattern blobs whose paths have reserved chars' '
+	cp r3/pattern r3/pattern1+renamed% &&
+	cp r3/pattern "r3/p;at%ter+n" &&
+	cp r3/pattern r3/^~pattern &&
+	git -C r3 add pattern1+renamed% "p;at%ter+n" ^~pattern &&
+	git -C r3 commit -m "add sparse pattern files with reserved chars"
+'
+
+test_expect_success 'combine:... with more than two sub-filters' '
+	git -C r3 rev-list --objects \
+		--filter=combine:tree:3+blob:limit=40+sparse:oid=master:pattern \
+		HEAD >actual &&
+
+	expect_has HEAD "" &&
+	expect_has HEAD~1 "" &&
+	expect_has HEAD~2 "" &&
+	expect_has HEAD dir1 &&
+	expect_has HEAD dir1/sparse1 &&
+	expect_has HEAD dir1/sparse2 &&
+
+	# Should also have 3 commits
+	test_line_count = 9 actual &&
+
+	# Try again, this time making sure the last sub-filter is only
+	# URL-decoded once.
+	cp actual expect &&
+
+	git -C r3 rev-list --objects \
+		--filter=combine:tree:3+blob:limit=40+sparse:oid=master:pattern1%2brenamed%25 \
+		HEAD >actual &&
+	test_cmp expect actual &&
+
+	# Use the same composite filter again, but with a pattern file name that
+	# requires encoding multiple characters, and use implicit filter
+	# combining.
+	test_when_finished "rm -f trace1" &&
+	GIT_TRACE=$(pwd)/trace1 git -C r3 rev-list --objects \
+		--filter=tree:3 --filter=blob:limit=40 \
+		--filter=sparse:oid="master:p;at%ter+n" \
+		HEAD >actual &&
+
+	test_cmp expect actual &&
+	grep "Add to combine filter-spec: sparse:oid=master:p%3bat%25ter%2bn" \
+		trace1 &&
+
+	# Repeat the above test, but this time, the characters to encode are in
+	# the LHS of the combined filter.
+	test_when_finished "rm -f trace2" &&
+	GIT_TRACE=$(pwd)/trace2 git -C r3 rev-list --objects \
+		--filter=sparse:oid=master:^~pattern \
+		--filter=tree:3 --filter=blob:limit=40 \
+		HEAD >actual &&
+
+	test_cmp expect actual &&
+	grep "Add to combine filter-spec: sparse:oid=master:%5e%7epattern" \
+		trace2
+'
+
 # Test provisional omit collection logic with a repo that has objects appearing
 # at multiple depths - first deeper than the filter's threshold, then shallow.
 
@@ -384,6 +525,37 @@ test_expect_success 'verify skipping tree iteration when collecting omits' '
 
 	echo "Skipping contents of tree subdir/..." >expect &&
 	test_cmp expect actual
+'
+
+test_expect_success 'setup r5' '
+	git init r5 &&
+	mkdir -p r5/subdir &&
+
+	echo 1     >r5/short-root          &&
+	echo 12345 >r5/long-root           &&
+	echo a     >r5/subdir/short-subdir &&
+	echo abcde >r5/subdir/long-subdir  &&
+
+	git -C r5 add short-root long-root subdir &&
+	git -C r5 commit -m "commit msg"
+'
+
+test_expect_success 'verify collecting omits in combined: filter' '
+	# Note that this test guards against the naive implementation of simply
+	# giving both filters the same "omits" set and expecting it to
+	# automatically merge them.
+	git -C r5 rev-list --objects --quiet --filter-print-omitted \
+		--filter=combine:tree:2+blob:limit=3 HEAD >actual &&
+
+	# Expect 0 trees/commits, 3 blobs omitted (all blobs except short-root)
+	omitted_1=$(echo 12345 | git hash-object --stdin) &&
+	omitted_2=$(echo a     | git hash-object --stdin) &&
+	omitted_3=$(echo abcde | git hash-object --stdin) &&
+
+	grep ~$omitted_1 actual &&
+	grep ~$omitted_2 actual &&
+	grep ~$omitted_3 actual &&
+	test_line_count = 3 actual
 '
 
 # Test tree:<depth> where a tree is iterated to twice - once where a subentry is
@@ -452,13 +624,6 @@ test_expect_success 'expand blob limit in protocol' '
 		--filter=blob:limit=1k "file://$(pwd)/r2" limit &&
 	! grep "blob:limit=1k" trace &&
 	grep "blob:limit=1024" trace
-'
-
-test_expect_success 'expand tree depth limit in protocol' '
-	GIT_TRACE_PACKET="$(pwd)/tree_trace" git -c protocol.version=2 clone \
-		--filter=tree:0k "file://$(pwd)/r2" tree &&
-	! grep "tree:0k" tree_trace &&
-	grep "tree:0" tree_trace
 '
 
 test_done

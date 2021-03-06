@@ -10,7 +10,7 @@ diff.autoRefreshIndex::
 
 diff.dirstat::
 	A comma separated list of `--dirstat` parameters specifying the
-	default behavior of the `--dirstat` option to linkgit:git-diff[1]`
+	default behavior of the `--dirstat` option to linkgit:git-diff[1]
 	and friends. The defaults can be overridden on the command line
 	(using `--dirstat=<param1,param2,...>`). The fallback defaults
 	(when not changed by `diff.dirstat`) are `changes,noncumulative,3`.
@@ -73,12 +73,13 @@ diff.external::
 	environment variable.  The command is called with parameters
 	as described under "git Diffs" in linkgit:git[1].  Note: if
 	you want to use an external diff program only on a subset of
-	your files, you	might want to use linkgit:gitattributes[5] instead.
+	your files, you might want to use linkgit:gitattributes[5] instead.
 
 diff.ignoreSubmodules::
 	Sets the default value of --ignore-submodules. Note that this
 	affects only 'git diff' Porcelain, and not lower level 'diff'
-	commands such as 'git diff-files'. 'git checkout' also honors
+	commands such as 'git diff-files'. 'git checkout'
+	and 'git switch' also honor
 	this setting when reporting uncommitted changes. Setting it to
 	'all' disables the submodule summary normally shown by 'git commit'
 	and 'git status' when `status.submoduleSummary` is set unless it is
@@ -188,7 +189,7 @@ diff.guitool::
 include::../mergetools-diff.txt[]
 
 diff.indentHeuristic::
-	Set this option to `true` to enable experimental heuristics
+	Set this option to `false` to disable the default heuristics
 	that shift diff hunk boundaries to make patches easier to read.
 
 diff.algorithm::

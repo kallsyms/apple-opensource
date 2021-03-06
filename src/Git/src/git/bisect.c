@@ -707,7 +707,7 @@ static int bisect_checkout(const struct object_id *bisect_rev, int no_checkout)
 {
 	char bisect_rev_hex[GIT_MAX_HEXSZ + 1];
 
-	memcpy(bisect_rev_hex, oid_to_hex(bisect_rev), GIT_SHA1_HEXSZ + 1);
+	memcpy(bisect_rev_hex, oid_to_hex(bisect_rev), the_hash_algo->hexsz + 1);
 	update_ref(NULL, "BISECT_EXPECTED_REV", bisect_rev, NULL, 0, UPDATE_REFS_DIE_ON_ERR);
 
 	argv_checkout[2] = bisect_rev_hex;
@@ -896,24 +896,15 @@ static void show_diff_tree(struct repository *r,
 			   const char *prefix,
 			   struct commit *commit)
 {
+	const char *argv[] = {
+		"diff-tree", "--pretty", "--stat", "--summary", "--cc", NULL
+	};
 	struct rev_info opt;
 
-	/* diff-tree init */
+	git_config(git_diff_ui_config, NULL);
 	repo_init_revisions(r, &opt, prefix);
-	git_config(git_diff_basic_config, NULL); /* no "diff" UI options */
-	opt.abbrev = 0;
-	opt.diff = 1;
 
-	/* This is what "--pretty" does */
-	opt.verbose_header = 1;
-	opt.use_terminator = 0;
-	opt.commit_format = CMIT_FMT_DEFAULT;
-
-	/* diff-tree init */
-	if (!opt.diffopt.output_format)
-		opt.diffopt.output_format = DIFF_FORMAT_RAW;
-
-	setup_revisions(0, NULL, &opt, NULL);
+	setup_revisions(ARRAY_SIZE(argv) - 1, argv, &opt, NULL);
 	log_tree_commit(&opt, commit);
 }
 

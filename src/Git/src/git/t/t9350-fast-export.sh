@@ -53,6 +53,33 @@ test_expect_success 'fast-export | fast-import' '
 
 '
 
+test_expect_success 'fast-export ^muss^{commit} muss' '
+	git fast-export --tag-of-filtered-object=rewrite ^muss^{commit} muss >actual &&
+	cat >expected <<-EOF &&
+	tag muss
+	from $(git rev-parse --verify muss^{commit})
+	$(git cat-file tag muss | grep tagger)
+	data 9
+	valentin
+
+	EOF
+	test_cmp expected actual
+'
+
+test_expect_success 'fast-export --mark-tags ^muss^{commit} muss' '
+	git fast-export --mark-tags --tag-of-filtered-object=rewrite ^muss^{commit} muss >actual &&
+	cat >expected <<-EOF &&
+	tag muss
+	mark :1
+	from $(git rev-parse --verify muss^{commit})
+	$(git cat-file tag muss | grep tagger)
+	data 9
+	valentin
+
+	EOF
+	test_cmp expected actual
+'
+
 test_expect_success 'fast-export master~2..master' '
 
 	git fast-export master~2..master >actual &&
@@ -94,22 +121,83 @@ test_expect_success 'fast-export --show-original-ids | git fast-import' '
 	test $MUSS = $(git rev-parse --verify refs/tags/muss)
 '
 
-test_expect_success 'iso-8859-1' '
+test_expect_success 'reencoding iso-8859-7' '
 
-	git config i18n.commitencoding ISO8859-1 &&
-	# use author and committer name in ISO-8859-1 to match it.
-	. "$TEST_DIRECTORY"/t3901/8859-1.txt &&
+	test_when_finished "git reset --hard HEAD~1" &&
+	test_config i18n.commitencoding iso-8859-7 &&
 	test_tick &&
 	echo rosten >file &&
-	git commit -s -m den file &&
-	git fast-export wer^..wer >iso8859-1.fi &&
-	sed "s/wer/i18n/" iso8859-1.fi |
+	git commit -s -F "$TEST_DIRECTORY/t9350/simple-iso-8859-7-commit-message.txt" file &&
+	git fast-export --reencode=yes wer^..wer >iso-8859-7.fi &&
+	sed "s/wer/i18n/" iso-8859-7.fi |
 		(cd new &&
 		 git fast-import &&
+		 # The commit object, if not re-encoded, would be 240 bytes.
+		 # Removing the "encoding iso-8859-7\n" header drops 20 bytes.
+		 # Re-encoding the Pi character from \xF0 (\360) in iso-8859-7
+		 # to \xCF\x80 (\317\200) in UTF-8 adds a byte.  Check for
+		 # the expected size.
+		 test 221 -eq "$(git cat-file -s i18n)" &&
+		 # ...and for the expected translation of bytes.
 		 git cat-file commit i18n >actual &&
-		 grep "Áéí óú" actual)
-
+		 grep $(printf "\317\200") actual &&
+		 # Also make sure the commit does not have the "encoding" header
+		 ! grep ^encoding actual)
 '
+
+test_expect_success 'aborting on iso-8859-7' '
+
+	test_when_finished "git reset --hard HEAD~1" &&
+	test_config i18n.commitencoding iso-8859-7 &&
+	echo rosten >file &&
+	git commit -s -F "$TEST_DIRECTORY/t9350/simple-iso-8859-7-commit-message.txt" file &&
+	test_must_fail git fast-export --reencode=abort wer^..wer >iso-8859-7.fi
+'
+
+test_expect_success 'preserving iso-8859-7' '
+
+	test_when_finished "git reset --hard HEAD~1" &&
+	test_config i18n.commitencoding iso-8859-7 &&
+	echo rosten >file &&
+	git commit -s -F "$TEST_DIRECTORY/t9350/simple-iso-8859-7-commit-message.txt" file &&
+	git fast-export --reencode=no wer^..wer >iso-8859-7.fi &&
+	sed "s/wer/i18n-no-recoding/" iso-8859-7.fi |
+		(cd new &&
+		 git fast-import &&
+		 # The commit object, if not re-encoded, is 240 bytes.
+		 # Removing the "encoding iso-8859-7\n" header would drops 20
+		 # bytes.  Re-encoding the Pi character from \xF0 (\360) in
+		 # iso-8859-7 to \xCF\x80 (\317\200) in UTF-8 adds a byte.
+		 # Check for the expected size...
+		 test 240 -eq "$(git cat-file -s i18n-no-recoding)" &&
+		 # ...as well as the expected byte.
+		 git cat-file commit i18n-no-recoding >actual &&
+		 grep $(printf "\360") actual &&
+		 # Also make sure the commit has the "encoding" header
+		 grep ^encoding actual)
+'
+
+test_expect_success 'encoding preserved if reencoding fails' '
+
+	test_when_finished "git reset --hard HEAD~1" &&
+	test_config i18n.commitencoding iso-8859-7 &&
+	echo rosten >file &&
+	git commit -s -F "$TEST_DIRECTORY/t9350/broken-iso-8859-7-commit-message.txt" file &&
+	git fast-export --reencode=yes wer^..wer >iso-8859-7.fi &&
+	sed "s/wer/i18n-invalid/" iso-8859-7.fi |
+		(cd new &&
+		 git fast-import &&
+		 git cat-file commit i18n-invalid >actual &&
+		 # Make sure the commit still has the encoding header
+		 grep ^encoding actual &&
+		 # Verify that the commit has the expected size; i.e.
+		 # that no bytes were re-encoded to a different encoding.
+		 test 252 -eq "$(git cat-file -s i18n-invalid)" &&
+		 # ...and check for the original special bytes
+		 grep $(printf "\360") actual &&
+		 grep $(printf "\377") actual)
+'
+
 test_expect_success 'import/export-marks' '
 
 	git checkout -b marks master &&
@@ -224,7 +312,6 @@ GIT_COMMITTER_NAME='C O Mitter'; export GIT_COMMITTER_NAME
 
 test_expect_success 'setup copies' '
 
-	git config --unset i18n.commitencoding &&
 	git checkout -b copy rein &&
 	git mv file file3 &&
 	git commit -m move1 &&
@@ -453,9 +540,40 @@ test_expect_success 'tree_tag'        '
 '
 
 # NEEDSWORK: not just check return status, but validate the output
+# Note that these tests DO NOTHING other than print a warning that
+# they are ommitting the one tag we asked them to export (because the
+# tags resolve to a tree).  They exist just to make sure we do not
+# abort but instead just warn.
 test_expect_success 'tree_tag-obj'    'git fast-export tree_tag-obj'
 test_expect_success 'tag-obj_tag'     'git fast-export tag-obj_tag'
 test_expect_success 'tag-obj_tag-obj' 'git fast-export tag-obj_tag-obj'
+
+test_expect_success 'handling tags of blobs' '
+	git tag -a -m "Tag of a blob" blobtag $(git rev-parse master:file) &&
+	git fast-export blobtag >actual &&
+	cat >expect <<-EOF &&
+	blob
+	mark :1
+	data 9
+	die Luft
+
+	tag blobtag
+	from :1
+	tagger $GIT_COMMITTER_NAME <$GIT_COMMITTER_EMAIL> $GIT_COMMITTER_DATE
+	data 14
+	Tag of a blob
+
+	EOF
+	test_cmp expect actual
+'
+
+test_expect_success 'handling nested tags' '
+	git tag -a -m "This is a nested tag" nested muss &&
+	git fast-export --mark-tags nested >output &&
+	grep "^from $ZERO_OID$" output &&
+	grep "^tag nested$" output >tag_lines &&
+	test_line_count = 2 tag_lines
+'
 
 test_expect_success 'directory becomes symlink'        '
 	git init dirtosymlink &&
@@ -508,17 +626,15 @@ test_expect_success 'fast-export quotes pathnames' '
 '
 
 test_expect_success 'test bidirectionality' '
-	>marks-cur &&
-	>marks-new &&
 	git init marks-test &&
-	git fast-export --export-marks=marks-cur --import-marks=marks-cur --branches | \
-	git --git-dir=marks-test/.git fast-import --export-marks=marks-new --import-marks=marks-new &&
+	git fast-export --export-marks=marks-cur --import-marks-if-exists=marks-cur --branches | \
+	git --git-dir=marks-test/.git fast-import --export-marks=marks-new --import-marks-if-exists=marks-new &&
 	(cd marks-test &&
 	git reset --hard &&
 	echo Wohlauf > file &&
 	git commit -a -m "back in time") &&
-	git --git-dir=marks-test/.git fast-export --export-marks=marks-new --import-marks=marks-new --branches | \
-	git fast-import --export-marks=marks-cur --import-marks=marks-cur
+	git --git-dir=marks-test/.git fast-export --export-marks=marks-new --import-marks-if-exists=marks-new --branches | \
+	git fast-import --export-marks=marks-cur --import-marks-if-exists=marks-cur
 '
 
 cat > expected << EOF

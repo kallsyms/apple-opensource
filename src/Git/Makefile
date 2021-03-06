@@ -135,6 +135,8 @@ install: info install-bin install-man install-contrib
 	rm -f "$(DSTROOT)$(PREFIX)"/libexec/git-core/git-cvs*
 	rm -f "$(DSTROOT)$(PREFIX)"/share/man/man*/*cvs*
 	rm -f "$(DSTROOT)$(PREFIX)"/share/man/man*/*archimport*
+	rm -f "$(DSTROOT)$(PREFIX)"/libexec/git-core/git-svn*
+	rm -rf "$(DSTROOT)$(PREFIX)"/share/git-core/perl/Git/SVN*
 	install -d -o root -g wheel -m 0755 $(DSTROOT)$(PREFIX)/local/OpenSourceVersions
 	install -o root -g wheel -m 0644 $(SRCROOT)/Git.plist $(DSTROOT)$(PREFIX)/local/OpenSourceVersions
 	install -o root -g wheel -m 0644 $(SRCROOT)/gitconfig $(DSTROOT)$(PREFIX)/share/git-core

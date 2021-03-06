@@ -2,12 +2,12 @@
 .\"     Title: gitworkflows
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GITWORKFLOWS" "7" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GITWORKFLOWS" "7" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -274,18 +274,7 @@ After a feature release, the integration branch \fInext\fR may optionally be rew
 .sp -1
 .IP \(bu 2.3
 .\}
-\fBgit checkout next\fR
-.RE
-.sp
-.RS 4
-.ie n \{\
-\h'-04'\(bu\h'+03'\c
-.\}
-.el \{\
-.sp -1
-.IP \(bu 2.3
-.\}
-\fBgit reset \-\-hard master\fR
+\fBgit switch \-C next master\fR
 .RE
 .sp
 .RS 4

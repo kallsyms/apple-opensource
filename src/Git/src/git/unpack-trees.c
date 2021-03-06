@@ -11,12 +11,11 @@
 #include "refs.h"
 #include "attr.h"
 #include "split-index.h"
-#include "dir.h"
 #include "submodule.h"
 #include "submodule-config.h"
 #include "fsmonitor.h"
 #include "object-store.h"
-#include "fetch-object.h"
+#include "promisor-remote.h"
 
 /*
  * Error messages expected by scripts out of plumbing commands such as
@@ -219,6 +218,9 @@ static int add_rejected_path(struct unpack_trees_options *o,
 			     enum unpack_trees_error_types e,
 			     const char *path)
 {
+	if (o->quiet)
+		return -1;
+
 	if (!o->show_all_errors)
 		return error(ERRORMSG(o, e), super_prefixed(path));
 
@@ -268,8 +270,7 @@ static int check_submodule_move_head(const struct cache_entry *ce,
 		flags |= SUBMODULE_MOVE_HEAD_FORCE;
 
 	if (submodule_move_head(ce->name, old_id, new_id, flags))
-		return o->gently ? -1 :
-				   add_rejected_path(o, ERROR_WOULD_LOSE_SUBMODULE, ce->name);
+		return add_rejected_path(o, ERROR_WOULD_LOSE_SUBMODULE, ce->name);
 	return 0;
 }
 
@@ -299,25 +300,6 @@ static void load_gitmodules_file(struct index_state *index,
 	}
 }
 
-/*
- * Unlink the last component and schedule the leading directories for
- * removal, such that empty directories get removed.
- */
-static void unlink_entry(const struct cache_entry *ce)
-{
-	const struct submodule *sub = submodule_from_ce(ce);
-	if (sub) {
-		/* state.force is set at the caller. */
-		submodule_move_head(ce->name, "HEAD", NULL,
-				    SUBMODULE_MOVE_HEAD_FORCE);
-	}
-	if (!check_leading_path(ce->name, ce_namelen(ce)))
-		return;
-	if (remove_or_warn(ce->ce_mode, ce->name))
-		return;
-	schedule_dir_for_removal(ce->name, ce_namelen(ce));
-}
-
 static struct progress *get_progress(struct unpack_trees_options *o)
 {
 	unsigned cnt = 0, total = 0;
@@ -332,7 +314,7 @@ static struct progress *get_progress(struct unpack_trees_options *o)
 			total++;
 	}
 
-	return start_delayed_progress(_("Checking out files"), total);
+	return start_delayed_progress(_("Updating files"), total);
 }
 
 static void setup_collided_checkout_detection(struct checkout *state,
@@ -410,33 +392,34 @@ static int check_updates(struct unpack_trees_options *o)
 				unlink_entry(ce);
 		}
 	}
-	remove_marked_cache_entries(index);
+	remove_marked_cache_entries(index, 0);
 	remove_scheduled_dirs();
 
 	if (should_update_submodules() && o->update && !o->dry_run)
 		load_gitmodules_file(index, &state);
 
 	enable_delayed_checkout(&state);
-	if (repository_format_partial_clone && o->update && !o->dry_run) {
+	if (has_promisor_remote() && o->update && !o->dry_run) {
 		/*
 		 * Prefetch the objects that are to be checked out in the loop
 		 * below.
 		 */
 		struct oid_array to_fetch = OID_ARRAY_INIT;
-		int fetch_if_missing_store = fetch_if_missing;
-		fetch_if_missing = 0;
 		for (i = 0; i < index->cache_nr; i++) {
 			struct cache_entry *ce = index->cache[i];
-			if ((ce->ce_flags & CE_UPDATE) &&
-			    !S_ISGITLINK(ce->ce_mode)) {
-				if (!has_object_file(&ce->oid))
-					oid_array_append(&to_fetch, &ce->oid);
-			}
+
+			if (!(ce->ce_flags & CE_UPDATE) ||
+			    S_ISGITLINK(ce->ce_mode))
+				continue;
+			if (!oid_object_info_extended(the_repository, &ce->oid,
+						      NULL,
+						      OBJECT_INFO_FOR_PREFETCH))
+				continue;
+			oid_array_append(&to_fetch, &ce->oid);
 		}
 		if (to_fetch.nr)
-			fetch_objects(repository_format_partial_clone,
-				      to_fetch.oid, to_fetch.nr);
-		fetch_if_missing = fetch_if_missing_store;
+			promisor_remote_get_direct(the_repository,
+						   to_fetch.oid, to_fetch.nr);
 		oid_array_clear(&to_fetch);
 	}
 	for (i = 0; i < index->cache_nr; i++) {
@@ -648,7 +631,7 @@ static int unpack_index_entry(struct cache_entry *ce,
 	return ret;
 }
 
-static int find_cache_pos(struct traverse_info *, const struct name_entry *);
+static int find_cache_pos(struct traverse_info *, const char *p, size_t len);
 
 static void restore_cache_bottom(struct traverse_info *info, int bottom)
 {
@@ -667,7 +650,7 @@ static int switch_cache_bottom(struct traverse_info *info)
 	if (o->diff_index_cached)
 		return 0;
 	ret = o->cache_bottom;
-	pos = find_cache_pos(info->prev, &info->name);
+	pos = find_cache_pos(info->prev, info->name, info->namelen);
 
 	if (pos < -1)
 		o->cache_bottom = -2 - pos;
@@ -702,21 +685,19 @@ static int index_pos_by_traverse_info(struct name_entry *names,
 				      struct traverse_info *info)
 {
 	struct unpack_trees_options *o = info->data;
-	int len = traverse_path_len(info, names);
-	char *name = xmalloc(len + 1 /* slash */ + 1 /* NUL */);
+	struct strbuf name = STRBUF_INIT;
 	int pos;
 
-	make_traverse_path(name, info, names);
-	name[len++] = '/';
-	name[len] = '\0';
-	pos = index_name_pos(o->src_index, name, len);
+	strbuf_make_traverse_path(&name, info, names->path, names->pathlen);
+	strbuf_addch(&name, '/');
+	pos = index_name_pos(o->src_index, name.buf, name.len);
 	if (pos >= 0)
 		BUG("This is a directory and should not exist in index");
 	pos = -pos - 1;
-	if (!starts_with(o->src_index->cache[pos]->name, name) ||
-	    (pos > 0 && starts_with(o->src_index->cache[pos-1]->name, name)))
+	if (!starts_with(o->src_index->cache[pos]->name, name.buf) ||
+	    (pos > 0 && starts_with(o->src_index->cache[pos-1]->name, name.buf)))
 		BUG("pos must point at the first entry in this directory");
-	free(name);
+	strbuf_release(&name);
 	return pos;
 }
 
@@ -726,7 +707,6 @@ static int index_pos_by_traverse_info(struct name_entry *names,
  * instead of ODB since we already know what these trees contain.
  */
 static int traverse_by_cache_tree(int pos, int nr_entries, int nr_names,
-				  struct name_entry *names,
 				  struct traverse_info *info)
 {
 	struct cache_entry *src[MAX_UNPACK_TREES + 1] = { NULL, };
@@ -816,7 +796,7 @@ static int traverse_trees_recursive(int n, unsigned long dirmask,
 		 * unprocessed entries before 'pos'.
 		 */
 		bottom = o->cache_bottom;
-		ret = traverse_by_cache_tree(pos, nr_entries, n, names, info);
+		ret = traverse_by_cache_tree(pos, nr_entries, n, info);
 		o->cache_bottom = bottom;
 		return ret;
 	}
@@ -828,8 +808,10 @@ static int traverse_trees_recursive(int n, unsigned long dirmask,
 	newinfo = *info;
 	newinfo.prev = info;
 	newinfo.pathspec = info->pathspec;
-	newinfo.name = *p;
-	newinfo.pathlen += tree_entry_len(p) + 1;
+	newinfo.name = p->path;
+	newinfo.namelen = p->pathlen;
+	newinfo.mode = p->mode;
+	newinfo.pathlen = st_add3(newinfo.pathlen, tree_entry_len(p), 1);
 	newinfo.df_conflicts |= df_conflicts;
 
 	/*
@@ -857,7 +839,7 @@ static int traverse_trees_recursive(int n, unsigned long dirmask,
 			const struct object_id *oid = NULL;
 			if (dirmask & 1)
 				oid = &names[i].oid;
-			buf[nr_buf++] = fill_tree_descriptor(t + i, oid);
+			buf[nr_buf++] = fill_tree_descriptor(the_repository, t + i, oid);
 		}
 	}
 
@@ -880,14 +862,18 @@ static int traverse_trees_recursive(int n, unsigned long dirmask,
  * itself - the caller needs to do the final check for the cache
  * entry having more data at the end!
  */
-static int do_compare_entry_piecewise(const struct cache_entry *ce, const struct traverse_info *info, const struct name_entry *n)
+static int do_compare_entry_piecewise(const struct cache_entry *ce,
+				      const struct traverse_info *info,
+				      const char *name, size_t namelen,
+				      unsigned mode)
 {
-	int len, pathlen, ce_len;
+	int pathlen, ce_len;
 	const char *ce_name;
 
 	if (info->prev) {
 		int cmp = do_compare_entry_piecewise(ce, info->prev,
-						     &info->name);
+						     info->name, info->namelen,
+						     info->mode);
 		if (cmp)
 			return cmp;
 	}
@@ -901,15 +887,15 @@ static int do_compare_entry_piecewise(const struct cache_entry *ce, const struct
 	ce_len -= pathlen;
 	ce_name = ce->name + pathlen;
 
-	len = tree_entry_len(n);
-	return df_name_compare(ce_name, ce_len, S_IFREG, n->path, len, n->mode);
+	return df_name_compare(ce_name, ce_len, S_IFREG, name, namelen, mode);
 }
 
 static int do_compare_entry(const struct cache_entry *ce,
 			    const struct traverse_info *info,
-			    const struct name_entry *n)
+			    const char *name, size_t namelen,
+			    unsigned mode)
 {
-	int len, pathlen, ce_len;
+	int pathlen, ce_len;
 	const char *ce_name;
 	int cmp;
 
@@ -919,7 +905,7 @@ static int do_compare_entry(const struct cache_entry *ce,
 	 * it is quicker to use the precomputed version.
 	 */
 	if (!info->traverse_path)
-		return do_compare_entry_piecewise(ce, info, n);
+		return do_compare_entry_piecewise(ce, info, name, namelen, mode);
 
 	cmp = strncmp(ce->name, info->traverse_path, info->pathlen);
 	if (cmp)
@@ -934,13 +920,12 @@ static int do_compare_entry(const struct cache_entry *ce,
 	ce_len -= pathlen;
 	ce_name = ce->name + pathlen;
 
-	len = tree_entry_len(n);
-	return df_name_compare(ce_name, ce_len, S_IFREG, n->path, len, n->mode);
+	return df_name_compare(ce_name, ce_len, S_IFREG, name, namelen, mode);
 }
 
 static int compare_entry(const struct cache_entry *ce, const struct traverse_info *info, const struct name_entry *n)
 {
-	int cmp = do_compare_entry(ce, info, n);
+	int cmp = do_compare_entry(ce, info, n->path, n->pathlen, n->mode);
 	if (cmp)
 		return cmp;
 
@@ -948,7 +933,7 @@ static int compare_entry(const struct cache_entry *ce, const struct traverse_inf
 	 * Even if the beginning compared identically, the ce should
 	 * compare as bigger than a directory leading up to it!
 	 */
-	return ce_namelen(ce) > traverse_path_len(info, n);
+	return ce_namelen(ce) > traverse_path_len(info, tree_entry_len(n));
 }
 
 static int ce_in_traverse_path(const struct cache_entry *ce,
@@ -956,7 +941,8 @@ static int ce_in_traverse_path(const struct cache_entry *ce,
 {
 	if (!info->prev)
 		return 1;
-	if (do_compare_entry(ce, info->prev, &info->name))
+	if (do_compare_entry(ce, info->prev,
+			     info->name, info->namelen, info->mode))
 		return 0;
 	/*
 	 * If ce (blob) is the same name as the path (which is a tree
@@ -971,7 +957,7 @@ static struct cache_entry *create_ce_entry(const struct traverse_info *info,
 	struct index_state *istate,
 	int is_transient)
 {
-	int len = traverse_path_len(info, n);
+	size_t len = traverse_path_len(info, tree_entry_len(n));
 	struct cache_entry *ce =
 		is_transient ?
 		make_empty_transient_cache_entry(len) :
@@ -981,7 +967,8 @@ static struct cache_entry *create_ce_entry(const struct traverse_info *info,
 	ce->ce_flags = create_ce_flags(stage);
 	ce->ce_namelen = len;
 	oidcpy(&ce->oid, &n->oid);
-	make_traverse_path(ce->name, info, n);
+	/* len+1 because the cache_entry allocates space for NUL */
+	make_traverse_path(ce->name, len + 1, info, n->path, n->pathlen);
 
 	return ce;
 }
@@ -1059,7 +1046,7 @@ static int unpack_nondirectories(int n, unsigned long mask,
 static int unpack_failed(struct unpack_trees_options *o, const char *message)
 {
 	discard_index(&o->result);
-	if (!o->gently && !o->exiting_early) {
+	if (!o->quiet && !o->exiting_early) {
 		if (message)
 			return error("%s", message);
 		return -1;
@@ -1074,13 +1061,12 @@ static int unpack_failed(struct unpack_trees_options *o, const char *message)
  * the directory.
  */
 static int find_cache_pos(struct traverse_info *info,
-			  const struct name_entry *p)
+			  const char *p, size_t p_len)
 {
 	int pos;
 	struct unpack_trees_options *o = info->data;
 	struct index_state *index = o->src_index;
 	int pfxlen = info->pathlen;
-	int p_len = tree_entry_len(p);
 
 	for (pos = o->cache_bottom; pos < index->cache_nr; pos++) {
 		const struct cache_entry *ce = index->cache[pos];
@@ -1116,7 +1102,7 @@ static int find_cache_pos(struct traverse_info *info,
 			ce_len = ce_slash - ce_name;
 		else
 			ce_len = ce_namelen(ce) - pfxlen;
-		cmp = name_compare(p->path, p_len, ce_name, ce_len);
+		cmp = name_compare(p, p_len, ce_name, ce_len);
 		/*
 		 * Exact match; if we have a directory we need to
 		 * delay returning it.
@@ -1131,7 +1117,7 @@ static int find_cache_pos(struct traverse_info *info,
 		 * E.g.  ce_name == "t-i", and p->path == "t"; we may
 		 * have "t/a" in the index.
 		 */
-		if (p_len < ce_len && !memcmp(ce_name, p->path, p_len) &&
+		if (p_len < ce_len && !memcmp(ce_name, p, p_len) &&
 		    ce_name[p_len] < '/')
 			continue; /* keep looking */
 		break;
@@ -1142,7 +1128,7 @@ static int find_cache_pos(struct traverse_info *info,
 static struct cache_entry *find_cache_entry(struct traverse_info *info,
 					    const struct name_entry *p)
 {
-	int pos = find_cache_pos(info, p);
+	int pos = find_cache_pos(info, p->path, p->pathlen);
 	struct unpack_trees_options *o = info->data;
 
 	if (0 <= pos)
@@ -1155,10 +1141,10 @@ static void debug_path(struct traverse_info *info)
 {
 	if (info->prev) {
 		debug_path(info->prev);
-		if (*info->prev->name.path)
+		if (*info->prev->name)
 			putchar('/');
 	}
-	printf("%s", info->name.path);
+	printf("%s", info->name);
 }
 
 static void debug_name_entry(int i, struct name_entry *n)
@@ -1282,7 +1268,8 @@ static int clear_ce_flags_1(struct index_state *istate,
 			    struct cache_entry **cache, int nr,
 			    struct strbuf *prefix,
 			    int select_mask, int clear_mask,
-			    struct exclude_list *el, int defval);
+			    struct pattern_list *pl,
+			    enum pattern_match_result default_match);
 
 /* Whole directory matching */
 static int clear_ce_flags_dir(struct index_state *istate,
@@ -1290,19 +1277,21 @@ static int clear_ce_flags_dir(struct index_state *istate,
 			      struct strbuf *prefix,
 			      char *basename,
 			      int select_mask, int clear_mask,
-			      struct exclude_list *el, int defval)
+			      struct pattern_list *pl,
+			      enum pattern_match_result default_match)
 {
 	struct cache_entry **cache_end;
 	int dtype = DT_DIR;
-	int ret = is_excluded_from_list(prefix->buf, prefix->len,
-					basename, &dtype, el, istate);
 	int rc;
+	enum pattern_match_result ret;
+	ret = path_matches_pattern_list(prefix->buf, prefix->len,
+					basename, &dtype, pl, istate);
 
 	strbuf_addch(prefix, '/');
 
 	/* If undecided, use matching result of parent dir in defval */
-	if (ret < 0)
-		ret = defval;
+	if (ret == UNDECIDED)
+		ret = default_match;
 
 	for (cache_end = cache; cache_end != cache + nr; cache_end++) {
 		struct cache_entry *ce = *cache_end;
@@ -1311,23 +1300,23 @@ static int clear_ce_flags_dir(struct index_state *istate,
 	}
 
 	/*
-	 * TODO: check el, if there are no patterns that may conflict
+	 * TODO: check pl, if there are no patterns that may conflict
 	 * with ret (iow, we know in advance the incl/excl
 	 * decision for the entire directory), clear flag here without
 	 * calling clear_ce_flags_1(). That function will call
-	 * the expensive is_excluded_from_list() on every entry.
+	 * the expensive path_matches_pattern_list() on every entry.
 	 */
 	rc = clear_ce_flags_1(istate, cache, cache_end - cache,
 			      prefix,
 			      select_mask, clear_mask,
-			      el, ret);
+			      pl, ret);
 	strbuf_setlen(prefix, prefix->len - 1);
 	return rc;
 }
 
 /*
  * Traverse the index, find every entry that matches according to
- * o->el. Do "ce_flags &= ~clear_mask" on those entries. Return the
+ * o->pl. Do "ce_flags &= ~clear_mask" on those entries. Return the
  * number of traversed entries.
  *
  * If select_mask is non-zero, only entries whose ce_flags has on of
@@ -1344,7 +1333,8 @@ static int clear_ce_flags_1(struct index_state *istate,
 			    struct cache_entry **cache, int nr,
 			    struct strbuf *prefix,
 			    int select_mask, int clear_mask,
-			    struct exclude_list *el, int defval)
+			    struct pattern_list *pl,
+			    enum pattern_match_result default_match)
 {
 	struct cache_entry **cache_end = cache + nr;
 
@@ -1355,7 +1345,8 @@ static int clear_ce_flags_1(struct index_state *istate,
 	while(cache != cache_end) {
 		struct cache_entry *ce = *cache;
 		const char *name, *slash;
-		int len, dtype, ret;
+		int len, dtype;
+		enum pattern_match_result ret;
 
 		if (select_mask && !(ce->ce_flags & select_mask)) {
 			cache++;
@@ -1379,7 +1370,7 @@ static int clear_ce_flags_1(struct index_state *istate,
 						       prefix,
 						       prefix->buf + prefix->len - len,
 						       select_mask, clear_mask,
-						       el, defval);
+						       pl, default_match);
 
 			/* clear_c_f_dir eats a whole dir already? */
 			if (processed) {
@@ -1391,18 +1382,20 @@ static int clear_ce_flags_1(struct index_state *istate,
 			strbuf_addch(prefix, '/');
 			cache += clear_ce_flags_1(istate, cache, cache_end - cache,
 						  prefix,
-						  select_mask, clear_mask, el, defval);
+						  select_mask, clear_mask, pl,
+						  default_match);
 			strbuf_setlen(prefix, prefix->len - len - 1);
 			continue;
 		}
 
 		/* Non-directory */
 		dtype = ce_to_dtype(ce);
-		ret = is_excluded_from_list(ce->name, ce_namelen(ce),
-					    name, &dtype, el, istate);
-		if (ret < 0)
-			ret = defval;
-		if (ret > 0)
+		ret = path_matches_pattern_list(ce->name,
+						ce_namelen(ce),
+						name, &dtype, pl, istate);
+		if (ret == UNDECIDED)
+			ret = default_match;
+		if (ret == MATCHED)
 			ce->ce_flags &= ~clear_mask;
 		cache++;
 	}
@@ -1411,7 +1404,7 @@ static int clear_ce_flags_1(struct index_state *istate,
 
 static int clear_ce_flags(struct index_state *istate,
 			  int select_mask, int clear_mask,
-			  struct exclude_list *el)
+			  struct pattern_list *pl)
 {
 	static struct strbuf prefix = STRBUF_INIT;
 
@@ -1422,13 +1415,13 @@ static int clear_ce_flags(struct index_state *istate,
 				istate->cache_nr,
 				&prefix,
 				select_mask, clear_mask,
-				el, 0);
+				pl, 0);
 }
 
 /*
  * Set/Clear CE_NEW_SKIP_WORKTREE according to $GIT_DIR/info/sparse-checkout
  */
-static void mark_new_skip_worktree(struct exclude_list *el,
+static void mark_new_skip_worktree(struct pattern_list *pl,
 				   struct index_state *istate,
 				   int select_flag, int skip_wt_flag)
 {
@@ -1454,7 +1447,7 @@ static void mark_new_skip_worktree(struct exclude_list *el,
 	 * 2. Widen worktree according to sparse-checkout file.
 	 * Matched entries will have skip_wt_flag cleared (i.e. "in")
 	 */
-	clear_ce_flags(istate, select_flag, skip_wt_flag, el);
+	clear_ce_flags(istate, select_flag, skip_wt_flag, pl);
 }
 
 static int verify_absent(const struct cache_entry *,
@@ -1470,21 +1463,21 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 {
 	int i, ret;
 	static struct cache_entry *dfc;
-	struct exclude_list el;
+	struct pattern_list pl;
 
 	if (len > MAX_UNPACK_TREES)
 		die("unpack_trees takes at most %d trees", MAX_UNPACK_TREES);
 
 	trace_performance_enter();
-	memset(&el, 0, sizeof(el));
+	memset(&pl, 0, sizeof(pl));
 	if (!core_apply_sparse_checkout || !o->update)
 		o->skip_sparse_checkout = 1;
 	if (!o->skip_sparse_checkout) {
 		char *sparse = git_pathdup("info/sparse-checkout");
-		if (add_excludes_from_file_to_list(sparse, "", 0, &el, NULL) < 0)
+		if (add_patterns_from_file_to_list(sparse, "", 0, &pl, NULL) < 0)
 			o->skip_sparse_checkout = 1;
 		else
-			o->el = &el;
+			o->pl = &pl;
 		free(sparse);
 	}
 
@@ -1515,7 +1508,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 	 * Sparse checkout loop #1: set NEW_SKIP_WORKTREE on existing entries
 	 */
 	if (!o->skip_sparse_checkout)
-		mark_new_skip_worktree(o->el, o->src_index, 0, CE_NEW_SKIP_WORKTREE);
+		mark_new_skip_worktree(o->pl, o->src_index, 0, CE_NEW_SKIP_WORKTREE);
 
 	if (!dfc)
 		dfc = xcalloc(1, cache_entry_size(0));
@@ -1580,7 +1573,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 		 * If the will have NEW_SKIP_WORKTREE, also set CE_SKIP_WORKTREE
 		 * so apply_sparse_checkout() won't attempt to remove it from worktree
 		 */
-		mark_new_skip_worktree(o->el, &o->result, CE_ADDED, CE_SKIP_WORKTREE | CE_NEW_SKIP_WORKTREE);
+		mark_new_skip_worktree(o->pl, &o->result, CE_ADDED, CE_SKIP_WORKTREE | CE_NEW_SKIP_WORKTREE);
 
 		ret = 0;
 		for (i = 0; i < o->result.cache_nr; i++) {
@@ -1637,6 +1630,8 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 						  WRITE_TREE_SILENT |
 						  WRITE_TREE_REPAIR);
 		}
+
+		o->result.updated_workdir = 1;
 		discard_index(o->dst_index);
 		*o->dst_index = o->result;
 	} else {
@@ -1646,7 +1641,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 
 done:
 	trace_performance_leave("unpack_trees");
-	clear_exclude_list(&el);
+	clear_pattern_list(&pl);
 	return ret;
 
 return_failed:
@@ -1664,8 +1659,7 @@ return_failed:
 static int reject_merge(const struct cache_entry *ce,
 			struct unpack_trees_options *o)
 {
-	return o->gently ? -1 :
-		add_rejected_path(o, ERROR_WOULD_OVERWRITE, ce->name);
+	return add_rejected_path(o, ERROR_WOULD_OVERWRITE, ce->name);
 }
 
 static int same(const struct cache_entry *a, const struct cache_entry *b)
@@ -1712,8 +1706,7 @@ static int verify_uptodate_1(const struct cache_entry *ce,
 			int r = check_submodule_move_head(ce,
 				"HEAD", oid_to_hex(&ce->oid), o);
 			if (r)
-				return o->gently ? -1 :
-					add_rejected_path(o, error_type, ce->name);
+				return add_rejected_path(o, error_type, ce->name);
 			return 0;
 		}
 
@@ -1731,8 +1724,7 @@ static int verify_uptodate_1(const struct cache_entry *ce,
 	}
 	if (errno == ENOENT)
 		return 0;
-	return o->gently ? -1 :
-		add_rejected_path(o, error_type, ce->name);
+	return add_rejected_path(o, error_type, ce->name);
 }
 
 int verify_uptodate(const struct cache_entry *ce,
@@ -1778,7 +1770,6 @@ static void invalidate_ce_path(const struct cache_entry *ce,
  */
 static int verify_clean_submodule(const char *old_sha1,
 				  const struct cache_entry *ce,
-				  enum unpack_trees_error_types error_type,
 				  struct unpack_trees_options *o)
 {
 	if (!submodule_from_ce(ce))
@@ -1789,7 +1780,6 @@ static int verify_clean_submodule(const char *old_sha1,
 }
 
 static int verify_clean_subdirectory(const struct cache_entry *ce,
-				     enum unpack_trees_error_types error_type,
 				     struct unpack_trees_options *o)
 {
 	/*
@@ -1812,7 +1802,7 @@ static int verify_clean_subdirectory(const struct cache_entry *ce,
 		if (!sub_head && oideq(&oid, &ce->oid))
 			return 0;
 		return verify_clean_submodule(sub_head ? NULL : oid_to_hex(&oid),
-					      ce, error_type, o);
+					      ce, o);
 	}
 
 	/*
@@ -1854,8 +1844,7 @@ static int verify_clean_subdirectory(const struct cache_entry *ce,
 		d.exclude_per_dir = o->dir->exclude_per_dir;
 	i = read_directory(&d, o->src_index, pathbuf, namelen+1, NULL);
 	if (i)
-		return o->gently ? -1 :
-			add_rejected_path(o, ERROR_NOT_UPTODATE_DIR, ce->name);
+		return add_rejected_path(o, ERROR_NOT_UPTODATE_DIR, ce->name);
 	free(pathbuf);
 	return cnt;
 }
@@ -1908,7 +1897,7 @@ static int check_ok_to_remove(const char *name, int len, int dtype,
 		 * files that are in "foo/" we would lose
 		 * them.
 		 */
-		if (verify_clean_subdirectory(ce, error_type, o) < 0)
+		if (verify_clean_subdirectory(ce, o) < 0)
 			return -1;
 		return 0;
 	}
@@ -1924,8 +1913,7 @@ static int check_ok_to_remove(const char *name, int len, int dtype,
 			return 0;
 	}
 
-	return o->gently ? -1 :
-		add_rejected_path(o, error_type, name);
+	return add_rejected_path(o, error_type, name);
 }
 
 /*
@@ -2366,7 +2354,7 @@ int bind_merge(const struct cache_entry * const *src,
 		return error("Cannot do a bind merge of %d trees",
 			     o->merge_size);
 	if (a && old)
-		return o->gently ? -1 :
+		return o->quiet ? -1 :
 			error(ERRORMSG(o, ERROR_BIND_OVERLAP),
 			      super_prefixed(a->name),
 			      super_prefixed(old->name));
@@ -2406,7 +2394,7 @@ int oneway_merge(const struct cache_entry * const *src,
 		if (o->update && S_ISGITLINK(old->ce_mode) &&
 		    should_update_submodules() && !verify_uptodate(old, o))
 			update |= CE_UPDATE;
-		add_entry(o, old, update, 0);
+		add_entry(o, old, update, CE_STAGEMASK);
 		return 0;
 	}
 	return merged_entry(a, old, o);

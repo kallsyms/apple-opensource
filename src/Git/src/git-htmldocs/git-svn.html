@@ -2057,11 +2057,11 @@ this, either.  Using this conflicts with the <em>useSvmProps</em>
 option for (hopefully) obvious reasons.</p></div>
 <div class="paragraph"><p>This option is NOT recommended as it makes it difficult to track down
 old references to SVN revision numbers in existing documentation, bug
-reports and archives.  If you plan to eventually migrate from SVN to Git
-and are certain about dropping SVN history, consider
-<a href="git-filter-branch.html">git-filter-branch(1)</a> instead.  filter-branch also allows
-reformatting of metadata for ease-of-reading and rewriting authorship
-info for non-"svn.authorsFile" users.</p></div>
+reports, and archives.  If you plan to eventually migrate from SVN to
+Git and are certain about dropping SVN history, consider
+<a href="https://github.com/newren/git-filter-repo">git-filter-repo</a> instead.
+filter-repo also allows reformatting of metadata for ease-of-reading
+and rewriting authorship info for non-"svn.authorsFile" users.</p></div>
 </dd>
 <dt class="hdlist1">
 svn.useSvmProps
@@ -2425,10 +2425,10 @@ listed below are allowed:</p></div>
         branches = branches/re*se:refs/remotes/project-a/branches/*
         tags = tags/*/project-a:refs/remotes/project-a/tags/*</code></pre>
 </div></div>
-<div class="paragraph"><p>Keep in mind that the <em>*</em> (asterisk) wildcard of the local ref
-(right of the <em>:</em>) <strong>must</strong> be the farthest right path component;
+<div class="paragraph"><p>Keep in mind that the <code>*</code> (asterisk) wildcard of the local ref
+(right of the <code>:</code>) <strong>must</strong> be the farthest right path component;
 however the remote wildcard may be anywhere as long as it&#8217;s an
-independent path component (surrounded by <em>/</em> or EOL).   This
+independent path component (surrounded by <code>/</code> or EOL).   This
 type of configuration is not automatically created by <em>init</em> and
 should be manually entered with a text-editor or using <em>git config</em>.</p></div>
 <div class="paragraph"><p>Also note that only one asterisk is allowed per word. For example:</p></div>
@@ -2514,7 +2514,7 @@ rewinds it.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2018-07-18 13:16:04 PDT
+ 2019-09-30 14:04:22 JST
 </div>
 </div>
 </body>

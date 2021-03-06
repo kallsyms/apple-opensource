@@ -7,9 +7,6 @@ test_description='Various diff formatting options'
 
 . ./test-lib.sh
 
-LF='
-'
-
 test_expect_success setup '
 
 	GIT_AUTHOR_DATE="2006-06-26 00:00:00 +0000" &&
@@ -338,6 +335,8 @@ format-patch --inline --stdout initial..master^^
 format-patch --stdout --cover-letter -n initial..master^
 
 diff --abbrev initial..side
+diff -U initial..side
+diff -U1 initial..side
 diff -r initial..side
 diff --stat initial..side
 diff -r --stat initial..side

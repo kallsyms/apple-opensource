@@ -346,6 +346,32 @@ test_expect_success 'Verify descending sort' '
 '
 
 cat >expected <<\EOF
+refs/tags/testtag
+refs/tags/testtag-2
+EOF
+
+test_expect_success 'exercise patterns with prefixes' '
+	git tag testtag-2 &&
+	test_when_finished "git tag -d testtag-2" &&
+	git for-each-ref --format="%(refname)" \
+		refs/tags/testtag refs/tags/testtag-2 >actual &&
+	test_cmp expected actual
+'
+
+cat >expected <<\EOF
+refs/tags/testtag
+refs/tags/testtag-2
+EOF
+
+test_expect_success 'exercise glob patterns with prefixes' '
+	git tag testtag-2 &&
+	test_when_finished "git tag -d testtag-2" &&
+	git for-each-ref --format="%(refname)" \
+		refs/tags/testtag "refs/tags/testtag-*" >actual &&
+	test_cmp expected actual
+'
+
+cat >expected <<\EOF
 'refs/heads/master'
 'refs/remotes/origin/master'
 'refs/tags/testtag'
@@ -392,8 +418,15 @@ test_atom head upstream:track '[ahead 1]'
 test_atom head upstream:trackshort '>'
 test_atom head upstream:track,nobracket 'ahead 1'
 test_atom head upstream:nobracket,track 'ahead 1'
-test_atom head push:track '[ahead 1]'
-test_atom head push:trackshort '>'
+
+test_expect_success 'setup for push:track[short]' '
+	test_commit third &&
+	git update-ref refs/remotes/myfork/master master &&
+	git reset master~1
+'
+
+test_atom head push:track '[behind 1]'
+test_atom head push:trackshort '<'
 
 test_expect_success 'Check that :track[short] cannot be used with other atoms' '
 	test_must_fail git for-each-ref --format="%(refname:track)" 2>/dev/null &&
@@ -420,8 +453,10 @@ test_expect_success 'Check for invalid refname format' '
 test_expect_success 'set up color tests' '
 	cat >expected.color <<-EOF &&
 	$(git rev-parse --short refs/heads/master) <GREEN>master<RESET>
+	$(git rev-parse --short refs/remotes/myfork/master) <GREEN>myfork/master<RESET>
 	$(git rev-parse --short refs/remotes/origin/master) <GREEN>origin/master<RESET>
 	$(git rev-parse --short refs/tags/testtag) <GREEN>testtag<RESET>
+	$(git rev-parse --short refs/tags/third) <GREEN>third<RESET>
 	$(git rev-parse --short refs/tags/two) <GREEN>two<RESET>
 	EOF
 	sed "s/<[^>]*>//g" <expected.color >expected.bare &&
@@ -490,6 +525,25 @@ test_expect_success 'Check ambiguous head and tag refs II (loose)' '
 	git for-each-ref --format "%(refname:short)" refs/heads/ambiguous refs/tags/ambiguous >actual &&
 	test_cmp expected actual
 '
+
+test_expect_success 'create tag without tagger' '
+	git tag -a -m "Broken tag" taggerless &&
+	git tag -f taggerless $(git cat-file tag taggerless |
+		sed -e "/^tagger /d" |
+		git hash-object --stdin -w -t tag)
+'
+
+test_atom refs/tags/taggerless type 'commit'
+test_atom refs/tags/taggerless tag 'taggerless'
+test_atom refs/tags/taggerless tagger ''
+test_atom refs/tags/taggerless taggername ''
+test_atom refs/tags/taggerless taggeremail ''
+test_atom refs/tags/taggerless taggerdate ''
+test_atom refs/tags/taggerless committer ''
+test_atom refs/tags/taggerless committername ''
+test_atom refs/tags/taggerless committeremail ''
+test_atom refs/tags/taggerless committerdate ''
+test_atom refs/tags/taggerless subject 'Broken tag'
 
 test_expect_success 'an unusual tag with an incomplete line' '
 

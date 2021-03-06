@@ -363,6 +363,8 @@ static inline int needs_hiding(const char *path)
 			/* ignore trailing slashes */
 			if (*path)
 				basename = path;
+			else
+				break;
 		}
 
 	if (hide_dotfiles == HIDE_DOTFILES_TRUE)
@@ -1186,14 +1188,21 @@ static char *lookup_prog(const char *dir, int dirlen, const char *cmd,
 			 int isexe, int exe_only)
 {
 	char path[MAX_PATH];
+	wchar_t wpath[MAX_PATH];
 	snprintf(path, sizeof(path), "%.*s\\%s.exe", dirlen, dir, cmd);
 
-	if (!isexe && access(path, F_OK) == 0)
+	if (xutftowcs_path(wpath, path) < 0)
+		return NULL;
+
+	if (!isexe && _waccess(wpath, F_OK) == 0)
 		return xstrdup(path);
-	path[strlen(path)-4] = '\0';
-	if ((!exe_only || isexe) && access(path, F_OK) == 0)
-		if (!(GetFileAttributes(path) & FILE_ATTRIBUTE_DIRECTORY))
+	wpath[wcslen(wpath)-4] = '\0';
+	if ((!exe_only || isexe) && _waccess(wpath, F_OK) == 0) {
+		if (!(GetFileAttributesW(wpath) & FILE_ATTRIBUTE_DIRECTORY)) {
+			path[strlen(path)-4] = '\0';
 			return xstrdup(path);
+		}
+	}
 	return NULL;
 }
 
@@ -1254,11 +1263,6 @@ static int wenvcmp(const void *a, const void *b)
 	return _wcsnicmp(p, q, p_len);
 }
 
-/* We need a stable sort to convert the environment between UTF-16 <-> UTF-8 */
-#ifndef INTERNAL_QSORT
-#include "qsort.c"
-#endif
-
 /*
  * Build an environment block combining the inherited environment
  * merged with the given list of settings.
@@ -1290,15 +1294,15 @@ static wchar_t *make_environment_block(char **deltaenv)
 		}
 
 		ALLOC_ARRAY(result, size);
-		memcpy(result, wenv, size * sizeof(*wenv));
+		COPY_ARRAY(result, wenv, size);
 		FreeEnvironmentStringsW(wenv);
 		return result;
 	}
 
 	/*
 	 * If there is a deltaenv, let's accumulate all keys into `array`,
-	 * sort them using the stable git_qsort() and then copy, skipping
-	 * duplicate keys
+	 * sort them using the stable git_stable_qsort() and then copy,
+	 * skipping duplicate keys
 	 */
 	for (p = wenv; p && *p; ) {
 		ALLOC_GROW(array, nr + 1, alloc);
@@ -1321,7 +1325,7 @@ static wchar_t *make_environment_block(char **deltaenv)
 		p += wlen + 1;
 	}
 
-	git_qsort(array, nr, sizeof(*array), wenvcmp);
+	git_stable_qsort(array, nr, sizeof(*array), wenvcmp);
 	ALLOC_ARRAY(result, size + delta_size);
 
 	for (p = result, i = 0; i < nr; i++) {
@@ -1334,7 +1338,7 @@ static wchar_t *make_environment_block(char **deltaenv)
 			continue;
 
 		size = wcslen(array[i]) + 1;
-		memcpy(p, array[i], size * sizeof(*p));
+		COPY_ARRAY(p, array[i], size);
 		p += size;
 	}
 	*p = L'\0';
@@ -1446,7 +1450,7 @@ static pid_t mingw_spawnve_fd(const char *cmd, const char **argv, char **deltaen
 	do_unset_environment_variables();
 
 	/* Determine whether or not we are associated to a console */
-	cons = CreateFile("CONOUT$", GENERIC_WRITE,
+	cons = CreateFileW(L"CONOUT$", GENERIC_WRITE,
 			FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
 			FILE_ATTRIBUTE_NORMAL, NULL);
 	if (cons == INVALID_HANDLE_VALUE) {
@@ -1476,7 +1480,9 @@ static pid_t mingw_spawnve_fd(const char *cmd, const char **argv, char **deltaen
 	si.hStdOutput = winansi_get_osfhandle(fhout);
 	si.hStdError = winansi_get_osfhandle(fherr);
 
-	if (xutftowcs_path(wcmd, cmd) < 0)
+	if (*argv && !strcmp(cmd, *argv))
+		wcmd[0] = L'\0';
+	else if (xutftowcs_path(wcmd, cmd) < 0)
 		return -1;
 	if (dir && xutftowcs_path(wdir, dir) < 0)
 		return -1;
@@ -1505,8 +1511,8 @@ static pid_t mingw_spawnve_fd(const char *cmd, const char **argv, char **deltaen
 	wenvblk = make_environment_block(deltaenv);
 
 	memset(&pi, 0, sizeof(pi));
-	ret = CreateProcessW(wcmd, wargs, NULL, NULL, TRUE, flags,
-		wenvblk, dir ? wdir : NULL, &si, &pi);
+	ret = CreateProcessW(*wcmd ? wcmd : NULL, wargs, NULL, NULL, TRUE,
+		flags, wenvblk, dir ? wdir : NULL, &si, &pi);
 
 	free(wenvblk);
 	free(wargs);
@@ -1590,19 +1596,26 @@ static int try_shell_exec(const char *cmd, char *const *argv)
 		return 0;
 	prog = path_lookup(interpr, 1);
 	if (prog) {
+		int exec_id;
 		int argc = 0;
-		const char **argv2;
+#ifndef _MSC_VER
+		const
+#endif
+		char **argv2;
 		while (argv[argc]) argc++;
 		ALLOC_ARRAY(argv2, argc + 1);
 		argv2[0] = (char *)cmd;	/* full path to the script file */
 		memcpy(&argv2[1], &argv[1], sizeof(*argv) * argc);
+		exec_id = trace2_exec(prog, argv2);
 		pid = mingw_spawnv(prog, argv2, 1);
 		if (pid >= 0) {
 			int status;
 			if (waitpid(pid, &status, 0) < 0)
 				status = 255;
+			trace2_exec_result(exec_id, status);
 			exit(status);
 		}
+		trace2_exec_result(exec_id, -1);
 		pid = 1;	/* indicate that we tried but failed */
 		free(prog);
 		free(argv2);
@@ -1615,12 +1628,17 @@ int mingw_execv(const char *cmd, char *const *argv)
 	/* check if git_command is a shell script */
 	if (!try_shell_exec(cmd, argv)) {
 		int pid, status;
+		int exec_id;
 
+		exec_id = trace2_exec(cmd, (const char **)argv);
 		pid = mingw_spawnv(cmd, (const char **)argv, 0);
-		if (pid < 0)
+		if (pid < 0) {
+			trace2_exec_result(exec_id, -1);
 			return -1;
+		}
 		if (waitpid(pid, &status, 0) < 0)
 			status = 255;
+		trace2_exec_result(exec_id, status);
 		exit(status);
 	}
 	return -1;
@@ -1688,6 +1706,8 @@ char *mingw_getenv(const char *name)
 	if (!w_key)
 		die("Out of memory, (tried to allocate %u wchar_t's)", len_key);
 	xutftowcs(w_key, name, len_key);
+	/* GetEnvironmentVariableW() only sets the last error upon failure */
+	SetLastError(ERROR_SUCCESS);
 	len_value = GetEnvironmentVariableW(w_key, w_value, ARRAY_SIZE(w_value));
 	if (!len_value && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
 		free(w_key);
@@ -1744,142 +1764,10 @@ int mingw_putenv(const char *namevalue)
 	return result ? 0 : -1;
 }
 
-/*
- * Note, this isn't a complete replacement for getaddrinfo. It assumes
- * that service contains a numerical port, or that it is null. It
- * does a simple search using gethostbyname, and returns one IPv4 host
- * if one was found.
- */
-static int WSAAPI getaddrinfo_stub(const char *node, const char *service,
-				   const struct addrinfo *hints,
-				   struct addrinfo **res)
-{
-	struct hostent *h = NULL;
-	struct addrinfo *ai;
-	struct sockaddr_in *sin;
-
-	if (node) {
-		h = gethostbyname(node);
-		if (!h)
-			return WSAGetLastError();
-	}
-
-	ai = xmalloc(sizeof(struct addrinfo));
-	*res = ai;
-	ai->ai_flags = 0;
-	ai->ai_family = AF_INET;
-	ai->ai_socktype = hints ? hints->ai_socktype : 0;
-	switch (ai->ai_socktype) {
-	case SOCK_STREAM:
-		ai->ai_protocol = IPPROTO_TCP;
-		break;
-	case SOCK_DGRAM:
-		ai->ai_protocol = IPPROTO_UDP;
-		break;
-	default:
-		ai->ai_protocol = 0;
-		break;
-	}
-	ai->ai_addrlen = sizeof(struct sockaddr_in);
-	if (hints && (hints->ai_flags & AI_CANONNAME))
-		ai->ai_canonname = h ? xstrdup(h->h_name) : NULL;
-	else
-		ai->ai_canonname = NULL;
-
-	sin = xcalloc(1, ai->ai_addrlen);
-	sin->sin_family = AF_INET;
-	/* Note: getaddrinfo is supposed to allow service to be a string,
-	 * which should be looked up using getservbyname. This is
-	 * currently not implemented */
-	if (service)
-		sin->sin_port = htons(atoi(service));
-	if (h)
-		sin->sin_addr = *(struct in_addr *)h->h_addr;
-	else if (hints && (hints->ai_flags & AI_PASSIVE))
-		sin->sin_addr.s_addr = INADDR_ANY;
-	else
-		sin->sin_addr.s_addr = INADDR_LOOPBACK;
-	ai->ai_addr = (struct sockaddr *)sin;
-	ai->ai_next = NULL;
-	return 0;
-}
-
-static void WSAAPI freeaddrinfo_stub(struct addrinfo *res)
-{
-	free(res->ai_canonname);
-	free(res->ai_addr);
-	free(res);
-}
-
-static int WSAAPI getnameinfo_stub(const struct sockaddr *sa, socklen_t salen,
-				   char *host, DWORD hostlen,
-				   char *serv, DWORD servlen, int flags)
-{
-	const struct sockaddr_in *sin = (const struct sockaddr_in *)sa;
-	if (sa->sa_family != AF_INET)
-		return EAI_FAMILY;
-	if (!host && !serv)
-		return EAI_NONAME;
-
-	if (host && hostlen > 0) {
-		struct hostent *ent = NULL;
-		if (!(flags & NI_NUMERICHOST))
-			ent = gethostbyaddr((const char *)&sin->sin_addr,
-					    sizeof(sin->sin_addr), AF_INET);
-
-		if (ent)
-			snprintf(host, hostlen, "%s", ent->h_name);
-		else if (flags & NI_NAMEREQD)
-			return EAI_NONAME;
-		else
-			snprintf(host, hostlen, "%s", inet_ntoa(sin->sin_addr));
-	}
-
-	if (serv && servlen > 0) {
-		struct servent *ent = NULL;
-		if (!(flags & NI_NUMERICSERV))
-			ent = getservbyport(sin->sin_port,
-					    flags & NI_DGRAM ? "udp" : "tcp");
-
-		if (ent)
-			snprintf(serv, servlen, "%s", ent->s_name);
-		else
-			snprintf(serv, servlen, "%d", ntohs(sin->sin_port));
-	}
-
-	return 0;
-}
-
-static HMODULE ipv6_dll = NULL;
-static void (WSAAPI *ipv6_freeaddrinfo)(struct addrinfo *res);
-static int (WSAAPI *ipv6_getaddrinfo)(const char *node, const char *service,
-				      const struct addrinfo *hints,
-				      struct addrinfo **res);
-static int (WSAAPI *ipv6_getnameinfo)(const struct sockaddr *sa, socklen_t salen,
-				      char *host, DWORD hostlen,
-				      char *serv, DWORD servlen, int flags);
-/*
- * gai_strerror is an inline function in the ws2tcpip.h header, so we
- * don't need to try to load that one dynamically.
- */
-
-static void socket_cleanup(void)
-{
-	WSACleanup();
-	if (ipv6_dll)
-		FreeLibrary(ipv6_dll);
-	ipv6_dll = NULL;
-	ipv6_freeaddrinfo = freeaddrinfo_stub;
-	ipv6_getaddrinfo = getaddrinfo_stub;
-	ipv6_getnameinfo = getnameinfo_stub;
-}
-
 static void ensure_socket_initialization(void)
 {
 	WSADATA wsa;
 	static int initialized = 0;
-	const char *libraries[] = { "ws2_32.dll", "wship6.dll", NULL };
-	const char **name;
 
 	if (initialized)
 		return;
@@ -1888,35 +1776,7 @@ static void ensure_socket_initialization(void)
 		die("unable to initialize winsock subsystem, error %d",
 			WSAGetLastError());
 
-	for (name = libraries; *name; name++) {
-		ipv6_dll = LoadLibraryExA(*name, NULL,
-					  LOAD_LIBRARY_SEARCH_SYSTEM32);
-		if (!ipv6_dll)
-			continue;
-
-		ipv6_freeaddrinfo = (void (WSAAPI *)(struct addrinfo *))
-			GetProcAddress(ipv6_dll, "freeaddrinfo");
-		ipv6_getaddrinfo = (int (WSAAPI *)(const char *, const char *,
-						   const struct addrinfo *,
-						   struct addrinfo **))
-			GetProcAddress(ipv6_dll, "getaddrinfo");
-		ipv6_getnameinfo = (int (WSAAPI *)(const struct sockaddr *,
-						   socklen_t, char *, DWORD,
-						   char *, DWORD, int))
-			GetProcAddress(ipv6_dll, "getnameinfo");
-		if (!ipv6_freeaddrinfo || !ipv6_getaddrinfo || !ipv6_getnameinfo) {
-			FreeLibrary(ipv6_dll);
-			ipv6_dll = NULL;
-		} else
-			break;
-	}
-	if (!ipv6_freeaddrinfo || !ipv6_getaddrinfo || !ipv6_getnameinfo) {
-		ipv6_freeaddrinfo = freeaddrinfo_stub;
-		ipv6_getaddrinfo = getaddrinfo_stub;
-		ipv6_getnameinfo = getnameinfo_stub;
-	}
-
-	atexit(socket_cleanup);
+	atexit((void(*)(void)) WSACleanup);
 	initialized = 1;
 }
 
@@ -1934,24 +1794,12 @@ struct hostent *mingw_gethostbyname(const char *host)
 	return gethostbyname(host);
 }
 
-void mingw_freeaddrinfo(struct addrinfo *res)
-{
-	ipv6_freeaddrinfo(res);
-}
-
+#undef getaddrinfo
 int mingw_getaddrinfo(const char *node, const char *service,
 		      const struct addrinfo *hints, struct addrinfo **res)
 {
 	ensure_socket_initialization();
-	return ipv6_getaddrinfo(node, service, hints, res);
-}
-
-int mingw_getnameinfo(const struct sockaddr *sa, socklen_t salen,
-		      char *host, DWORD hostlen, char *serv, DWORD servlen,
-		      int flags)
-{
-	ensure_socket_initialization();
-	return ipv6_getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
+	return getaddrinfo(node, service, hints, res);
 }
 
 int mingw_socket(int domain, int type, int protocol)
@@ -2148,13 +1996,19 @@ struct passwd *getpwuid(int uid)
 	static unsigned initialized;
 	static char user_name[100];
 	static struct passwd *p;
+	wchar_t buf[100];
 	DWORD len;
 
 	if (initialized)
 		return p;
 
-	len = sizeof(user_name);
-	if (!GetUserName(user_name, &len)) {
+	len = ARRAY_SIZE(buf);
+	if (!GetUserNameW(buf, &len)) {
+		initialized = 1;
+		return NULL;
+	}
+
+	if (xwcstoutf(user_name, buf, sizeof(user_name)) < 0) {
 		initialized = 1;
 		return NULL;
 	}
@@ -2318,8 +2172,33 @@ int mingw_raise(int sig)
 			sigint_fn(SIGINT);
 		return 0;
 
+#if defined(_MSC_VER)
+	case SIGILL:
+	case SIGFPE:
+	case SIGSEGV:
+	case SIGTERM:
+	case SIGBREAK:
+	case SIGABRT:
+	case SIGABRT_COMPAT:
+		/*
+		 * The <signal.h> header in the MS C Runtime defines 8 signals
+		 * as being supported on the platform. Anything else causes an
+		 * "Invalid signal or error" (which in DEBUG builds causes the
+		 * Abort/Retry/Ignore dialog). We by-pass the CRT for things we
+		 * already know will fail.
+		 */
+		return raise(sig);
+	default:
+		errno = EINVAL;
+		return -1;
+
+#else
+
 	default:
 		return raise(sig);
+
+#endif
+
 	}
 }
 
@@ -2501,6 +2380,30 @@ static void setup_windows_environment(void)
 	/* simulate TERM to enable auto-color (see color.c) */
 	if (!getenv("TERM"))
 		setenv("TERM", "cygwin", 1);
+
+	/* calculate HOME if not set */
+	if (!getenv("HOME")) {
+		/*
+		 * try $HOMEDRIVE$HOMEPATH - the home share may be a network
+		 * location, thus also check if the path exists (i.e. is not
+		 * disconnected)
+		 */
+		if ((tmp = getenv("HOMEDRIVE"))) {
+			struct strbuf buf = STRBUF_INIT;
+			strbuf_addstr(&buf, tmp);
+			if ((tmp = getenv("HOMEPATH"))) {
+				strbuf_addstr(&buf, tmp);
+				if (is_directory(buf.buf))
+					setenv("HOME", buf.buf, 1);
+				else
+					tmp = NULL; /* use $USERPROFILE */
+			}
+			strbuf_release(&buf);
+		}
+		/* use $USERPROFILE if the home share is not available */
+		if (!tmp && (tmp = getenv("USERPROFILE")))
+			setenv("HOME", tmp, 1);
+	}
 }
 
 int is_valid_win32_path(const char *path)
@@ -2547,18 +2450,13 @@ int is_valid_win32_path(const char *path)
 	}
 }
 
+#if !defined(_MSC_VER)
 /*
  * Disable MSVCRT command line wildcard expansion (__getmainargs called from
  * mingw startup code, see init.c in mingw runtime).
  */
 int _CRT_glob = 0;
-
-typedef struct {
-	int newmode;
-} _startupinfo;
-
-extern int __wgetmainargs(int *argc, wchar_t ***argv, wchar_t ***env, int glob,
-		_startupinfo *si);
+#endif
 
 static NORETURN void die_startup(void)
 {
@@ -2636,19 +2534,40 @@ static void maybe_redirect_std_handles(void)
 				  GENERIC_WRITE, FILE_FLAG_NO_BUFFERING);
 }
 
-void mingw_startup(void)
+#ifdef _MSC_VER
+#ifdef _DEBUG
+#include <crtdbg.h>
+#endif
+#endif
+
+/*
+ * We implement wmain() and compile with -municode, which would
+ * normally ignore main(), but we call the latter from the former
+ * so that we can handle non-ASCII command-line parameters
+ * appropriately.
+ *
+ * To be more compatible with the core git code, we convert
+ * argv into UTF8 and pass them directly to main().
+ */
+int wmain(int argc, const wchar_t **wargv)
 {
-	int i, maxlen, argc;
-	char *buffer;
-	wchar_t **wenv, **wargv;
-	_startupinfo si;
+	int i, maxlen, exit_status;
+	char *buffer, **save;
+	const char **argv;
+
+	trace2_initialize_clock();
+
+#ifdef _MSC_VER
+#ifdef _DEBUG
+	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_DEBUG);
+#endif
+
+#ifdef USE_MSVC_CRTDBG
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+#endif
 
 	maybe_redirect_std_handles();
-
-	/* get wide char arguments and environment */
-	si.newmode = 0;
-	if (__wgetmainargs(&argc, &wargv, &wenv, _CRT_glob, &si) < 0)
-		die_startup();
 
 	/* determine size of argv and environ conversion buffer */
 	maxlen = wcslen(wargv[0]);
@@ -2659,9 +2578,16 @@ void mingw_startup(void)
 	maxlen = 3 * maxlen + 1;
 	buffer = malloc_startup(maxlen);
 
-	/* convert command line arguments and environment to UTF-8 */
+	/*
+	 * Create a UTF-8 version of w_argv. Also create a "save" copy
+	 * to remember all the string pointers because parse_options()
+	 * will remove claimed items from the argv that we pass down.
+	 */
+	ALLOC_ARRAY(argv, argc + 1);
+	ALLOC_ARRAY(save, argc + 1);
 	for (i = 0; i < argc; i++)
-		__argv[i] = wcstoutfdup_startup(buffer, wargv[i], maxlen);
+		argv[i] = save[i] = wcstoutfdup_startup(buffer, wargv[i], maxlen);
+	argv[i] = save[i] = NULL;
 	free(buffer);
 
 	/* fix Windows specific environment settings */
@@ -2680,6 +2606,16 @@ void mingw_startup(void)
 
 	/* initialize Unicode console */
 	winansi_init();
+
+	/* invoke the real main() using our utf8 version of argv. */
+	exit_status = main(argc, argv);
+
+	for (i = 0; i < argc; i++)
+		free(save[i]);
+	free(save);
+	free(argv);
+
+	return exit_status;
 }
 
 int uname(struct utsname *buf)

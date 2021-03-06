@@ -34,6 +34,7 @@ static const char *msg_would_remove = N_("Would remove %s\n");
 static const char *msg_skip_git_dir = N_("Skipping repository %s\n");
 static const char *msg_would_skip_git_dir = N_("Would skip repository %s\n");
 static const char *msg_warn_remove_failed = N_("failed to remove %s");
+static const char *msg_warn_lstat_failed = N_("could not lstat %s\n");
 
 enum color_clean {
 	CLEAN_COLOR_RESET = 0,
@@ -157,7 +158,8 @@ static int remove_dirs(struct strbuf *path, const char *prefix, int force_flag,
 
 	*dir_gone = 1;
 
-	if ((force_flag & REMOVE_DIR_KEEP_NESTED_GIT) && is_nonbare_repository_dir(path)) {
+	if ((force_flag & REMOVE_DIR_KEEP_NESTED_GIT) &&
+	    is_nonbare_repository_dir(path)) {
 		if (!quiet) {
 			quote_path_relative(path->buf, prefix, &quoted);
 			printf(dry_run ?  _(msg_would_skip_git_dir) : _(msg_skip_git_dir),
@@ -194,7 +196,7 @@ static int remove_dirs(struct strbuf *path, const char *prefix, int force_flag,
 		strbuf_setlen(path, len);
 		strbuf_addstr(path, e->d_name);
 		if (lstat(path->buf, &st))
-			; /* fall thru */
+			warning_errno(_(msg_warn_lstat_failed), path->buf);
 		else if (S_ISDIR(st.st_mode)) {
 			if (remove_dirs(path, prefix, force_flag, dry_run, quiet, &gone))
 				ret = 1;
@@ -647,7 +649,7 @@ static int filter_by_patterns_cmd(void)
 	struct strbuf confirm = STRBUF_INIT;
 	struct strbuf **ignore_list;
 	struct string_list_item *item;
-	struct exclude_list *el;
+	struct pattern_list *pl;
 	int changed = -1, i;
 
 	for (;;) {
@@ -670,7 +672,7 @@ static int filter_by_patterns_cmd(void)
 			break;
 
 		memset(&dir, 0, sizeof(dir));
-		el = add_exclude_list(&dir, EXC_CMDL, "manual exclude");
+		pl = add_pattern_list(&dir, EXC_CMDL, "manual exclude");
 		ignore_list = strbuf_split_max(&confirm, ' ', 0);
 
 		for (i = 0; ignore_list[i]; i++) {
@@ -678,7 +680,7 @@ static int filter_by_patterns_cmd(void)
 			if (!ignore_list[i]->len)
 				continue;
 
-			add_exclude(ignore_list[i]->buf, "", 0, el, -(i+1));
+			add_pattern(ignore_list[i]->buf, "", 0, pl, -(i+1));
 		}
 
 		changed = 0;
@@ -900,7 +902,7 @@ int cmd_clean(int argc, const char **argv, const char *prefix)
 	struct pathspec pathspec;
 	struct strbuf buf = STRBUF_INIT;
 	struct string_list exclude_list = STRING_LIST_INIT_NODUP;
-	struct exclude_list *el;
+	struct pattern_list *pl;
 	struct string_list_item *item;
 	const char *qname;
 	struct option options[] = {
@@ -945,8 +947,18 @@ int cmd_clean(int argc, const char **argv, const char *prefix)
 
 	if (force > 1)
 		rm_flags = 0;
+	else
+		dir.flags |= DIR_SKIP_NESTED_GIT;
 
 	dir.flags |= DIR_SHOW_OTHER_DIRECTORIES;
+
+	if (argc) {
+		/*
+		 * Remaining args implies pathspecs specified, and we should
+		 * recurse within those.
+		 */
+		remove_directories = 1;
+	}
 
 	if (remove_directories)
 		dir.flags |= DIR_SHOW_IGNORED_TOO | DIR_KEEP_UNTRACKED_CONTENTS;
@@ -957,9 +969,9 @@ int cmd_clean(int argc, const char **argv, const char *prefix)
 	if (!ignored)
 		setup_standard_excludes(&dir);
 
-	el = add_exclude_list(&dir, EXC_CMDL, "--exclude option");
+	pl = add_pattern_list(&dir, EXC_CMDL, "--exclude option");
 	for (i = 0; i < exclude_list.nr; i++)
-		add_exclude(exclude_list.items[i].string, "", 0, el, -(i+1));
+		add_pattern(exclude_list.items[i].string, "", 0, pl, -(i+1));
 
 	parse_pathspec(&pathspec, 0,
 		       PATHSPEC_PREFER_CWD,
@@ -1006,6 +1018,7 @@ int cmd_clean(int argc, const char **argv, const char *prefix)
 	for_each_string_list_item(item, &del_list) {
 		struct stat st;
 
+		strbuf_reset(&abs_path);
 		if (prefix)
 			strbuf_addstr(&abs_path, prefix);
 
@@ -1039,7 +1052,6 @@ int cmd_clean(int argc, const char **argv, const char *prefix)
 				printf(dry_run ? _(msg_would_remove) : _(msg_remove), qname);
 			}
 		}
-		strbuf_reset(&abs_path);
 	}
 
 	strbuf_release(&abs_path);

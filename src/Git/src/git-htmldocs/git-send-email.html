@@ -1161,6 +1161,24 @@ must be used for each option.</p></div>
 <h3 id="_automating">Automating</h3>
 <div class="dlist"><dl>
 <dt class="hdlist1">
+--no-[to|cc|bcc]
+</dt>
+<dd>
+<p>
+        Clears any list of "To:", "Cc:", "Bcc:" addresses previously
+        set via config.
+</p>
+</dd>
+<dt class="hdlist1">
+--no-identity
+</dt>
+<dd>
+<p>
+        Clears the previously read value of <code>sendemail.identity</code> set
+        via config, if any.
+</p>
+</dd>
+<dt class="hdlist1">
 --to-cmd=&lt;command&gt;
 </dt>
 <dd>
@@ -1562,7 +1580,7 @@ sendemail.confirm
 <h3 id="_use_gmail_as_the_smtp_server">Use gmail as the smtp server</h3>
 <div class="paragraph"><p>To use <em>git send-email</em> to send your patches through the GMail SMTP server,
 edit ~/.gitconfig to specify your account settings:</p></div>
-<div class="literalblock">
+<div class="listingblock">
 <div class="content">
 <pre><code>[sendemail]
         smtpEncryption = tls
@@ -1585,8 +1603,11 @@ $ git send-email outgoing/*</code></pre>
 app-specific or your regular password as appropriate.  If you have credential
 helper configured (see <a href="git-credential.html">git-credential(1)</a>), the password will be saved in
 the credential store so you won&#8217;t have to type it the next time.</p></div>
-<div class="paragraph"><p>Note: the following perl modules are required
-      Net::SMTP::SSL, MIME::Base64 and Authen::SASL</p></div>
+<div class="paragraph"><p>Note: the following core Perl modules that may be installed with your
+distribution of Perl are required:
+MIME::Base64, MIME::QuotedPrint, Net::Domain and Net::SMTP.
+These additional Perl modules are also required:
+Authen::SASL and Mail::Address.</p></div>
 </div>
 </div>
 </div>
@@ -1607,7 +1628,7 @@ the credential store so you won&#8217;t have to type it the next time.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-02-05 15:33:20 PST
+ 2019-10-09 14:51:03 JST
 </div>
 </div>
 </body>

@@ -187,8 +187,8 @@ CUMULATIVE_VARIABLES += RECURSIVE_CFLAGS RECURSIVE_MFLAGS RECURSIVE_CCFLAGS RECU
 # nonrecursive flags
 #
 
-ARCHFULL_RC_CFLAGS = $(foreach X, $(RC_ARCHS),$(addprefix -arch , $(X)))
-ARCHLESS_RC_CFLAGS = $(filter-out $(ARCHFULL_RC_CFLAGS), $(RC_CFLAGS))
+ARCHFULL_RC_CFLAGS = $(RC_CFLAGS)
+ARCHLESS_RC_CFLAGS = $(RC_NONARCH_CFLAGS)
 
 # All the requested archs
 # RDW 04/15/1999 -- Don't pass '-arch foo' on PDO since the

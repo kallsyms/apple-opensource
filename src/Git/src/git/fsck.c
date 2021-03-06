@@ -9,12 +9,14 @@
 #include "tag.h"
 #include "fsck.h"
 #include "refs.h"
+#include "url.h"
 #include "utf8.h"
 #include "decorate.h"
 #include "oidset.h"
 #include "packfile.h"
 #include "submodule-config.h"
 #include "config.h"
+#include "credential.h"
 #include "help.h"
 
 static struct oidset gitmodules_found = OIDSET_INIT;
@@ -182,41 +184,6 @@ static int fsck_msg_type(enum fsck_msg_id msg_id,
 	return msg_type;
 }
 
-static void init_skiplist(struct fsck_options *options, const char *path)
-{
-	FILE *fp;
-	struct strbuf sb = STRBUF_INIT;
-	struct object_id oid;
-
-	fp = fopen(path, "r");
-	if (!fp)
-		die("Could not open skip list: %s", path);
-	while (!strbuf_getline(&sb, fp)) {
-		const char *p;
-		const char *hash;
-
-		/*
-		 * Allow trailing comments, leading whitespace
-		 * (including before commits), and empty or whitespace
-		 * only lines.
-		 */
-		hash = strchr(sb.buf, '#');
-		if (hash)
-			strbuf_setlen(&sb, hash - sb.buf);
-		strbuf_trim(&sb);
-		if (!sb.len)
-			continue;
-
-		if (parse_oid_hex(sb.buf, &oid, &p) || *p != '\0')
-			die("Invalid SHA-1: %s", sb.buf);
-		oidset_insert(&options->skiplist, &oid);
-	}
-	if (ferror(fp))
-		die_errno("Could not read '%s'", path);
-	fclose(fp);
-	strbuf_release(&sb);
-}
-
 static int parse_msg_type(const char *str)
 {
 	if (!strcmp(str, "error"))
@@ -285,7 +252,7 @@ void fsck_set_msg_types(struct fsck_options *options, const char *values)
 		if (!strcmp(buf, "skiplist")) {
 			if (equal == len)
 				die("skiplist requires a path");
-			init_skiplist(options, buf + equal + 1);
+			oidset_parse_file(&options->skiplist, buf + equal + 1);
 			buf += len + 1;
 			continue;
 		}
@@ -605,7 +572,7 @@ static int fsck_tree(struct tree *item, struct fsck_options *options)
 	o_name = NULL;
 
 	while (desc.size) {
-		unsigned mode;
+		unsigned short mode;
 		const char *name, *backslash;
 		const struct object_id *oid;
 
@@ -982,6 +949,149 @@ static int fsck_tag(struct tag *tag, const char *data,
 	return fsck_tag_buffer(tag, data, size, options);
 }
 
+/*
+ * Like builtin/submodule--helper.c's starts_with_dot_slash, but without
+ * relying on the platform-dependent is_dir_sep helper.
+ *
+ * This is for use in checking whether a submodule URL is interpreted as
+ * relative to the current directory on any platform, since \ is a
+ * directory separator on Windows but not on other platforms.
+ */
+static int starts_with_dot_slash(const char *str)
+{
+	return str[0] == '.' && (str[1] == '/' || str[1] == '\\');
+}
+
+/*
+ * Like starts_with_dot_slash, this is a variant of submodule--helper's
+ * helper of the same name with the twist that it accepts backslash as a
+ * directory separator even on non-Windows platforms.
+ */
+static int starts_with_dot_dot_slash(const char *str)
+{
+	return str[0] == '.' && starts_with_dot_slash(str + 1);
+}
+
+static int submodule_url_is_relative(const char *url)
+{
+	return starts_with_dot_slash(url) || starts_with_dot_dot_slash(url);
+}
+
+/*
+ * Count directory components that a relative submodule URL should chop
+ * from the remote_url it is to be resolved against.
+ *
+ * In other words, this counts "../" components at the start of a
+ * submodule URL.
+ *
+ * Returns the number of directory components to chop and writes a
+ * pointer to the next character of url after all leading "./" and
+ * "../" components to out.
+ */
+static int count_leading_dotdots(const char *url, const char **out)
+{
+	int result = 0;
+	while (1) {
+		if (starts_with_dot_dot_slash(url)) {
+			result++;
+			url += strlen("../");
+			continue;
+		}
+		if (starts_with_dot_slash(url)) {
+			url += strlen("./");
+			continue;
+		}
+		*out = url;
+		return result;
+	}
+}
+/*
+ * Check whether a transport is implemented by git-remote-curl.
+ *
+ * If it is, returns 1 and writes the URL that would be passed to
+ * git-remote-curl to the "out" parameter.
+ *
+ * Otherwise, returns 0 and leaves "out" untouched.
+ *
+ * Examples:
+ *   http::https://example.com/repo.git -> 1, https://example.com/repo.git
+ *   https://example.com/repo.git -> 1, https://example.com/repo.git
+ *   git://example.com/repo.git -> 0
+ *
+ * This is for use in checking for previously exploitable bugs that
+ * required a submodule URL to be passed to git-remote-curl.
+ */
+static int url_to_curl_url(const char *url, const char **out)
+{
+	/*
+	 * We don't need to check for case-aliases, "http.exe", and so
+	 * on because in the default configuration, is_transport_allowed
+	 * prevents URLs with those schemes from being cloned
+	 * automatically.
+	 */
+	if (skip_prefix(url, "http::", out) ||
+	    skip_prefix(url, "https::", out) ||
+	    skip_prefix(url, "ftp::", out) ||
+	    skip_prefix(url, "ftps::", out))
+		return 1;
+	if (starts_with(url, "http://") ||
+	    starts_with(url, "https://") ||
+	    starts_with(url, "ftp://") ||
+	    starts_with(url, "ftps://")) {
+		*out = url;
+		return 1;
+	}
+	return 0;
+}
+
+static int check_submodule_url(const char *url)
+{
+	const char *curl_url;
+
+	if (looks_like_command_line_option(url))
+		return -1;
+
+	if (submodule_url_is_relative(url)) {
+		char *decoded;
+		const char *next;
+		int has_nl;
+
+		/*
+		 * This could be appended to an http URL and url-decoded;
+		 * check for malicious characters.
+		 */
+		decoded = url_decode(url);
+		has_nl = !!strchr(decoded, '\n');
+
+		free(decoded);
+		if (has_nl)
+			return -1;
+
+		/*
+		 * URLs which escape their root via "../" can overwrite
+		 * the host field and previous components, resolving to
+		 * URLs like https::example.com/submodule.git and
+		 * https:///example.com/submodule.git that were
+		 * susceptible to CVE-2020-11008.
+		 */
+		if (count_leading_dotdots(url, &next) > 0 &&
+		    (*next == ':' || *next == '/'))
+			return -1;
+	}
+
+	else if (url_to_curl_url(url, &curl_url)) {
+		struct credential c = CREDENTIAL_INIT;
+		int ret = 0;
+		if (credential_from_url_gently(&c, curl_url, 1) ||
+		    !*c.host)
+			ret = -1;
+		credential_clear(&c);
+		return ret;
+	}
+
+	return 0;
+}
+
 struct fsck_gitmodules_data {
 	struct object *obj;
 	struct fsck_options *options;
@@ -1006,7 +1116,7 @@ static int fsck_gitmodules_fn(const char *var, const char *value, void *vdata)
 				    "disallowed submodule name: %s",
 				    name);
 	if (!strcmp(key, "url") && value &&
-	    looks_like_command_line_option(value))
+	    check_submodule_url(value) < 0)
 		data->ret |= report(data->options, data->obj,
 				    FSCK_MSG_GITMODULES_URL,
 				    "disallowed submodule url: %s",
@@ -1115,7 +1225,7 @@ int fsck_finish(struct fsck_options *options)
 
 		blob = lookup_blob(the_repository, oid);
 		if (!blob) {
-			struct object *obj = lookup_unknown_object(oid->hash);
+			struct object *obj = lookup_unknown_object(oid);
 			ret |= report(options, obj,
 				      FSCK_MSG_GITMODULES_BLOB,
 				      "non-blob found at .gitmodules");

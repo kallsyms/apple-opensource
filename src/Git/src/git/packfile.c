@@ -6,7 +6,6 @@
 #include "mergesort.h"
 #include "packfile.h"
 #include "delta.h"
-#include "list.h"
 #include "streaming.h"
 #include "sha1-lookup.h"
 #include "commit.h"
@@ -16,14 +15,16 @@
 #include "tree.h"
 #include "object-store.h"
 #include "midx.h"
+#include "commit-graph.h"
+#include "promisor-remote.h"
 
 char *odb_pack_name(struct strbuf *buf,
-		    const unsigned char *sha1,
+		    const unsigned char *hash,
 		    const char *ext)
 {
 	strbuf_reset(buf);
 	strbuf_addf(buf, "%s/pack/pack-%s.%s", get_object_directory(),
-		    sha1_to_hex(sha1), ext);
+		    hash_to_hex(hash), ext);
 	return buf->buf;
 }
 
@@ -235,7 +236,7 @@ struct packed_git *parse_pack_index(unsigned char *sha1, const char *idx_path)
 	struct packed_git *p = alloc_packed_git(alloc);
 
 	memcpy(p->pack_name, path, alloc); /* includes NUL */
-	hashcpy(p->sha1, sha1);
+	hashcpy(p->hash, sha1);
 	if (check_packed_git_idx(idx_path, p)) {
 		free(p);
 		return NULL;
@@ -286,13 +287,6 @@ static int unuse_one_window(struct packed_git *current)
 	return 0;
 }
 
-void release_pack_memory(size_t need)
-{
-	size_t cur = pack_mapped;
-	while (need >= (cur - pack_mapped) && unuse_one_window(NULL))
-		; /* nothing */
-}
-
 void close_pack_windows(struct packed_git *p)
 {
 	while (p->windows) {
@@ -309,7 +303,7 @@ void close_pack_windows(struct packed_git *p)
 	}
 }
 
-static int close_pack_fd(struct packed_git *p)
+int close_pack_fd(struct packed_git *p)
 {
 	if (p->pack_fd < 0)
 		return 0;
@@ -336,7 +330,7 @@ void close_pack(struct packed_git *p)
 	close_pack_index(p);
 }
 
-void close_all_packs(struct raw_object_store *o)
+void close_object_store(struct raw_object_store *o)
 {
 	struct packed_git *p;
 
@@ -350,6 +344,36 @@ void close_all_packs(struct raw_object_store *o)
 		close_midx(o->multi_pack_index);
 		o->multi_pack_index = NULL;
 	}
+
+	close_commit_graph(o);
+}
+
+void unlink_pack_path(const char *pack_name, int force_delete)
+{
+	static const char *exts[] = {".pack", ".idx", ".keep", ".bitmap", ".promisor"};
+	int i;
+	struct strbuf buf = STRBUF_INIT;
+	size_t plen;
+
+	strbuf_addstr(&buf, pack_name);
+	strip_suffix_mem(buf.buf, &buf.len, ".pack");
+	plen = buf.len;
+
+	if (!force_delete) {
+		strbuf_addstr(&buf, ".keep");
+		if (!access(buf.buf, F_OK)) {
+			strbuf_release(&buf);
+			return;
+		}
+	}
+
+	for (i = 0; i < ARRAY_SIZE(exts); i++) {
+		strbuf_setlen(&buf, plen);
+		strbuf_addstr(&buf, exts[i]);
+		unlink(buf.buf);
+	}
+
+	strbuf_release(&buf);
 }
 
 /*
@@ -466,6 +490,16 @@ static unsigned int get_max_fd_limit(void)
 #endif
 }
 
+const char *pack_basename(struct packed_git *p)
+{
+	const char *ret = strrchr(p->pack_name, '/');
+	if (ret)
+		ret = ret + 1; /* skip past slash */
+	else
+		ret = p->pack_name; /* we only have a base */
+	return ret;
+}
+
 /*
  * Do not call this directly as this leaks p->pack_fd on error return;
  * call open_packed_git() instead.
@@ -482,7 +516,7 @@ static int open_packed_git_1(struct packed_git *p)
 
 	if (!p->index_data) {
 		struct multi_pack_index *m;
-		const char *pack_name = strrchr(p->pack_name, '/');
+		const char *pack_name = pack_basename(p);
 
 		for (m = the_repository->objects->multi_pack_index;
 		     m; m = m->next) {
@@ -630,7 +664,7 @@ unsigned char *use_pack(struct packed_git *p,
 			while (packed_git_limit < pack_mapped
 				&& unuse_one_window(p))
 				; /* nothing */
-			win->base = xmmap(NULL, win->len,
+			win->base = xmmap_gently(NULL, win->len,
 				PROT_READ, MAP_PRIVATE,
 				p->pack_fd, win->offset);
 			if (win->base == MAP_FAILED)
@@ -669,22 +703,11 @@ void unuse_pack(struct pack_window **w_cursor)
 	}
 }
 
-static void try_to_free_pack_memory(size_t size)
-{
-	release_pack_memory(size);
-}
-
 struct packed_git *add_packed_git(const char *path, size_t path_len, int local)
 {
-	static int have_set_try_to_free_routine;
 	struct stat st;
 	size_t alloc;
 	struct packed_git *p;
-
-	if (!have_set_try_to_free_routine) {
-		have_set_try_to_free_routine = 1;
-		set_try_to_free_routine(try_to_free_pack_memory);
-	}
 
 	/*
 	 * Make sure a corresponding .pack file exists and that
@@ -722,8 +745,8 @@ struct packed_git *add_packed_git(const char *path, size_t path_len, int local)
 	p->pack_local = local;
 	p->mtime = st.st_mtime;
 	if (path_len < the_hash_algo->hexsz ||
-	    get_sha1_hex(path + path_len - the_hash_algo->hexsz, p->sha1))
-		hashclr(p->sha1);
+	    get_sha1_hex(path + path_len - the_hash_algo->hexsz, p->hash))
+		hashclr(p->hash);
 	return p;
 }
 
@@ -893,25 +916,25 @@ static void prepare_packed_git(struct repository *r);
  * all unreachable objects about to be pruned, in which case they're not really
  * interesting as a measure of repo size in the first place.
  */
-unsigned long approximate_object_count(void)
+unsigned long repo_approximate_object_count(struct repository *r)
 {
-	if (!the_repository->objects->approximate_object_count_valid) {
+	if (!r->objects->approximate_object_count_valid) {
 		unsigned long count;
 		struct multi_pack_index *m;
 		struct packed_git *p;
 
-		prepare_packed_git(the_repository);
+		prepare_packed_git(r);
 		count = 0;
-		for (m = get_multi_pack_index(the_repository); m; m = m->next)
+		for (m = get_multi_pack_index(r); m; m = m->next)
 			count += m->num_objects;
-		for (p = the_repository->objects->packed_git; p; p = p->next) {
+		for (p = r->objects->packed_git; p; p = p->next) {
 			if (open_pack_index(p))
 				continue;
 			count += p->num_objects;
 		}
-		the_repository->objects->approximate_object_count = count;
+		r->objects->approximate_object_count = count;
 	}
-	return the_repository->objects->approximate_object_count;
+	return r->objects->approximate_object_count;
 }
 
 static void *get_next_packed_git(const void *p)
@@ -984,8 +1007,6 @@ static void prepare_packed_git(struct repository *r)
 	}
 	rearrange_packed_git(r);
 
-	r->objects->all_packs = NULL;
-
 	prepare_packed_git_mru(r);
 	r->objects->packed_git_initialized = 1;
 }
@@ -1016,26 +1037,16 @@ struct multi_pack_index *get_multi_pack_index(struct repository *r)
 
 struct packed_git *get_all_packs(struct repository *r)
 {
+	struct multi_pack_index *m;
+
 	prepare_packed_git(r);
-
-	if (!r->objects->all_packs) {
-		struct packed_git *p = r->objects->packed_git;
-		struct multi_pack_index *m;
-
-		for (m = r->objects->multi_pack_index; m; m = m->next) {
-			uint32_t i;
-			for (i = 0; i < m->num_packs; i++) {
-				if (!prepare_midx_pack(m, i)) {
-					m->packs[i]->next = p;
-					p = m->packs[i];
-				}
-			}
-		}
-
-		r->objects->all_packs = p;
+	for (m = r->objects->multi_pack_index; m; m = m->next) {
+		uint32_t i;
+		for (i = 0; i < m->num_packs; i++)
+			prepare_midx_pack(r, m, i);
 	}
 
-	return r->objects->all_packs;
+	return r->objects->packed_git;
 }
 
 struct list_head *get_packed_git_mru(struct repository *r)
@@ -1271,7 +1282,7 @@ static enum object_type packed_to_object_type(struct repository *r,
 		if (poi_stack_nr >= poi_stack_alloc && poi_stack == small_poi_stack) {
 			poi_stack_alloc = alloc_nr(poi_stack_nr);
 			ALLOC_ARRAY(poi_stack, poi_stack_alloc);
-			memcpy(poi_stack, small_poi_stack, sizeof(off_t)*poi_stack_nr);
+			COPY_ARRAY(poi_stack, small_poi_stack, poi_stack_nr);
 		} else {
 			ALLOC_GROW(poi_stack, poi_stack_nr+1, poi_stack_alloc);
 		}
@@ -1332,7 +1343,7 @@ struct delta_base_cache_key {
 };
 
 struct delta_base_cache_entry {
-	struct hashmap hash;
+	struct hashmap_entry ent;
 	struct delta_base_cache_key key;
 	struct list_head lru;
 	void *data;
@@ -1352,7 +1363,7 @@ static unsigned int pack_entry_hash(struct packed_git *p, off_t base_offset)
 static struct delta_base_cache_entry *
 get_delta_base_cache_entry(struct packed_git *p, off_t base_offset)
 {
-	struct hashmap_entry entry;
+	struct hashmap_entry entry, *e;
 	struct delta_base_cache_key key;
 
 	if (!delta_base_cache.cmpfn)
@@ -1361,7 +1372,8 @@ get_delta_base_cache_entry(struct packed_git *p, off_t base_offset)
 	hashmap_entry_init(&entry, pack_entry_hash(p, base_offset));
 	key.p = p;
 	key.base_offset = base_offset;
-	return hashmap_get(&delta_base_cache, &entry, &key);
+	e = hashmap_get(&delta_base_cache, &entry, &key);
+	return e ? container_of(e, struct delta_base_cache_entry, ent) : NULL;
 }
 
 static int delta_base_cache_key_eq(const struct delta_base_cache_key *a,
@@ -1371,11 +1383,16 @@ static int delta_base_cache_key_eq(const struct delta_base_cache_key *a,
 }
 
 static int delta_base_cache_hash_cmp(const void *unused_cmp_data,
-				     const void *va, const void *vb,
+				     const struct hashmap_entry *va,
+				     const struct hashmap_entry *vb,
 				     const void *vkey)
 {
-	const struct delta_base_cache_entry *a = va, *b = vb;
+	const struct delta_base_cache_entry *a, *b;
 	const struct delta_base_cache_key *key = vkey;
+
+	a = container_of(va, const struct delta_base_cache_entry, ent);
+	b = container_of(vb, const struct delta_base_cache_entry, ent);
+
 	if (key)
 		return !delta_base_cache_key_eq(&a->key, key);
 	else
@@ -1394,7 +1411,7 @@ static int in_delta_base_cache(struct packed_git *p, off_t base_offset)
  */
 static void detach_delta_base_cache_entry(struct delta_base_cache_entry *ent)
 {
-	hashmap_remove(&delta_base_cache, ent, &ent->key);
+	hashmap_remove(&delta_base_cache, &ent->ent, &ent->key);
 	list_del(&ent->lru);
 	delta_base_cached -= ent->size;
 	free(ent);
@@ -1458,8 +1475,8 @@ static void add_delta_base_cache(struct packed_git *p, off_t base_offset,
 
 	if (!delta_base_cache.cmpfn)
 		hashmap_init(&delta_base_cache, delta_base_cache_hash_cmp, NULL, 0);
-	hashmap_entry_init(ent, pack_entry_hash(p, base_offset));
-	hashmap_add(&delta_base_cache, ent);
+	hashmap_entry_init(&ent->ent, pack_entry_hash(p, base_offset));
+	hashmap_add(&delta_base_cache, &ent->ent);
 }
 
 int packed_object_info(struct repository *r, struct packed_git *p,
@@ -1681,8 +1698,8 @@ void *unpack_entry(struct repository *r, struct packed_git *p, off_t obj_offset,
 		    && delta_stack == small_delta_stack) {
 			delta_stack_alloc = alloc_nr(delta_stack_nr);
 			ALLOC_ARRAY(delta_stack, delta_stack_alloc);
-			memcpy(delta_stack, small_delta_stack,
-			       sizeof(*delta_stack)*delta_stack_nr);
+			COPY_ARRAY(delta_stack, small_delta_stack,
+				   delta_stack_nr);
 		} else {
 			ALLOC_GROW(delta_stack, delta_stack_nr+1, delta_stack_alloc);
 		}
@@ -1988,13 +2005,13 @@ int find_pack_entry(struct repository *r, const struct object_id *oid, struct pa
 		return 0;
 
 	for (m = r->objects->multi_pack_index; m; m = m->next) {
-		if (fill_midx_entry(oid, e, m))
+		if (fill_midx_entry(r, oid, e, m))
 			return 1;
 	}
 
 	list_for_each(pos, &r->objects->packed_git_mru) {
 		struct packed_git *p = list_entry(pos, struct packed_git, mru);
-		if (fill_pack_entry(oid, e, p)) {
+		if (!p->multi_pack_index && fill_pack_entry(oid, e, p)) {
 			list_move(&p->mru, &r->objects->packed_git_mru);
 			return 1;
 		}
@@ -2023,8 +2040,10 @@ int for_each_object_in_pack(struct packed_git *p,
 	uint32_t i;
 	int r = 0;
 
-	if (flags & FOR_EACH_OBJECT_PACK_ORDER)
-		load_pack_revindex(p);
+	if (flags & FOR_EACH_OBJECT_PACK_ORDER) {
+		if (load_pack_revindex(p))
+			return -1;
+	}
 
 	for (i = 0; i < p->num_objects; i++) {
 		uint32_t pos;
@@ -2108,7 +2127,7 @@ static int add_promisor_object(const struct object_id *oid,
 			oidset_insert(set, &parents->item->object.oid);
 	} else if (obj->type == OBJ_TAG) {
 		struct tag *tag = (struct tag *) obj;
-		oidset_insert(set, &tag->tagged->oid);
+		oidset_insert(set, get_tagged_oid(tag));
 	}
 	return 0;
 }
@@ -2119,7 +2138,7 @@ int is_promisor_object(const struct object_id *oid)
 	static int promisor_objects_prepared;
 
 	if (!promisor_objects_prepared) {
-		if (repository_format_partial_clone) {
+		if (has_promisor_remote()) {
 			for_each_packed_object(add_promisor_object,
 					       &promisor_objects,
 					       FOR_EACH_OBJECT_PROMISOR_ONLY);

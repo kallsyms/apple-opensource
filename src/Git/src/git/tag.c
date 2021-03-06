@@ -100,10 +100,9 @@ struct object *deref_tag_noverify(struct object *o)
 
 struct tag *lookup_tag(struct repository *r, const struct object_id *oid)
 {
-	struct object *obj = lookup_object(r, oid->hash);
+	struct object *obj = lookup_object(r, oid);
 	if (!obj)
-		return create_object(r, oid->hash,
-				     alloc_tag_node(r));
+		return create_object(r, oid, alloc_tag_node(r));
 	return object_as_type(r, obj, OBJ_TAG, 0);
 }
 
@@ -212,4 +211,11 @@ int parse_tag(struct tag *item)
 	ret = parse_tag_buffer(the_repository, item, data, size);
 	free(data);
 	return ret;
+}
+
+struct object_id *get_tagged_oid(struct tag *tag)
+{
+	if (!tag->tagged)
+		die("bad tag");
+	return &tag->tagged->oid;
 }

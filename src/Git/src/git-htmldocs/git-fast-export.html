@@ -760,8 +760,9 @@ git-fast-export(1) Manual Page
 <div class="paragraph"><p>This program dumps the given revisions in a form suitable to be piped
 into <em>git fast-import</em>.</p></div>
 <div class="paragraph"><p>You can use it as a human-readable bundle replacement (see
-<a href="git-bundle.html">git-bundle(1)</a>), or as a kind of an interactive
-<em>git filter-branch</em>.</p></div>
+<a href="git-bundle.html">git-bundle(1)</a>), or as a format that can be edited before being
+fed to <em>git fast-import</em> in order to do history rewrites (an ability
+relied on by tools like <em>git filter-repo</em>).</p></div>
 </div>
 </div>
 <div class="sect1">
@@ -849,10 +850,24 @@ produced incorrect results if you gave these options.</p></div>
         &lt;file&gt;.  The input file must exist, must be readable, and
         must use the same format as produced by --export-marks.
 </p>
-<div class="paragraph"><p>Any commits that have already been marked will not be exported again.
-If the backend uses a similar --import-marks file, this allows for
-incremental bidirectional exporting of the repository by keeping the
-marks the same across runs.</p></div>
+</dd>
+<dt class="hdlist1">
+--mark-tags
+</dt>
+<dd>
+<p>
+        In addition to labelling blobs and commits with mark ids, also
+        label tags.  This is useful in conjunction with
+        <code>--export-marks</code> and <code>--import-marks</code>, and is also useful (and
+        necessary) for exporting of nested tags.  It does not hurt
+        other cases and would be the default, but many fast-import
+        frontends are not prepared to accept tags with mark
+        identifiers.
+</p>
+<div class="paragraph"><p>Any commits (or tags) that have already been marked will not be
+exported again.  If the backend uses a similar --import-marks file,
+this allows for incremental bidirectional exporting of the repository
+by keeping the marks the same across runs.</p></div>
 </dd>
 <dt class="hdlist1">
 --fake-missing-tagger
@@ -918,7 +933,7 @@ marks the same across runs.</p></div>
         and will make master&#126;4 no longer have master&#126;5 as
         a parent (though both the old master&#126;4 and new
         master&#126;4 will have all the same files).  Use
-        --reference-excluded-parents to instead have the the stream
+        --reference-excluded-parents to instead have the stream
         refer to commits in the excluded range of history by their
         sha1sum.  Note that the resulting stream can only be used by a
         repository which already contains the necessary parent
@@ -935,6 +950,18 @@ marks the same across runs.</p></div>
         ignored by importers such as git-fast-import, it may be useful
         for intermediary filters (e.g. for rewriting commit messages
         which refer to older commits, or for stripping blobs by id).
+</p>
+</dd>
+<dt class="hdlist1">
+--reencode=(yes|no|abort)
+</dt>
+<dd>
+<p>
+        Specify how to handle <code>encoding</code> header in commit objects.  When
+        asking to <em>abort</em> (which is the default), this program will die
+        when encountering such a commit object.  With <em>yes</em>, the commit
+        message will be reencoded into UTF-8.  With <em>no</em>, the original
+        encoding will be preserved.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1062,7 +1089,7 @@ a tag referencing a tree instead of a commit.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-01-04 14:31:36 PST
+ 2019-10-15 14:20:15 JST
 </div>
 </div>
 </body>

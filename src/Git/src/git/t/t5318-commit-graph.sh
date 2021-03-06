@@ -20,7 +20,14 @@ test_expect_success 'verify graph with no graph file' '
 test_expect_success 'write graph with no packs' '
 	cd "$TRASH_DIRECTORY/full" &&
 	git commit-graph write --object-dir . &&
-	test_path_is_file info/commit-graph
+	test_path_is_missing info/commit-graph
+'
+
+test_expect_success 'exit with correct error on bad input to --stdin-packs' '
+	cd "$TRASH_DIRECTORY/full" &&
+	echo doesnotexist >in &&
+	test_expect_code 1 git commit-graph write --stdin-packs <in 2>stderr &&
+	test_i18ngrep "error adding pack" stderr
 '
 
 test_expect_success 'create commits and repack' '
@@ -31,6 +38,15 @@ test_expect_success 'create commits and repack' '
 		git branch commits/$i
 	done &&
 	git repack
+'
+
+test_expect_success 'exit with correct error on bad input to --stdin-commits' '
+	cd "$TRASH_DIRECTORY/full" &&
+	echo HEAD | test_expect_code 1 git commit-graph write --stdin-commits 2>stderr &&
+	test_i18ngrep "invalid commit object id" stderr &&
+	# valid tree OID, but not a commit OID
+	git rev-parse HEAD^{tree} | test_expect_code 1 git commit-graph write --stdin-commits 2>stderr &&
+	test_i18ngrep "invalid commit object id" stderr
 '
 
 graph_git_two_modes() {
@@ -75,7 +91,7 @@ graph_read_expect() {
 
 test_expect_success 'write graph' '
 	cd "$TRASH_DIRECTORY/full" &&
-	graph1=$(git commit-graph write) &&
+	git commit-graph write &&
 	test_path_is_file $objdir/info/commit-graph &&
 	graph_read_expect "3"
 '
@@ -106,6 +122,42 @@ test_expect_success 'Add more commits' '
 	git merge commits/5 commits/7 &&
 	git branch merge/3 &&
 	git repack
+'
+
+test_expect_success 'commit-graph write progress off for redirected stderr' '
+	cd "$TRASH_DIRECTORY/full" &&
+	git commit-graph write 2>err &&
+	test_line_count = 0 err
+'
+
+test_expect_success 'commit-graph write force progress on for stderr' '
+	cd "$TRASH_DIRECTORY/full" &&
+	git commit-graph write --progress 2>err &&
+	test_file_not_empty err
+'
+
+test_expect_success 'commit-graph write with the --no-progress option' '
+	cd "$TRASH_DIRECTORY/full" &&
+	git commit-graph write --no-progress 2>err &&
+	test_line_count = 0 err
+'
+
+test_expect_success 'commit-graph verify progress off for redirected stderr' '
+	cd "$TRASH_DIRECTORY/full" &&
+	git commit-graph verify 2>err &&
+	test_line_count = 0 err
+'
+
+test_expect_success 'commit-graph verify force progress on for stderr' '
+	cd "$TRASH_DIRECTORY/full" &&
+	git commit-graph verify --progress 2>err &&
+	test_file_not_empty err
+'
+
+test_expect_success 'commit-graph verify with the --no-progress option' '
+	cd "$TRASH_DIRECTORY/full" &&
+	git commit-graph verify --no-progress 2>err &&
+	test_line_count = 0 err
 '
 
 # Current graph structure:
@@ -366,6 +418,26 @@ GRAPH_OCTOPUS_DATA_OFFSET=$(($GRAPH_COMMIT_DATA_OFFSET + \
 GRAPH_BYTE_OCTOPUS=$(($GRAPH_OCTOPUS_DATA_OFFSET + 4))
 GRAPH_BYTE_FOOTER=$(($GRAPH_OCTOPUS_DATA_OFFSET + 4 * $NUM_OCTOPUS_EDGES))
 
+corrupt_graph_setup() {
+	cd "$TRASH_DIRECTORY/full" &&
+	test_when_finished mv commit-graph-backup $objdir/info/commit-graph &&
+	cp $objdir/info/commit-graph commit-graph-backup
+}
+
+corrupt_graph_verify() {
+	grepstr=$1
+	test_must_fail git commit-graph verify 2>test_err &&
+	grep -v "^+" test_err >err &&
+	test_i18ngrep "$grepstr" err &&
+	if test "$2" != "no-copy"
+	then
+		cp $objdir/info/commit-graph commit-graph-pre-write-test
+	fi &&
+	git status --short &&
+	GIT_TEST_COMMIT_GRAPH_DIE_ON_LOAD=true git commit-graph write &&
+	git commit-graph verify
+}
+
 # usage: corrupt_graph_and_verify <position> <data> <string> [<zero_pos>]
 # Manipulates the commit-graph file at the position
 # by inserting the data, optionally zeroing the file
@@ -376,18 +448,27 @@ corrupt_graph_and_verify() {
 	pos=$1
 	data="${2:-\0}"
 	grepstr=$3
-	cd "$TRASH_DIRECTORY/full" &&
+	corrupt_graph_setup &&
 	orig_size=$(wc -c < $objdir/info/commit-graph) &&
 	zero_pos=${4:-${orig_size}} &&
-	test_when_finished mv commit-graph-backup $objdir/info/commit-graph &&
-	cp $objdir/info/commit-graph commit-graph-backup &&
 	printf "$data" | dd of="$objdir/info/commit-graph" bs=1 seek="$pos" conv=notrunc &&
 	dd of="$objdir/info/commit-graph" bs=1 seek="$zero_pos" if=/dev/null &&
 	generate_zero_bytes $(($orig_size - $zero_pos)) >>"$objdir/info/commit-graph" &&
-	test_must_fail git commit-graph verify 2>test_err &&
-	grep -v "^+" test_err >err &&
-	test_i18ngrep "$grepstr" err
+	corrupt_graph_verify "$grepstr"
+
 }
+
+test_expect_success POSIXPERM,SANITY 'detect permission problem' '
+	corrupt_graph_setup &&
+	chmod 000 $objdir/info/commit-graph &&
+	corrupt_graph_verify "Could not open" "no-copy"
+'
+
+test_expect_success 'detect too small' '
+	corrupt_graph_setup &&
+	echo "a small graph" >$objdir/info/commit-graph &&
+	corrupt_graph_verify "too small"
+'
 
 test_expect_success 'detect bad signature' '
 	corrupt_graph_and_verify 0 "\0" \
@@ -499,6 +580,7 @@ test_expect_success 'git fsck (checks commit-graph)' '
 	git fsck &&
 	corrupt_graph_and_verify $GRAPH_BYTE_FOOTER "\00" \
 		"incorrect checksum" &&
+	cp commit-graph-pre-write-test $objdir/info/commit-graph &&
 	test_must_fail git fsck
 '
 
@@ -537,6 +619,49 @@ test_expect_success 'get_commit_tree_in_graph works for non-the_repository' '
 		repo/.git repo "$(git -C repo rev-parse one)" >actual &&
 	git -C repo rev-parse one^{tree} >expect &&
 	test_cmp expect actual
+'
+
+test_expect_success 'corrupt commit-graph write (broken parent)' '
+	rm -rf repo &&
+	git init repo &&
+	(
+		cd repo &&
+		empty="$(git mktree </dev/null)" &&
+		cat >broken <<-EOF &&
+		tree $empty
+		parent 0000000000000000000000000000000000000000
+		author whatever <whatever@example.com> 1234 -0000
+		committer whatever <whatever@example.com> 1234 -0000
+
+		broken commit
+		EOF
+		broken="$(git hash-object -w -t commit --literally broken)" &&
+		git commit-tree -p "$broken" -m "good commit" "$empty" >good &&
+		test_must_fail git commit-graph write --stdin-commits \
+			<good 2>test_err &&
+		test_i18ngrep "unable to parse commit" test_err
+	)
+'
+
+test_expect_success 'corrupt commit-graph write (missing tree)' '
+	rm -rf repo &&
+	git init repo &&
+	(
+		cd repo &&
+		tree="$(git mktree </dev/null)" &&
+		cat >broken <<-EOF &&
+		parent 0000000000000000000000000000000000000000
+		author whatever <whatever@example.com> 1234 -0000
+		committer whatever <whatever@example.com> 1234 -0000
+
+		broken commit
+		EOF
+		broken="$(git hash-object -w -t commit --literally broken)" &&
+		git commit-tree -p "$broken" -m "good" "$tree" >good &&
+		test_must_fail git commit-graph write --stdin-commits \
+			<good 2>test_err &&
+		test_i18ngrep "unable to get tree for" test_err
+	)
 '
 
 test_done

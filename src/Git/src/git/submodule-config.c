@@ -38,24 +38,28 @@ enum lookup_type {
 };
 
 static int config_path_cmp(const void *unused_cmp_data,
-			   const void *entry,
-			   const void *entry_or_key,
+			   const struct hashmap_entry *eptr,
+			   const struct hashmap_entry *entry_or_key,
 			   const void *unused_keydata)
 {
-	const struct submodule_entry *a = entry;
-	const struct submodule_entry *b = entry_or_key;
+	const struct submodule_entry *a, *b;
+
+	a = container_of(eptr, const struct submodule_entry, ent);
+	b = container_of(entry_or_key, const struct submodule_entry, ent);
 
 	return strcmp(a->config->path, b->config->path) ||
 	       !oideq(&a->config->gitmodules_oid, &b->config->gitmodules_oid);
 }
 
 static int config_name_cmp(const void *unused_cmp_data,
-			   const void *entry,
-			   const void *entry_or_key,
+			   const struct hashmap_entry *eptr,
+			   const struct hashmap_entry *entry_or_key,
 			   const void *unused_keydata)
 {
-	const struct submodule_entry *a = entry;
-	const struct submodule_entry *b = entry_or_key;
+	const struct submodule_entry *a, *b;
+
+	a = container_of(eptr, const struct submodule_entry, ent);
+	b = container_of(entry_or_key, const struct submodule_entry, ent);
 
 	return strcmp(a->config->name, b->config->name) ||
 	       !oideq(&a->config->gitmodules_oid, &b->config->gitmodules_oid);
@@ -95,12 +99,12 @@ static void submodule_cache_clear(struct submodule_cache *cache)
 	 * allocation of struct submodule entries. Each is allocated by
 	 * their .gitmodules blob sha1 and submodule name.
 	 */
-	hashmap_iter_init(&cache->for_name, &iter);
-	while ((entry = hashmap_iter_next(&iter)))
+	hashmap_for_each_entry(&cache->for_name, &iter, entry,
+				ent /* member name */)
 		free_one_config(entry);
 
-	hashmap_free(&cache->for_path, 1);
-	hashmap_free(&cache->for_name, 1);
+	hashmap_free_entries(&cache->for_path, struct submodule_entry, ent);
+	hashmap_free_entries(&cache->for_name, struct submodule_entry, ent);
 	cache->initialized = 0;
 	cache->gitmodules_read = 0;
 }
@@ -123,9 +127,9 @@ static void cache_put_path(struct submodule_cache *cache,
 	unsigned int hash = hash_oid_string(&submodule->gitmodules_oid,
 					    submodule->path);
 	struct submodule_entry *e = xmalloc(sizeof(*e));
-	hashmap_entry_init(e, hash);
+	hashmap_entry_init(&e->ent, hash);
 	e->config = submodule;
-	hashmap_put(&cache->for_path, e);
+	hashmap_put(&cache->for_path, &e->ent);
 }
 
 static void cache_remove_path(struct submodule_cache *cache,
@@ -135,9 +139,9 @@ static void cache_remove_path(struct submodule_cache *cache,
 					    submodule->path);
 	struct submodule_entry e;
 	struct submodule_entry *removed;
-	hashmap_entry_init(&e, hash);
+	hashmap_entry_init(&e.ent, hash);
 	e.config = submodule;
-	removed = hashmap_remove(&cache->for_path, &e, NULL);
+	removed = hashmap_remove_entry(&cache->for_path, &e, ent, NULL);
 	free(removed);
 }
 
@@ -147,9 +151,9 @@ static void cache_add(struct submodule_cache *cache,
 	unsigned int hash = hash_oid_string(&submodule->gitmodules_oid,
 					    submodule->name);
 	struct submodule_entry *e = xmalloc(sizeof(*e));
-	hashmap_entry_init(e, hash);
+	hashmap_entry_init(&e->ent, hash);
 	e->config = submodule;
-	hashmap_add(&cache->for_name, e);
+	hashmap_add(&cache->for_name, &e->ent);
 }
 
 static const struct submodule *cache_lookup_path(struct submodule_cache *cache,
@@ -163,10 +167,10 @@ static const struct submodule *cache_lookup_path(struct submodule_cache *cache,
 	oidcpy(&key_config.gitmodules_oid, gitmodules_oid);
 	key_config.path = path;
 
-	hashmap_entry_init(&key, hash);
+	hashmap_entry_init(&key.ent, hash);
 	key.config = &key_config;
 
-	entry = hashmap_get(&cache->for_path, &key, NULL);
+	entry = hashmap_get_entry(&cache->for_path, &key, ent, NULL);
 	if (entry)
 		return entry->config;
 	return NULL;
@@ -183,10 +187,10 @@ static struct submodule *cache_lookup_name(struct submodule_cache *cache,
 	oidcpy(&key_config.gitmodules_oid, gitmodules_oid);
 	key_config.name = name;
 
-	hashmap_entry_init(&key, hash);
+	hashmap_entry_init(&key.ent, hash);
 	key.config = &key_config;
 
-	entry = hashmap_get(&cache->for_name, &key, NULL);
+	entry = hashmap_get_entry(&cache->for_name, &key, ent, NULL);
 	if (entry)
 		return entry->config;
 	return NULL;
@@ -281,7 +285,10 @@ static int parse_fetch_recurse(const char *opt, const char *arg,
 	default:
 		if (!strcmp(arg, "on-demand"))
 			return RECURSE_SUBMODULES_ON_DEMAND;
-
+		/*
+		 * Please update $__git_fetch_recurse_submodules in
+		 * git-completion.bash when you add new options.
+		 */
 		if (die_on_error)
 			die("bad %s argument: %s", opt, arg);
 		else
@@ -362,6 +369,10 @@ static int parse_push_recurse(const char *opt, const char *arg,
 			return RECURSE_SUBMODULES_CHECK;
 		else if (!strcmp(arg, "only"))
 			return RECURSE_SUBMODULES_ONLY;
+		/*
+		 * Please update $__git_push_recurse_submodules in
+		 * git-completion.bash when you add new modes.
+		 */
 		else if (die_on_error)
 			die("bad %s argument: %s", opt, arg);
 		else
@@ -551,7 +562,9 @@ static const struct submodule *config_from(struct submodule_cache *cache,
 		struct hashmap_iter iter;
 		struct submodule_entry *entry;
 
-		entry = hashmap_iter_first(&cache->for_name, &iter);
+		entry = hashmap_iter_first_entry(&cache->for_name, &iter,
+						struct submodule_entry,
+						ent /* member name */);
 		if (!entry)
 			return NULL;
 		return entry->config;
@@ -626,23 +639,16 @@ static void config_from_gitmodules(config_fn_t fn, struct repository *repo, void
 		const struct config_options opts = { 0 };
 		struct object_id oid;
 		char *file;
+		char *oidstr = NULL;
 
 		file = repo_worktree_path(repo, GITMODULES_FILE);
 		if (file_exists(file)) {
 			config_source.file = file;
-		} else if (repo->submodule_prefix) {
-			/*
-			 * When get_oid and config_with_options, used below,
-			 * become able to work on a specific repository, this
-			 * warning branch can be removed.
-			 */
-			warning("nested submodules without %s in the working tree are not supported yet",
-				GITMODULES_FILE);
-			goto out;
-		} else if (get_oid(GITMODULES_INDEX, &oid) >= 0) {
-			config_source.blob = GITMODULES_INDEX;
-		} else if (get_oid(GITMODULES_HEAD, &oid) >= 0) {
-			config_source.blob = GITMODULES_HEAD;
+		} else if (repo_get_oid(repo, GITMODULES_INDEX, &oid) >= 0 ||
+			   repo_get_oid(repo, GITMODULES_HEAD, &oid) >= 0) {
+			config_source.blob = oidstr = xstrdup(oid_to_hex(&oid));
+			if (repo != the_repository)
+				add_to_alternates_memory(repo->objects->odb->path);
 		} else {
 			goto out;
 		}
@@ -650,6 +656,7 @@ static void config_from_gitmodules(config_fn_t fn, struct repository *repo, void
 		config_with_options(fn, data, &config_source, &opts);
 
 out:
+		free(oidstr);
 		free(file);
 	}
 }

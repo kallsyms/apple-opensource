@@ -111,7 +111,7 @@ int should_autocreate_reflog(const char *refname);
 
 int is_branch(const char *refname);
 
-extern int refs_init_db(struct strbuf *err);
+int refs_init_db(struct strbuf *err);
 
 /*
  * If refname is a non-symbolic reference that refers to a tag object,
@@ -148,7 +148,9 @@ int refname_match(const char *abbrev_name, const char *full_name);
 struct argv_array;
 void expand_ref_prefix(struct argv_array *prefixes, const char *prefix);
 
-int expand_ref(const char *str, int len, struct object_id *oid, char **ref);
+int expand_ref(struct repository *r, const char *str, int len, struct object_id *oid, char **ref);
+int repo_dwim_ref(struct repository *r, const char *str, int len, struct object_id *oid, char **ref);
+int repo_dwim_log(struct repository *r, const char *str, int len, struct object_id *oid, char **ref);
 int dwim_ref(const char *str, int len, struct object_id *oid, char **ref);
 int dwim_log(const char *str, int len, struct object_id *oid, char **ref);
 
@@ -386,7 +388,8 @@ int refs_create_reflog(struct ref_store *refs, const char *refname,
 int safe_create_reflog(const char *refname, int force_create, struct strbuf *err);
 
 /** Reads log for the value of ref during at_time. **/
-int read_ref_at(const char *refname, unsigned int flags,
+int read_ref_at(struct ref_store *refs,
+		const char *refname, unsigned int flags,
 		timestamp_t at_time, int cnt,
 		struct object_id *oid, char **msg,
 		timestamp_t *cutoff_time, int *cutoff_tz, int *cutoff_cnt);
@@ -460,8 +463,16 @@ int for_each_reflog(each_ref_fn fn, void *cb_data);
  */
 int check_refname_format(const char *refname, int flags);
 
+/*
+ * Apply the rules from check_refname_format, but mutate the result until it
+ * is acceptable, and place the result in "out".
+ */
+void sanitize_refname_component(const char *refname, struct strbuf *out);
+
 const char *prettify_refname(const char *refname);
 
+char *refs_shorten_unambiguous_ref(struct ref_store *refs,
+				   const char *refname, int strict);
 char *shorten_unambiguous_ref(const char *refname, int strict);
 
 /** rename ref, return 0 on success **/

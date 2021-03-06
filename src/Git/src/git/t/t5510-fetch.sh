@@ -570,6 +570,35 @@ test_expect_success 'LHS of refspec follows ref disambiguation rules' '
 	)
 '
 
+test_expect_success 'fetch.writeCommitGraph' '
+	git clone three write &&
+	(
+		cd three &&
+		test_commit new
+	) &&
+	(
+		cd write &&
+		git -c fetch.writeCommitGraph fetch origin &&
+		test_path_is_file .git/objects/info/commit-graphs/commit-graph-chain
+	)
+'
+
+test_expect_success 'fetch.writeCommitGraph with submodules' '
+	git clone dups super &&
+	(
+		cd super &&
+		git submodule add "file://$TRASH_DIRECTORY/three" &&
+		git commit -m "add submodule"
+	) &&
+	git clone "super" super-clone &&
+	(
+		cd super-clone &&
+		rm -rf .git/objects/info &&
+		git -c fetch.writeCommitGraph=true fetch origin &&
+		test_path_is_file .git/objects/info/commit-graphs/commit-graph-chain
+	)
+'
+
 # configured prune tests
 
 set_config_tristate () {
@@ -902,6 +931,29 @@ test_expect_success C_LOCALE_OUTPUT 'fetch compact output' '
 	test_cmp expect actual
 '
 
+test_expect_success '--no-show-forced-updates' '
+	mkdir forced-updates &&
+	(
+		cd forced-updates &&
+		git init &&
+		test_commit 1 &&
+		test_commit 2
+	) &&
+	git clone forced-updates forced-update-clone &&
+	git clone forced-updates no-forced-update-clone &&
+	git -C forced-updates reset --hard HEAD~1 &&
+	(
+		cd forced-update-clone &&
+		git fetch --show-forced-updates origin 2>output &&
+		test_i18ngrep "(forced update)" output
+	) &&
+	(
+		cd no-forced-update-clone &&
+		git fetch --no-show-forced-updates origin 2>output &&
+		test_i18ngrep ! "(forced update)" output
+	)
+'
+
 setup_negotiation_tip () {
 	SERVER="$1"
 	URL="$2"
@@ -978,6 +1030,7 @@ test_expect_success '--negotiation-tip limits "have" lines sent with HTTP protoc
 	check_negotiation_tip
 '
 
-stop_httpd
+# DO NOT add non-httpd-specific tests here, because the last part of this
+# test script is only executed when httpd is available and enabled.
 
 test_done

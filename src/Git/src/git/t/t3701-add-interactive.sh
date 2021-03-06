@@ -314,7 +314,7 @@ test_expect_success C_LOCALE_OUTPUT 'add first line works' '
 	git commit -am "clear local changes" &&
 	git apply patch &&
 	printf "%s\n" s y y | git add -p file 2>error |
-		sed -n -e "s/^Stage this hunk[^@]*\(@@ .*\)/\1/" \
+		sed -n -e "s/^([1-2]\/[1-2]) Stage this hunk[^@]*\(@@ .*\)/\1/" \
 		       -e "/^[-+@ \\\\]"/p  >output &&
 	test_must_be_empty error &&
 	git diff --cached >diff &&
@@ -639,4 +639,12 @@ test_expect_success 'add -p patch editing works with pathological context lines'
 	test_cmp expected-2 actual
 '
 
+test_expect_success 'checkout -p works with pathological context lines' '
+	test_write_lines a a a a a a >a &&
+	git add a &&
+	test_write_lines a b a b a b a b a b a > a&&
+	test_write_lines s n n y q | git checkout -p &&
+	test_write_lines a b a b a a b a b a >expect &&
+	test_cmp expect a
+'
 test_done

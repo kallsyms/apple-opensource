@@ -935,6 +935,15 @@ documented in <a href="git-config.html">git-config(1)</a>.</p></div>
 </p>
 </dd>
 <dt class="hdlist1">
+--[no-]auto-gc
+</dt>
+<dd>
+<p>
+        Run <code>git gc --auto</code> at the end to perform garbage collection
+        if needed. This is enabled by default.
+</p>
+</dd>
+<dt class="hdlist1">
 -p
 </dt>
 <dt class="hdlist1">
@@ -1039,11 +1048,14 @@ documented in <a href="git-config.html">git-config(1)</a>.</p></div>
 </dt>
 <dd>
 <p>
-        Number of parallel children to be used for fetching submodules.
-        Each will fetch from different submodules, such that fetching many
-        submodules will be faster. By default submodules will be fetched
-        one at a time.
+        Number of parallel children to be used for all forms of fetching.
 </p>
+<div class="paragraph"><p>If the <code>--multiple</code> option was specified, the different remotes will be fetched
+in parallel. If multiple submodules are fetched, they will be fetched in
+parallel. To control them independently, use the config settings
+<code>fetch.parallel</code> and <code>submodule.fetchJobs</code> (see <a href="git-config.html">git-config(1)</a>).</p></div>
+<div class="paragraph"><p>Typically, parallel recursive and multi-remote fetches will be faster. By
+default fetches are performed sequentially, not in parallel.</p></div>
 </dd>
 <dt class="hdlist1">
 --no-recurse-submodules
@@ -1052,6 +1064,18 @@ documented in <a href="git-config.html">git-config(1)</a>.</p></div>
 <p>
         Disable recursive fetching of submodules (this has the same effect as
         using the <code>--recurse-submodules=no</code> option).
+</p>
+</dd>
+<dt class="hdlist1">
+--set-upstream
+</dt>
+<dd>
+<p>
+        If the remote is fetched successfully, pull and add upstream
+        (tracking) reference, used by argument-less
+        <a href="git-pull.html">git-pull(1)</a> and other commands. For more information,
+        see <code>branch.&lt;name&gt;.merge</code> and <code>branch.&lt;name&gt;.remote</code> in
+        <a href="git-config.html">git-config(1)</a>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1149,9 +1173,33 @@ documented in <a href="git-config.html">git-config(1)</a>.</p></div>
 <p>
         Transmit the given string to the server when communicating using
         protocol version 2.  The given string must not contain a NUL or LF
-        character.
+        character.  The server&#8217;s handling of server options, including
+        unknown ones, is server-specific.
         When multiple <code>--server-option=&lt;option&gt;</code> are given, they are all
         sent to the other side in the order listed on the command line.
+</p>
+</dd>
+<dt class="hdlist1">
+--show-forced-updates
+</dt>
+<dd>
+<p>
+        By default, git checks if a branch is force-updated during
+        fetch. This can be disabled through fetch.showForcedUpdates, but
+        the --show-forced-updates option guarantees this check occurs.
+        See <a href="git-config.html">git-config(1)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+--no-show-forced-updates
+</dt>
+<dd>
+<p>
+        By default, git checks if a branch is force-updated during
+        fetch. Pass --no-show-forced-updates or set fetch.showForcedUpdates
+        to false to skip this check for performance reasons. If used during
+        <em>git-pull</em> the --ff-only option will still check for forced updates
+        before attempting a fast-forward update. See <a href="git-config.html">git-config(1)</a>.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1362,7 +1410,7 @@ may be used:</p></div>
 </ul></div>
 <div class="paragraph"><p>where &lt;address&gt; may be a path, a server and path, or an arbitrary
 URL-like string recognized by the specific remote helper being
-invoked. See <a href="gitremote-helpers.html">gitremote-helpers(1)</a> for details.</p></div>
+invoked. See <a href="gitremote-helpers.html">gitremote-helpers(7)</a> for details.</p></div>
 <div class="paragraph"><p>If there are a large number of similarly-named remote repositories and
 you want to use a different format for them (such that the URLs you
 use will be rewritten into URLs that work), you can create a
@@ -1776,7 +1824,7 @@ Using refspecs explicitly:
 <div class="paragraph"><p>This updates (or creates, as necessary) branches <code>pu</code> and <code>tmp</code> in
 the local repository by fetching from the branches (respectively)
 <code>pu</code> and <code>maint</code> from the remote repository.</p></div>
-<div class="paragraph"><p>The <code>pu</code> branch will be updated even if it is does not fast-forward,
+<div class="paragraph"><p>The <code>pu</code> branch will be updated even if it does not fast-forward,
 because it is prefixed with a plus sign; <code>tmp</code> will not be.</p></div>
 </li>
 <li>
@@ -1843,7 +1891,7 @@ As in #1, the attacker chooses an object ID X to steal. The victim sends
 <div class="sectionbody">
 <div class="paragraph"><p>Using --recurse-submodules can only fetch new commits in already checked
 out submodules right now. When e.g. upstream added a new submodule in the
-just fetched commits of the superproject the submodule itself can not be
+just fetched commits of the superproject the submodule itself cannot be
 fetched, making it impossible to check out that submodule later without
 having to do a fetch again. This is expected to be fixed in a future Git
 version.</p></div>
@@ -1866,7 +1914,7 @@ version.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-02-05 15:33:20 PST
+ 2019-08-09 06:41:52 JST
 </div>
 </div>
 </body>

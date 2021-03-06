@@ -775,10 +775,12 @@ are affected.</p></div>
 </dt>
 <dd>
 <p>
-        Remove untracked directories in addition to untracked files.
-        If an untracked directory is managed by a different Git
-        repository, it is not removed by default.  Use -f option twice
-        if you really want to remove such a directory.
+        Normally, when no &lt;path&gt; is specified, git clean will not
+        recurse into untracked directories to avoid removing too much.
+        Specify -d to have it recurse into such directories as well.
+        If any paths are specified, -d is irrelevant; all untracked
+        files matching the specified paths (with exceptions for nested
+        git directories mentioned under <code>--force</code>) will be removed.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -791,9 +793,9 @@ are affected.</p></div>
 <p>
         If the Git configuration variable clean.requireForce is not set
         to false, <em>git clean</em> will refuse to delete files or directories
-        unless given -f, -n or -i. Git will refuse to delete directories
-        with .git sub directory or file unless a second -f
-        is given.
+        unless given -f or -i.  Git will refuse to modify untracked
+        nested git repositories (directories with a .git subdirectory)
+        unless a second -f is given.
 </p>
 </dd>
 <dt class="hdlist1">
@@ -839,9 +841,8 @@ are affected.</p></div>
 </dt>
 <dd>
 <p>
-        In addition to those found in .gitignore (per directory) and
-        $GIT_DIR/info/exclude, also consider these patterns to be in the
-        set of the ignore rules in effect.
+        Use the given exclude pattern in addition to the standard ignore rules
+        (see <a href="gitignore.html">gitignore(5)</a>).
 </p>
 </dd>
 <dt class="hdlist1">
@@ -849,11 +850,11 @@ are affected.</p></div>
 </dt>
 <dd>
 <p>
-        Don&#8217;t use the standard ignore rules read from .gitignore (per
-        directory) and $GIT_DIR/info/exclude, but do still use the ignore
-        rules given with <code>-e</code> options.  This allows removing all untracked
+        Don&#8217;t use the standard ignore rules (see <a href="gitignore.html">gitignore(5)</a>), but
+        still use the ignore rules given with <code>-e</code> options from the command
+        line.  This allows removing all untracked
         files, including build products.  This can be used (possibly in
-        conjunction with <em>git reset</em>) to create a pristine
+        conjunction with <em>git restore</em> or <em>git reset</em>) to create a pristine
         working directory to test a clean build.
 </p>
 </dd>
@@ -972,7 +973,7 @@ help
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2018-01-26 15:11:04 PST
+ 2019-10-11 16:25:30 JST
 </div>
 </div>
 </body>

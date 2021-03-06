@@ -181,7 +181,7 @@ static struct combine_diff_path *emit_path(struct combine_diff_path *p,
 	struct tree_desc *t, struct tree_desc *tp,
 	int imin)
 {
-	unsigned mode;
+	unsigned short mode;
 	const char *path;
 	const struct object_id *oid;
 	int pathlen;
@@ -422,8 +422,8 @@ static struct combine_diff_path *ll_diff_tree_paths(
 	 *   diff_tree_oid(parent, commit) )
 	 */
 	for (i = 0; i < nparent; ++i)
-		tptree[i] = fill_tree_descriptor(&tp[i], parents_oid[i]);
-	ttree = fill_tree_descriptor(&t, oid);
+		tptree[i] = fill_tree_descriptor(opt->repo, &tp[i], parents_oid[i]);
+	ttree = fill_tree_descriptor(opt->repo, &t, oid);
 
 	/* Enable recursion indefinitely */
 	opt->pathspec.recursive = opt->flags.recursive;

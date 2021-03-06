@@ -30,14 +30,13 @@ check_fsck () {
 }
 
 corrupt () {
-	aa=${1%??????????????????????????????????????} zz=${1#??}
-	mv .git/objects/$aa/$zz .git/$aa$zz
+	mv .git/objects/$(test_oid_to_path $1) .git/$1
 }
 
 recover () {
-	aa=${1%??????????????????????????????????????} zz=${1#??}
+	aa=$(echo $1 | cut -c 1-2)
 	mkdir -p .git/objects/$aa
-	mv .git/$aa$zz .git/objects/$aa/$zz
+	mv .git/$1 .git/objects/$(test_oid_to_path $1)
 }
 
 check_dont_have () {
@@ -55,6 +54,7 @@ check_dont_have () {
 }
 
 test_expect_success setup '
+	test_oid_init &&
 	mkdir -p A/B &&
 	echo rat >C &&
 	echo ox >A/D &&
@@ -232,25 +232,34 @@ test_expect_success '--expire=never' '
 '
 
 test_expect_success 'gc.reflogexpire=never' '
+	test_config gc.reflogexpire never &&
+	test_config gc.reflogexpireunreachable never &&
 
-	git config gc.reflogexpire never &&
-	git config gc.reflogexpireunreachable never &&
-	git reflog expire --verbose --all &&
+	git reflog expire --verbose --all >output &&
+	test_line_count = 9 output &&
+
 	git reflog refs/heads/master >output &&
 	test_line_count = 4 output
 '
 
 test_expect_success 'gc.reflogexpire=false' '
+	test_config gc.reflogexpire false &&
+	test_config gc.reflogexpireunreachable false &&
 
-	git config gc.reflogexpire false &&
-	git config gc.reflogexpireunreachable false &&
 	git reflog expire --verbose --all &&
 	git reflog refs/heads/master >output &&
-	test_line_count = 4 output &&
+	test_line_count = 4 output
 
-	git config --unset gc.reflogexpire &&
-	git config --unset gc.reflogexpireunreachable
+'
 
+test_expect_success 'git reflog expire unknown reference' '
+	test_config gc.reflogexpire never &&
+	test_config gc.reflogexpireunreachable never &&
+
+	test_must_fail git reflog expire master@{123} 2>stderr &&
+	test_i18ngrep "points nowhere" stderr &&
+	test_must_fail git reflog expire does-not-exist 2>stderr &&
+	test_i18ngrep "points nowhere" stderr
 '
 
 test_expect_success 'checkout should not delete log for packed ref' '
@@ -304,12 +313,12 @@ test_expect_success 'stale dirs do not cause d/f conflicts (reflogs off)' '
 # Each line is 114 characters, so we need 75 to still have a few before the
 # last 8K. The 89-character padding on the final entry lines up our
 # newline exactly.
-test_expect_success 'parsing reverse reflogs at BUFSIZ boundaries' '
+test_expect_success SHA1 'parsing reverse reflogs at BUFSIZ boundaries' '
 	git checkout -b reflogskip &&
-	z38=00000000000000000000000000000000000000 &&
+	zf=$(test_oid zero_2) &&
 	ident="abc <xyz> 0000000001 +0000" &&
 	for i in $(test_seq 1 75); do
-		printf "$z38%02d $z38%02d %s\t" $i $(($i+1)) "$ident" &&
+		printf "$zf%02d $zf%02d %s\t" $i $(($i+1)) "$ident" &&
 		if test $i = 75; then
 			for j in $(test_seq 1 89); do
 				printf X
@@ -320,7 +329,7 @@ test_expect_success 'parsing reverse reflogs at BUFSIZ boundaries' '
 		printf "\n"
 	done >.git/logs/refs/heads/reflogskip &&
 	git rev-parse reflogskip@{73} >actual &&
-	echo ${z38}03 >expect &&
+	echo ${zf}03 >expect &&
 	test_cmp expect actual
 '
 

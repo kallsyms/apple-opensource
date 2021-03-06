@@ -2,12 +2,12 @@
 .\"     Title: git-fetch
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 02/24/2019
+.\"      Date: 11/04/2019
 .\"    Manual: Git Manual
-.\"    Source: Git 2.21.0
+.\"    Source: Git 2.24.0
 .\"  Language: English
 .\"
-.TH "GIT\-FETCH" "1" "02/24/2019" "Git 2\&.21\&.0" "Git Manual"
+.TH "GIT\-FETCH" "1" "11/04/2019" "Git 2\&.24\&.0" "Git Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -145,6 +145,13 @@ Keep downloaded pack\&.
 Allow several <repository> and <group> arguments to be specified\&. No <refspec>s may be specified\&.
 .RE
 .PP
+\-\-[no\-]auto\-gc
+.RS 4
+Run
+\fBgit gc \-\-auto\fR
+at the end to perform garbage collection if needed\&. This is enabled by default\&.
+.RE
+.PP
 \-p, \-\-prune
 .RS 4
 Before fetching, remove any remote\-tracking references that no longer exist on the remote\&. Tags are not subject to pruning if they are fetched only because of the default tag auto\-following or due to a \-\-tags option\&. However, if tags are fetched due to an explicit refspec (either on the command line or in the remote configuration, for example if the remote was cloned with the \-\-mirror option), then they are also subject to pruning\&. Supplying
@@ -199,7 +206,18 @@ to only recurse into a populated submodule when the superproject retrieves a com
 .PP
 \-j, \-\-jobs=<n>
 .RS 4
-Number of parallel children to be used for fetching submodules\&. Each will fetch from different submodules, such that fetching many submodules will be faster\&. By default submodules will be fetched one at a time\&.
+Number of parallel children to be used for all forms of fetching\&.
+.sp
+If the
+\fB\-\-multiple\fR
+option was specified, the different remotes will be fetched in parallel\&. If multiple submodules are fetched, they will be fetched in parallel\&. To control them independently, use the config settings
+\fBfetch\&.parallel\fR
+and
+\fBsubmodule\&.fetchJobs\fR
+(see
+\fBgit-config\fR(1))\&.
+.sp
+Typically, parallel recursive and multi\-remote fetches will be faster\&. By default fetches are performed sequentially, not in parallel\&.
 .RE
 .PP
 \-\-no\-recurse\-submodules
@@ -207,6 +225,18 @@ Number of parallel children to be used for fetching submodules\&. Each will fetc
 Disable recursive fetching of submodules (this has the same effect as using the
 \fB\-\-recurse\-submodules=no\fR
 option)\&.
+.RE
+.PP
+\-\-set\-upstream
+.RS 4
+If the remote is fetched successfully, pull and add upstream (tracking) reference, used by argument\-less
+\fBgit-pull\fR(1)
+and other commands\&. For more information, see
+\fBbranch\&.<name>\&.merge\fR
+and
+\fBbranch\&.<name>\&.remote\fR
+in
+\fBgit-config\fR(1)\&.
 .RE
 .PP
 \-\-submodule\-prefix=<path>
@@ -257,9 +287,23 @@ Progress status is reported on the standard error stream by default when it is a
 .PP
 \-o <option>, \-\-server\-option=<option>
 .RS 4
-Transmit the given string to the server when communicating using protocol version 2\&. The given string must not contain a NUL or LF character\&. When multiple
+Transmit the given string to the server when communicating using protocol version 2\&. The given string must not contain a NUL or LF character\&. The server\(cqs handling of server options, including unknown ones, is server\-specific\&. When multiple
 \fB\-\-server\-option=<option>\fR
 are given, they are all sent to the other side in the order listed on the command line\&.
+.RE
+.PP
+\-\-show\-forced\-updates
+.RS 4
+By default, git checks if a branch is force\-updated during fetch\&. This can be disabled through fetch\&.showForcedUpdates, but the \-\-show\-forced\-updates option guarantees this check occurs\&. See
+\fBgit-config\fR(1)\&.
+.RE
+.PP
+\-\-no\-show\-forced\-updates
+.RS 4
+By default, git checks if a branch is force\-updated during fetch\&. Pass \-\-no\-show\-forced\-updates or set fetch\&.showForcedUpdates to false to skip this check for performance reasons\&. If used during
+\fIgit\-pull\fR
+the \-\-ff\-only option will still check for forced updates before attempting a fast\-forward update\&. See
+\fBgit-config\fR(1)\&.
 .RE
 .PP
 \-4, \-\-ipv4
@@ -512,7 +556,7 @@ When Git doesn\(cqt know how to handle a certain transport protocol, it attempts
 <transport>::<address>
 .RE
 .sp
-where <address> may be a path, a server and path, or an arbitrary URL\-like string recognized by the specific remote helper being invoked\&. See \fBgitremote-helpers\fR(1) for details\&.
+where <address> may be a path, a server and path, or an arbitrary URL\-like string recognized by the specific remote helper being invoked\&. See \fBgitremote-helpers\fR(7) for details\&.
 .sp
 If there are a large number of similarly\-named remote repositories and you want to use a different format for them (such that the URLs you use will be rewritten into URLs that work), you can create a configuration section of the form:
 .sp
@@ -990,7 +1034,7 @@ from the remote repository\&.
 .sp
 The
 \fBpu\fR
-branch will be updated even if it is does not fast\-forward, because it is prefixed with a plus sign;
+branch will be updated even if it does not fast\-forward, because it is prefixed with a plus sign;
 \fBtmp\fR
 will not be\&.
 .RE
@@ -1055,7 +1099,7 @@ As in #1, the attacker chooses an object ID X to steal\&. The victim sends an ob
 .RE
 .SH "BUGS"
 .sp
-Using \-\-recurse\-submodules can only fetch new commits in already checked out submodules right now\&. When e\&.g\&. upstream added a new submodule in the just fetched commits of the superproject the submodule itself can not be fetched, making it impossible to check out that submodule later without having to do a fetch again\&. This is expected to be fixed in a future Git version\&.
+Using \-\-recurse\-submodules can only fetch new commits in already checked out submodules right now\&. When e\&.g\&. upstream added a new submodule in the just fetched commits of the superproject the submodule itself cannot be fetched, making it impossible to check out that submodule later without having to do a fetch again\&. This is expected to be fixed in a future Git version\&.
 .SH "SEE ALSO"
 .sp
 \fBgit-pull\fR(1)

@@ -15,6 +15,7 @@
 #include "sha1-array.h"
 #include "packfile.h"
 #include "object-store.h"
+#include "promisor-remote.h"
 
 struct batch_options {
 	int enabled;
@@ -172,7 +173,8 @@ static int cat_one_file(int opt, const char *exp_type, const char *obj_name,
 			 * fall-back to the usual case.
 			 */
 		}
-		buf = read_object_with_reference(&oid, exp_type, &size, NULL);
+		buf = read_object_with_reference(the_repository,
+						 &oid, exp_type, &size, NULL);
 		break;
 
 	default:
@@ -523,8 +525,8 @@ static int batch_objects(struct batch_options *opt)
 	if (opt->all_objects) {
 		struct object_cb_data cb;
 
-		if (repository_format_partial_clone)
-			warning("This repository has extensions.partialClone set. Some objects may not be loaded.");
+		if (has_promisor_remote())
+			warning("This repository uses promisor remotes. Some objects may not be loaded.");
 
 		cb.opt = opt;
 		cb.expand = &data;

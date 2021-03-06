@@ -34,6 +34,11 @@ save_good_tree () {
 # successfully before (e.g. because the branch got rebased, changing only
 # the commit messages).
 skip_good_tree () {
+	if test "$TRAVIS_DEBUG_MODE" = true
+	then
+		return
+	fi
+
 	if ! good_tree_info="$(grep "^$(git rev-parse $CI_COMMIT^{tree}) " "$good_trees_file")"
 	then
 		# Haven't seen this tree yet, or no cached good trees file yet.
@@ -160,11 +165,13 @@ linux-clang|linux-gcc)
 		export CC=gcc-8
 	fi
 
-	export GIT_TEST_HTTPD=YesPlease
+	export GIT_TEST_HTTPD=true
 
 	# The Linux build installs the defined dependency versions below.
-	# The OS X build installs the latest available versions. Keep that
-	# in mind when you encounter a broken OS X build!
+	# The OS X build installs much more recent versions, whichever
+	# were recorded in the Homebrew database upon creating the OS X
+	# image.
+	# Keep that in mind when you encounter a broken OS X build!
 	export LINUX_P4_VERSION="16.2"
 	export LINUX_GIT_LFS_VERSION="1.5.2"
 
@@ -184,7 +191,7 @@ osx-clang|osx-gcc)
 	export GIT_SKIP_TESTS="t9810 t9816"
 	;;
 GIT_TEST_GETTEXT_POISON)
-	export GIT_TEST_GETTEXT_POISON=YesPlease
+	export GIT_TEST_GETTEXT_POISON=true
 	;;
 esac
 

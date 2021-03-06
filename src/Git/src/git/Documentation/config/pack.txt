@@ -112,7 +112,8 @@ pack.useSparse::
 	objects. This can have significant performance benefits when
 	computing a pack to send a small change. However, it is possible
 	that extra objects are added to the pack-file if the included
-	commits contain certain types of direct renames.
+	commits contain certain types of direct renames. Default is `false`
+	unless `feature.experimental` is enabled.
 
 pack.writeBitmaps (deprecated)::
 	This is a deprecated synonym for `repack.writeBitmaps`.
@@ -124,6 +125,4 @@ pack.writeBitmapHashCache::
 	bitmapped and non-bitmapped objects (e.g., when serving a fetch
 	between an older, bitmapped pack and objects that have been
 	pushed since the last gc). The downside is that it consumes 4
-	bytes per object of disk space, and that JGit's bitmap
-	implementation does not understand it, causing it to complain if
-	Git and JGit are used on the same repository. Defaults to false.
+	bytes per object of disk space. Defaults to true.

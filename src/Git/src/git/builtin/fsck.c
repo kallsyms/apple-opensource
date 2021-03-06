@@ -235,6 +235,48 @@ static int mark_used(struct object *obj, int type, void *data, struct fsck_optio
 	return 0;
 }
 
+static void mark_unreachable_referents(const struct object_id *oid)
+{
+	struct fsck_options options = FSCK_OPTIONS_DEFAULT;
+	struct object *obj = lookup_object(the_repository, oid);
+
+	if (!obj || !(obj->flags & HAS_OBJ))
+		return; /* not part of our original set */
+	if (obj->flags & REACHABLE)
+		return; /* reachable objects already traversed */
+
+	/*
+	 * Avoid passing OBJ_NONE to fsck_walk, which will parse the object
+	 * (and we want to avoid parsing blobs).
+	 */
+	if (obj->type == OBJ_NONE) {
+		enum object_type type = oid_object_info(the_repository,
+							&obj->oid, NULL);
+		if (type > 0)
+			object_as_type(the_repository, obj, type, 0);
+	}
+
+	options.walk = mark_used;
+	fsck_walk(obj, NULL, &options);
+}
+
+static int mark_loose_unreachable_referents(const struct object_id *oid,
+					    const char *path,
+					    void *data)
+{
+	mark_unreachable_referents(oid);
+	return 0;
+}
+
+static int mark_packed_unreachable_referents(const struct object_id *oid,
+					     struct packed_git *pack,
+					     uint32_t pos,
+					     void *data)
+{
+	mark_unreachable_referents(oid);
+	return 0;
+}
+
 /*
  * Check a single reachable object
  */
@@ -347,6 +389,26 @@ static void check_connectivity(void)
 	/* Traverse the pending reachable objects */
 	traverse_reachable();
 
+	/*
+	 * With --connectivity-only, we won't have actually opened and marked
+	 * unreachable objects with USED. Do that now to make --dangling, etc
+	 * accurate.
+	 */
+	if (connectivity_only && (show_dangling || write_lost_and_found)) {
+		/*
+		 * Even though we already have a "struct object" for each of
+		 * these in memory, we must not iterate over the internal
+		 * object hash as we do below. Our loop would potentially
+		 * resize the hash, making our iteration invalid.
+		 *
+		 * Instead, we'll just go back to the source list of objects,
+		 * and ignore any that weren't present in our earlier
+		 * traversal.
+		 */
+		for_each_loose_object(mark_loose_unreachable_referents, NULL, 0);
+		for_each_packed_object(mark_packed_unreachable_referents, NULL, 0);
+	}
+
 	/* Look up all the requirements, warn about missing objects.. */
 	max = get_max_object_index();
 	if (verbose)
@@ -435,7 +497,7 @@ static void fsck_handle_reflog_oid(const char *refname, struct object_id *oid,
 	struct object *obj;
 
 	if (!is_null_oid(oid)) {
-		obj = lookup_object(the_repository, oid->hash);
+		obj = lookup_object(the_repository, oid);
 		if (obj && (obj->flags & HAS_OBJ)) {
 			if (timestamp && name_objects)
 				add_decoration(fsck_walk_options.object_names,
@@ -694,7 +756,7 @@ static int fsck_cache_tree(struct cache_tree *it)
 
 static void mark_object_for_connectivity(const struct object_id *oid)
 {
-	struct object *obj = lookup_unknown_object(oid->hash);
+	struct object *obj = lookup_unknown_object(oid);
 	obj->flags |= HAS_OBJ;
 }
 
@@ -817,7 +879,7 @@ int cmd_fsck(int argc, const char **argv, const char *prefix)
 		struct object_id oid;
 		if (!get_oid(arg, &oid)) {
 			struct object *obj = lookup_object(the_repository,
-							   oid.hash);
+							   &oid);
 
 			if (!obj || !(obj->flags & HAS_OBJ)) {
 				if (is_promisor_object(&oid))

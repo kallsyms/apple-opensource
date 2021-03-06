@@ -14,7 +14,6 @@
 #
 #	test_expect_success ...
 #
-#	stop_httpd
 #	test_done
 #
 # Can be configured using the following variables.
@@ -42,15 +41,14 @@ then
 	test_done
 fi
 
-test_tristate GIT_TEST_HTTPD
-if test "$GIT_TEST_HTTPD" = false
+if ! git env--helper --type=bool --default=true --exit-code GIT_TEST_HTTPD
 then
 	skip_all="Network testing disabled (unset GIT_TEST_HTTPD to enable)"
 	test_done
 fi
 
 if ! test_have_prereq NOT_ROOT; then
-	test_skip_or_die $GIT_TEST_HTTPD \
+	test_skip_or_die GIT_TEST_HTTPD \
 		"Cannot run httpd tests as root"
 fi
 
@@ -96,7 +94,7 @@ GIT_TRACE=$GIT_TRACE; export GIT_TRACE
 
 if ! test -x "$LIB_HTTPD_PATH"
 then
-	test_skip_or_die $GIT_TEST_HTTPD "no web server found at '$LIB_HTTPD_PATH'"
+	test_skip_or_die GIT_TEST_HTTPD "no web server found at '$LIB_HTTPD_PATH'"
 fi
 
 HTTPD_VERSION=$($LIB_HTTPD_PATH -v | \
@@ -108,19 +106,19 @@ then
 	then
 		if ! test $HTTPD_VERSION -ge 2
 		then
-			test_skip_or_die $GIT_TEST_HTTPD \
+			test_skip_or_die GIT_TEST_HTTPD \
 				"at least Apache version 2 is required"
 		fi
 		if ! test -d "$DEFAULT_HTTPD_MODULE_PATH"
 		then
-			test_skip_or_die $GIT_TEST_HTTPD \
+			test_skip_or_die GIT_TEST_HTTPD \
 				"Apache module directory not found"
 		fi
 
 		LIB_HTTPD_MODULE_PATH="$DEFAULT_HTTPD_MODULE_PATH"
 	fi
 else
-	test_skip_or_die $GIT_TEST_HTTPD \
+	test_skip_or_die GIT_TEST_HTTPD \
 		"Could not identify web server at '$LIB_HTTPD_PATH'"
 fi
 
@@ -176,7 +174,7 @@ prepare_httpd() {
 start_httpd() {
 	prepare_httpd >&3 2>&4
 
-	trap 'code=$?; stop_httpd; (exit $code); die' EXIT
+	test_atexit stop_httpd
 
 	"$LIB_HTTPD_PATH" -d "$HTTPD_ROOT_PATH" \
 		-f "$TEST_PATH/apache.conf" $HTTPD_PARA \
@@ -184,15 +182,12 @@ start_httpd() {
 		>&3 2>&4
 	if test $? -ne 0
 	then
-		trap 'die' EXIT
 		cat "$HTTPD_ROOT_PATH"/error.log >&4 2>/dev/null
-		test_skip_or_die $GIT_TEST_HTTPD "web server setup failed"
+		test_skip_or_die GIT_TEST_HTTPD "web server setup failed"
 	fi
 }
 
 stop_httpd() {
-	trap 'die' EXIT
-
 	"$LIB_HTTPD_PATH" -d "$HTTPD_ROOT_PATH" \
 		-f "$TEST_PATH/apache.conf" $HTTPD_PARA -k stop
 }

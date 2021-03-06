@@ -1245,6 +1245,8 @@ FROM UPSTREAM REBASE" section in <a href="git-rebase.html">git-rebase(1)</a>.)</
 <p>
         Show untracked files.
 </p>
+<div class="openblock">
+<div class="content">
 <div class="paragraph"><p>The mode parameter is optional (defaults to <em>all</em>), and is used to
 specify the handling of untracked files; when -u is not used, the
 default is <em>normal</em>, i.e. show untracked files and directories.</p></div>
@@ -1264,10 +1266,11 @@ default is <em>normal</em>, i.e. show untracked files and directories.</p></div>
 <p>
 <em>all</em>    - Also shows individual files in untracked directories.
 </p>
-<div class="paragraph"><p>The default can be changed using the status.showUntrackedFiles
-configuration variable documented in <a href="git-config.html">git-config(1)</a>.</p></div>
 </li>
 </ul></div>
+<div class="paragraph"><p>The default can be changed using the status.showUntrackedFiles
+configuration variable documented in <a href="git-config.html">git-config(1)</a>.</p></div>
+</div></div>
 </dd>
 <dt class="hdlist1">
 -v
@@ -1433,7 +1436,7 @@ ISO 8601
 your working tree are temporarily stored to a staging area
 called the "index" with <em>git add</em>.  A file can be
 reverted back, only in the index but not in the working tree,
-to that of the last commit with <code>git reset HEAD -- &lt;file&gt;</code>,
+to that of the last commit with <code>git restore --staged &lt;file&gt;</code>,
 which effectively reverts <em>git add</em> and prevents the changes to
 this file from participating in the next commit.  After building
 the state to be committed incrementally with these commands,
@@ -1665,7 +1668,7 @@ information.</p></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-02-06 23:17:45 PST
+ 2019-10-09 14:51:03 JST
 </div>
 </div>
 </body>
