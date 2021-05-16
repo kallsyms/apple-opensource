@@ -43,14 +43,14 @@
  * VFS port to reuse as much existing code as possible.
  */
 
-#if 1
+#if 0
 #define xpl_trace_enter(fmt, ...) \
 	os_log_debug(OS_LOG_DEFAULT, "%s: Entering%s" fmt "...\n", __FUNCTION__, (fmt)[0] ? " with " : "", ##__VA_ARGS__)
 #else
 #define xpl_trace_enter(fmt, ...) do {} while(0)
 #endif
 
-#if 1
+#if 0
 #define xpl_debug(fmt, ...) \
 	os_log_debug(OS_LOG_DEFAULT, "%s:%s: " fmt, "ntfs", __FUNCTION__, ##__VA_ARGS__)
 #else
@@ -64,6 +64,12 @@
 
 #define xpl_error(fmt, ...) \
 	os_log_error(OS_LOG_DEFAULT, "%s:%s: " fmt, "ntfs", __FUNCTION__, ##__VA_ARGS__)
+
+#if SIMPLE_RWLOCK
+#define lck_rw_t pthread_mutex_t
+#else
+#define lck_rw_t pthread_rwlock_t
+#endif
 
 __attribute__((visibility("hidden"))) extern const char ntfs_dev_email[];
 __attribute__((visibility("hidden"))) extern const char ntfs_please_email[];
@@ -144,7 +150,7 @@ struct vnode {
 	off_t datasize;
 	char *nodename;
 	vnode_t parent;
-	pthread_mutex_t vnode_lock;
+	lck_rw_t vnode_lock;
 };
 
 struct vfs_context {
@@ -188,13 +194,22 @@ extern void _OSFree(const char *file, int line, void *ptr, size_t size,
 
 /* For our purposes we can assume that whoever is accessing the filesystem
  * operations has got superuser access. */
-#define kauth_cred_issuser(cred) (1)
-#define kauth_cred_getuid(cred) (0)
+static inline boolean_t kauth_cred_issuser(kauth_cred_t cred)
+{
+	(void)cred;
+	return TRUE;
+}
+
+static inline uid_t kauth_cred_getuid(kauth_cred_t cred)
+{
+	(void)cred;
+	return 0;
+}
 
 /* Simple rwlock is an initial implementation with a simple mutex, meaning
  * multiple readers isn't possible. This of course hurts performance under
  * highly parallel workloads. */
-#define SIMPLE_RWLOCK 1
+#define SIMPLE_RWLOCK 0
 
 struct lck_grp_attr_t;
 typedef struct lck_grp_attr_t lck_grp_attr_t;
@@ -286,7 +301,7 @@ static inline void lck_rwattr_free(lck_rwattr_t *attr)
 	err = pthread_rwlockattr_destroy(attr);
 #endif
 	if (err) {
-		xpl_perror(err, "Error while destroying lck_rw_t");
+		xpl_perror(err, "Error while destroying lck_rwattr_t");
 	}
 
 	free(attr);
@@ -308,17 +323,8 @@ typedef unsigned int     lck_rw_type_t;
 #define LCK_RW_TYPE_SHARED                      0x01
 #define LCK_RW_TYPE_EXCLUSIVE           0x02
 
-#if SIMPLE_RWLOCK
-#define lck_rw_t pthread_mutex_t
-#else
-typedef struct {
-	pthread_rwlock_t rwlock;
-	pthread_mutex_t mtx;
-} lck_rw_t;
-#endif
-
 #define lck_rw_init(lock, group, attr) _lck_rw_init(lock, attr##_rw)
-static inline void _lck_rw_init(lck_rw_t *lck, lck_attr_t *attr)
+static inline void _lck_rw_init(lck_rw_t *lck, lck_rwattr_t *attr)
 {
 	int err;
 
@@ -327,7 +333,7 @@ static inline void _lck_rw_init(lck_rw_t *lck, lck_attr_t *attr)
 #if SIMPLE_RWLOCK
 	err = pthread_mutex_init(lck, attr);
 #else
-	err = pthread_rwlock_rdlock(lck->);
+	err = pthread_rwlock_init(lck, attr);
 #endif
 	if (err) {
 		xpl_perror(err, "Error while initializating lck_rw_t");
@@ -343,7 +349,7 @@ static inline void lck_rw_lock_shared(lck_rw_t *lck)
 #if SIMPLE_RWLOCK
 	err = pthread_mutex_lock(lck);
 #else
-	err = pthread_rwlock_rdlock(lck->);
+	err = pthread_rwlock_rdlock(lck);
 #endif
 	if (err) {
 		xpl_perror(err, "Error while locking lck_rw_t in shared mode");
@@ -358,7 +364,7 @@ static inline void lck_rw_lock_exclusive(lck_rw_t *lck)
 #if SIMPLE_RWLOCK
 	err = pthread_mutex_lock(lck);
 #else
-	err = pthread_rwlock_rdlock(lck->);
+	err = pthread_rwlock_wrlock(lck);
 #endif
 	if (err) {
 		xpl_perror(err, "Error while locking lck_rw_t in exclusive "
@@ -375,9 +381,8 @@ static inline boolean_t lck_rw_try_lock(lck_rw_t *lck, lck_rw_type_t lck_rw_type
 	err = pthread_mutex_trylock(lck);
 #else
 	err = (lck_rw_type == LCK_RW_TYPE_SHARED) ?
-		pthread_rwlock_tryrdlock(&lck->rwlock) :
-		pthread_rwlock_trywrlock(&lck->rwlock);
-	pthread_rwlock_rdlock(lck->);
+		pthread_rwlock_tryrdlock(lck) :
+		pthread_rwlock_trywrlock(lck);
 #endif
 	if (err && err != EBUSY) {
 		xpl_perror(err, "Error while trylocking lck_rw_t in %s mode",
@@ -397,7 +402,10 @@ static inline boolean_t lck_rw_lock_shared_to_exclusive(lck_rw_t *lck)
 	 * exclusive. */
 	return TRUE;
 #else
-
+	/* Using a pthread_rwlock_t doesn't allow us to upgrade a lock, so
+	 * unlock the lock, return FALSE and force the caller to re-lock. */
+	pthread_rwlock_unlock(lck);
+	return FALSE;
 #endif
 }
 
@@ -409,7 +417,9 @@ static inline void lck_rw_lock_exclusive_to_shared(lck_rw_t *lck)
 	/* Simple implementation doesn't allow multiple readers. It's always
 	 * exclusive. */
 #else
-
+	/* Using a pthread_rwlock_t doesn't allow us to downgrade a lock, so
+	 * just leave it locked in exclusive mode. This may hurt performance in
+	 * some cases... */
 #endif
 }
 
@@ -612,7 +622,7 @@ typedef __darwin_uuid_t    uuid_t;
 
 //#define VFSATTR_INIT(s)			((s)->f_supported = (s)->f_active = 0LL)
 #define VFSATTR_SET_SUPPORTED(s, a)	((s)->f_supported |= VFSATTR_ ## a)
-//#define VFSATTR_IS_SUPPORTED(s, a)	((s)->f_supported & VFSATTR_ ## a)
+#define VFSATTR_IS_SUPPORTED(s, a)	((s)->f_supported & VFSATTR_ ## a)
 //#define VFSATTR_CLEAR_ACTIVE(s, a)	((s)->f_active &= ~VFSATTR_ ## a)
 #define VFSATTR_IS_ACTIVE(s, a)		((s)->f_active & VFSATTR_ ## a)
 //#define VFSATTR_ALL_SUPPORTED(s)	(((s)->f_active & (s)->f_supported) == (s)->f_active)
@@ -2245,6 +2255,8 @@ void    set_fsblocksize(struct vnode *);
 
 int xpl_vfs_mount_alloc_init(mount_t *mp, int fd, uint32_t blocksize,
 		vnode_t *out_devvp);
+
+int64_t xpl_vfs_mount_get_mount_time(mount_t mp);
 
 void xpl_vfs_mount_teardown(mount_t mp);
 

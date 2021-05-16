@@ -43,9 +43,9 @@
 
 #ifdef KERNEL
 #include <libkern/OSMalloc.h>
-#endif
-
+#else
 #include "ntfs_xpl.h"
+#endif
 
 #include "ntfs_debug.h"
 #include "ntfs_endian.h"
@@ -326,6 +326,12 @@ signed utf8_to_ntfs(const ntfs_volume *vol, const u8 *ins,
 				(int)err, (unsigned long)res_size,
 				(unsigned long)ntfs_size);
 		goto err;
+	} else if (res_size > INT_MAX) {
+		ntfs_error(vol->mp, "Got oversized UTF-8 string result from "
+				"UTF-8 to UTF-16LE transcoding: %zu bytes",
+				res_size);
+		err = EOVERFLOW;
+		goto err;
 	}
 	if (!*outs) {
 		*outs = ntfs;
@@ -334,7 +340,7 @@ signed utf8_to_ntfs(const ntfs_volume *vol, const u8 *ins,
 	res_size >>= NTFSCHAR_SIZE_SHIFT;
 	ntfs_debug("Converted string size in Unicode characters %lu.",
 			(unsigned long)res_size);
-	return res_size;
+	return (int)res_size;
 err:
 	if (!*outs)
 		OSFree(ntfs, ntfs_size, ntfs_malloc_tag);
@@ -427,6 +433,12 @@ signed ntfs_to_utf8(const ntfs_volume *vol, const ntfschar *ins,
 				"decomposed, NUL terminated, UTF-8 string "
 				"(error %d).", (int)err);
 		goto err;
+	} else if (res_size > INT_MAX) {
+		ntfs_error(vol->mp, "Got oversized UTF-8 string result from "
+				"UTF-16LE to UTF-8 transcoding: %zu bytes",
+				res_size);
+		err = EOVERFLOW;
+		goto err;
 	}
 	if (!*outs) {
 		if (res_size + 1 != utf8_size) {
@@ -441,7 +453,7 @@ signed ntfs_to_utf8(const ntfs_volume *vol, const ntfschar *ins,
 	}
 	ntfs_debug("Converted string size in bytes %lu (decomposed UTF-8).",
 			(unsigned long)res_size);
-	return res_size;
+	return (int)res_size;
 err:
 	if (!*outs)
 		OSFree(utf8, utf8_size, ntfs_malloc_tag);

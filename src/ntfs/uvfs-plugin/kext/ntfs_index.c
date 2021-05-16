@@ -1154,7 +1154,7 @@ errno_t ntfs_index_lookup_by_position(const s64 pos, const int key_len,
 				if (nr >= ictx->nr_entries - 1)
 					panic("%s(): nr >= ictx->nr_entries - "
 							"1\n", __FUNCTION__);
-				ictx->entry_nr = nr;
+				ictx->entry_nr = (unsigned)nr;
 				ictx->entry = ictx->entries[nr];
 				current_pos = pos;
 			} else if (current_pos > pos)
@@ -1707,7 +1707,7 @@ retry:
 			goto undo;
 		}
 		al = ni->attr_list;
-		al_entry_ofs = (u8*)al_entry - al;
+		al_entry_ofs = (unsigned)((u8*)al_entry - al);
 		al_end = al + ni->attr_list_size;
 		memcpy(tmp, al, al_entry_ofs);
 		if ((u8*)al_entry < al_end)
@@ -1749,7 +1749,7 @@ retry:
 	 * value from the cache.
 	 */
 	err = ntfs_attr_list_sync_extend(ni, base_m,
-			(u8*)al_entry - ni->attr_list, ctx);
+			(unsigned)((u8*)al_entry - ni->attr_list), ctx);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to extend attribute list "
 				"attribute of mft_no 0x%llx (error %d).",
@@ -2039,7 +2039,7 @@ static errno_t ntfs_index_block_alloc(ntfs_index_context *ictx, VCN *dst_vcn,
 			 * So emulate "ffz(x)" using "ffs(~x) - 1" which gives
 			 * the same result but incurs extra CPU overhead.
 			 */
-			bit = ffs(~(unsigned long)*bmp) - 1;
+			bit = ffs(~(unsigned)*bmp) - 1;
 			if (bit < 8)
 				goto allocated_bit;
 		}
@@ -2735,8 +2735,8 @@ move_idx_root:
 		 * metadata/disk.
 		 */
 		ntfs_attr_search_ctx_reinit(&ctx);
-		err = ntfs_attr_list_sync(base_ni, (u8*)al_entry -
-				base_ni->attr_list, &ctx);
+		err = ntfs_attr_list_sync(base_ni, (unsigned)((u8*)al_entry -
+				base_ni->attr_list), &ctx);
 		if (!err) {
 			/*
 			 * Need to update our cached pointers as the index root
@@ -4290,7 +4290,7 @@ skip_insert:
 		if (!(end_entry->flags & INDEX_ENTRY_END))
 			panic("%s(): !(end_entry->flags & INDEX_ENTRY_END)\n",
 					__FUNCTION__);
-		u = (u8*)end_entry - (u8*)entry +
+		u = (unsigned)((u8*)end_entry - (u8*)entry) +
 				le16_to_cpu(end_entry->length);
 		memcpy(right_entry, entry, u);
 		right_index->index_length = cpu_to_le32(

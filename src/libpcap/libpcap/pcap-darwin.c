@@ -981,6 +981,12 @@ pcap_ng_dump_pktap_comment(pcap_t *pcap, pcap_dumper_t *dumper,
 	}
 #endif /* PTH_FLAG_NEXUS_CHAN */
 
+#ifdef PTH_FLAG_WAKE_PKT
+	if (pktp_hdr->pth_flags & PTH_FLAG_WAKE_PKT) {
+		pmdflags |= PCAPNG_EPB_PMDF_WAKE_PKT;
+	}
+#endif /* PTH_FLAG_WAKE_PKT */
+
 	if (pmdflags != 0) {
 		pcap_ng_block_add_option_with_value(block, PCAPNG_EPB_PMD_FLAGS, &pmdflags, 4);
 	}
@@ -1403,6 +1409,12 @@ pcap_ng_dump_pktap_v2(pcap_t *pcap, pcap_dumper_t *dumper,
 		pmdflags |= PCAPNG_EPB_PMDF_NEXUS_CHANNEL;
 	}
 #endif /* PTH_FLAG_NEXUS_CHAN */
+
+#ifdef PTH_FLAG_WAKE_PKT
+	if (pktap_v2_hdr->pth_flags & PTH_FLAG_WAKE_PKT) {
+		pmdflags |= PCAPNG_EPB_PMDF_WAKE_PKT;
+	}
+#endif /* PTH_FLAG_WAKE_PKT */
 
 	if (pmdflags != 0) {
 		pcap_ng_block_add_option_with_value(block, PCAPNG_EPB_PMD_FLAGS, &pmdflags, 4);

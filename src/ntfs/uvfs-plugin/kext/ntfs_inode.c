@@ -1429,7 +1429,7 @@ errno_t ntfs_inode_afpinfo_read(ntfs_inode *ni)
 	upl_t upl;
 	upl_page_info_array_t pl;
 	AFPINFO *afp;
-	unsigned afp_size;
+	s64 afp_size;
 	errno_t err;
 
 	ntfs_debug("Entering for mft_no 0x%llx.",
@@ -1461,7 +1461,7 @@ errno_t ntfs_inode_afpinfo_read(ntfs_inode *ni)
 	lck_spin_unlock(&afp_ni->size_lock);
 	if (afp_size > PAGE_SIZE)
 		afp_size = PAGE_SIZE;
-	ntfs_inode_afpinfo_cache(ni, afp, afp_size);
+	ntfs_inode_afpinfo_cache(ni, afp, (unsigned)afp_size);
 	ntfs_page_unmap(afp_ni, upl, pl, FALSE);
 	ntfs_debug("Done.");
 err:
@@ -1561,7 +1561,7 @@ errno_t ntfs_inode_afpinfo_write(ntfs_inode *ni)
 	upl_t upl;
 	upl_page_info_array_t pl;
 	AFPINFO *afp;
-	unsigned afp_size;
+	s64 afp_size;
 	sle32 backup_time;
 	errno_t err;
 	BOOL delete, update;
@@ -1710,7 +1710,7 @@ errno_t ntfs_inode_afpinfo_write(ntfs_inode *ni)
 		afp->version = AfpInfo_Version;
 		afp->backup_time = const_cpu_to_sle32(INT32_MIN);
 	}
-	ntfs_inode_afpinfo_sync(afp, afp_size, ni);
+	ntfs_inode_afpinfo_sync(afp, (unsigned)afp_size, ni);
 	ntfs_page_unmap(afp_ni, upl, pl, TRUE);
 done:
 	lck_rw_unlock_exclusive(&afp_ni->lock);
@@ -2302,7 +2302,7 @@ no_data_attr_special_case:
 		/* We do not need the runlist any more so free it. */
 		OSFree(ai_runlist.rl, ai_runlist.alloc, ntfs_malloc_tag);
 		/* Finally cache the AFP_AfpInfo data in the base inode. */
-		ntfs_inode_afpinfo_cache(ni, &ai, ai_size);
+		ntfs_inode_afpinfo_cache(ni, &ai, (unsigned)ai_size);
 	}
 done:
 	/*
@@ -3854,6 +3854,7 @@ static errno_t ntfs_inode_sync_to_mft_record(ntfs_inode *ni)
 	 * freeing.
 	 */
 	dir_ni = NULL;
+	dir_ia_ni = NULL;
 	while (!SLIST_EMPTY(&fn_list)) {
 		next = SLIST_FIRST(&fn_list);
 		/*

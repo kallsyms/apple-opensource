@@ -151,6 +151,7 @@
 		C2EB731D23D8A38A0040672B /* dummy-library-mac-i386.c in Sources */ = {isa = PBXBuildFile; fileRef = C2EB731C23D8A38A0040672B /* dummy-library-mac-i386.c */; };
 		E8923DA5116AB2820071B552 /* objc-block-trampolines.mm in Sources */ = {isa = PBXBuildFile; fileRef = E8923DA0116AB2820071B552 /* objc-block-trampolines.mm */; };
 		E934A9F123E996D00088F26F /* objc4.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = E934A9EF23E9967D0088F26F /* objc4.plist */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		F378CAC725534BC000AC8F83 /* module.modulemap in Headers */ = {isa = PBXBuildFile; fileRef = F378CAC625534BAC00AC8F83 /* module.modulemap */; settings = {ATTRIBUTES = (Private, ); }; };
 		F9BCC71B205C68E800DD9AFC /* objc-blocktramps-arm64.s in Sources */ = {isa = PBXBuildFile; fileRef = 8379996D13CBAF6F007C2B5F /* objc-blocktramps-arm64.s */; };
 /* End PBXBuildFile section */
 
@@ -325,6 +326,7 @@
 		E934A9EF23E9967D0088F26F /* objc4.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = objc4.plist; sourceTree = "<group>"; };
 		E97047552497CC5300781D29 /* check_preopt_caches.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = check_preopt_caches.entitlements; sourceTree = "<group>"; };
 		E9AD465924925261002AF1DB /* check_preopt_caches.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = check_preopt_caches.mm; sourceTree = "<group>"; };
+		F378CAC625534BAC00AC8F83 /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; name = module.modulemap; path = runtime/ModulePrivate/module.modulemap; sourceTree = "<group>"; };
 		F9BCC727205C68E800DD9AFC /* libobjc-trampolines.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = "libobjc-trampolines.dylib"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -484,6 +486,7 @@
 		838485C70D6D688200CEA253 /* Private Headers */ = {
 			isa = PBXGroup;
 			children = (
+				F378CAC625534BAC00AC8F83 /* module.modulemap */,
 				838485BB0D6D687300CEA253 /* maptable.h */,
 				7213C36221FA7C730090A271 /* NSObject-internal.h */,
 				834EC0A311614167009B2563 /* objc-abi.h */,
@@ -609,6 +612,7 @@
 				838485F60D6D68A200CEA253 /* objc-config.h in Headers */,
 				6E1475EE21DFDB1B001357EA /* llvm-MathExtras.h in Headers */,
 				838485F80D6D68A200CEA253 /* objc-exception.h in Headers */,
+				F378CAC725534BC000AC8F83 /* module.modulemap in Headers */,
 				83BE02E80FCCB24D00661494 /* objc-file-old.h in Headers */,
 				83BE02E90FCCB24D00661494 /* objc-file.h in Headers */,
 				75A9504F202BAA0600D7D56F /* objc-locks-new.h in Headers */,

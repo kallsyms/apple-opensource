@@ -280,7 +280,8 @@ make_data_block(const void *data, size_t len)
 				struct pcapng_enhanced_packet_fields *epb_fields;
 				uint32_t pktflags = PCAPNG_PBF_DIR_OUTBOUND | PCAPNG_PBF_DIR_INBOUND;
 				uint32_t pmdflags = PCAPNG_EPB_PMDF_NEW_FLOW | PCAPNG_EPB_PMDF_REXMIT |
-					PCAPNG_EPB_PMDF_KEEP_ALIVE | PCAPNG_EPB_PMDF_SOCKET | PCAPNG_EPB_PMDF_NEXUS_CHANNEL;
+					PCAPNG_EPB_PMDF_KEEP_ALIVE | PCAPNG_EPB_PMDF_SOCKET | PCAPNG_EPB_PMDF_NEXUS_CHANNEL |
+					PCAPNG_EPB_PMDF_WAKE_PKT;
 
 				pcapng_block_t block = pcap_ng_block_alloc(pcap_ng_block_size_max());
 				

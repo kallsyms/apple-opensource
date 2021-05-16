@@ -82,7 +82,7 @@ OBJC_AVAILABLE(10.15, 13.0, 13.0, 6.0, 5.0);
 
 // Maps class name to Class, for in-use classes only. NXStrValueMapPrototype.
 OBJC_EXPORT NXMapTable * _Nullable gdb_objc_realized_classes
-    OBJC_AVAILABLE(10.6, 3.1, 9.0, 1.0, 2.0);
+    OBJC_MAP_AVAILABILITY;
 
 // A generation count of realized classes. Increments when new classes
 // are realized. This is NOT an exact count of the number of classes.

@@ -125,6 +125,9 @@ struct rtentry;		/* declarations in <net/if.h> */
 #endif
 
 #ifdef __APPLE__
+#ifndef __OPEN_SOURCE__
+#include "pcap-skywalk.h"
+#endif
 
 #ifdef HAVE_PKTAP_API
 #include "pcap-pktap.h"
@@ -529,6 +532,9 @@ static struct capture_source_type {
 	pcap_t *(*create_op)(const char *, char *, int *);
 } capture_source_types[] = {
 #ifdef __APPLE__
+#ifndef __OPEN_SOURCE__
+	{ NULL, skywalk_create },
+#endif
 #ifdef HAVE_PKTAP_API
 	{ NULL, pktap_create },
 #endif

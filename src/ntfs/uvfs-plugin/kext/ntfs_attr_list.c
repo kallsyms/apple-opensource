@@ -389,7 +389,7 @@ errno_t ntfs_attr_list_add(ntfs_inode *base_ni, MFT_RECORD *m,
 		 */
 		al_entry = (ATTR_LIST_ENTRY*)((u8*)al_entry + al_entry_len);
 	} while (1);
-	al_size = (u8*)al_entry - al;
+	al_size = (unsigned)((u8*)al_entry - al);
 	/*
 	 * We now have built the attribute list attribute value in @al.
 	 *
@@ -1340,7 +1340,8 @@ errno_t ntfs_attr_list_sync_extend(ntfs_inode *base_ni, MFT_RECORD *base_m,
 	ATTR_LIST_ENTRY *al_entry;
 	u8 *al_end;
 	unsigned bytes_needed, bytes_free, alloc_size, name_ofs;
-	unsigned mp_size, mp_ofs, arec_size, old_arec_size;
+	unsigned mp_size, mp_ofs, old_arec_size;
+	s64 arec_size;
 	errno_t err, err2;
 	le32 type;
 	BOOL dirty_mft, remap_needed;
@@ -1619,7 +1620,7 @@ update_resident:
 		 * new value thus syncing everything starting at that offset.
 		 */
 		if ((u8*)al_entry - base_ni->attr_list < (long)al_ofs)
-			al_ofs = (u8*)al_entry - base_ni->attr_list;
+			al_ofs = (unsigned)((u8*)al_entry - base_ni->attr_list);
 	}
 	/*
 	 * Find the attribute list attribute record in the base mft record
@@ -1722,7 +1723,7 @@ make_non_resident:
 	 * never have gotten here as this case would be detected when the inode
 	 * is read in.
 	 */
-	err = ntfs_attr_record_resize(base_m, al_a, arec_size);
+	err = ntfs_attr_record_resize(base_m, al_a, (u32)arec_size);
 	if (err)
 		panic("%s(): err (ntfs_attr_record_resize())\n", __FUNCTION__);
 	/*
@@ -1854,7 +1855,7 @@ next_pass:
 					goto next_pass;
 				}
 				/*
-				 * TODO: Need to get these cases triggerred and
+				 * TODO: Need to get these cases triggered and
 				 * then need to run chkdsk to check for
 				 * validity of moving these attributes out of
 				 * the base mft record.
@@ -2054,7 +2055,7 @@ next_pass:
 		 * new value thus syncing everything starting at that offset.
 		 */
 		if ((u8*)al_entry - base_ni->attr_list < (long)al_ofs)
-			al_ofs = (u8*)al_entry - base_ni->attr_list;
+			al_ofs = (unsigned)((u8*)al_entry - base_ni->attr_list);
 	}
 	/*
 	 * Find the attribute list attribute record in the base mft record
@@ -2185,7 +2186,7 @@ void ntfs_attr_list_entries_delete(ntfs_inode *ni,
 	 * Determine the number of bytes to be deleted from the attribute list
 	 * attribute.
 	 */
-	to_delete = (u8*)end_entry - (u8*)start_entry;
+	to_delete = (unsigned)((u8*)end_entry - (u8*)start_entry);
 	ntfs_debug("Entering for base mft_no 0x%llx, attr type 0x%x, "
 			"start_entry length 0x%x, start_entry offset 0x%lx, "
 			"end_entry offset 0x%lx, bytes to_delete 0x%x.",
@@ -2199,7 +2200,8 @@ void ntfs_attr_list_entries_delete(ntfs_inode *ni,
 	 * Determine the number of bytes in the attribute list attribute
 	 * following the entries to be deleted.
 	 */
-	to_copy = ni->attr_list_size - ((u8*)end_entry - ni->attr_list);
+	to_copy =
+		ni->attr_list_size - (unsigned)((u8*)end_entry - ni->attr_list);
 	/*
 	 * Determine the new size and allocated size for the attribute list
 	 * attribute.
@@ -2241,7 +2243,7 @@ cut:
 		 */
 		if (!tmp)
 			goto cut;
-		entry_ofs = (u8*)start_entry - ni->attr_list;
+		entry_ofs = (unsigned)((u8*)start_entry - ni->attr_list);
 		memcpy(tmp, ni->attr_list, entry_ofs);
 		if (to_copy > 0)
 			memcpy(tmp + entry_ofs, end_entry, to_copy);

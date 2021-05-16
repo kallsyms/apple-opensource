@@ -1689,7 +1689,7 @@ errno_t ntfs_attr_record_delete(ntfs_inode *base_ni, ntfs_attr_search_ctx *ctx)
 	 * We now need to delete the corresponding attribute list attribute
 	 * entry.
 	 */
-	al_ofs = (u8*)al_entry - base_ni->attr_list;
+	al_ofs = (unsigned)((u8*)al_entry - base_ni->attr_list);
 	ntfs_attr_list_entry_delete(base_ni, al_entry);
 	ntfs_attr_search_ctx_reinit(ctx);
 	err = ntfs_attr_list_sync_shrink(base_ni, al_ofs, ctx);
@@ -2682,7 +2682,7 @@ retry:
 			goto undo;
 		}
 		al = ni->attr_list;
-		al_entry_ofs = (u8*)al_entry - al;
+		al_entry_ofs = (unsigned)((u8*)al_entry - al);
 		al_end = al + ni->attr_list_size;
 		memcpy(tmp, al, al_entry_ofs);
 		if ((u8*)al_entry < al_end)
@@ -2724,7 +2724,7 @@ retry:
 	 * value from the cache.
 	 */
 	err = ntfs_attr_list_sync_extend(ni, base_m,
-			(u8*)al_entry - ni->attr_list, ctx);
+			(unsigned)((u8*)al_entry - ni->attr_list), ctx);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to extend attribute list "
 				"attribute of mft_no 0x%llx (error %d).",
@@ -2981,6 +2981,8 @@ errno_t ntfs_attr_make_non_resident(ntfs_inode *ni)
 	if (ni->rl.elements)
 		panic("%s(): ni->rl.elements\n", __FUNCTION__);
 	upl = NULL;
+	pl = NULL;
+	kaddr = NULL;
 	if (new_size > 0) {
 		/* Start by allocating clusters to hold the attribute value. */
 		err = ntfs_cluster_alloc(vol, 0, new_size >>
@@ -3361,7 +3363,7 @@ next_pass:
 		 * new value thus syncing everything starting at that offset.
 		 */
 		if ((u8*)al_entry - base_ni->attr_list < (long)al_ofs) {
-			al_ofs = (u8*)al_entry - base_ni->attr_list;
+			al_ofs = (unsigned)((u8*)al_entry - base_ni->attr_list);
 			al_dirty = TRUE;
 		}
 		/*
@@ -3808,7 +3810,7 @@ errno_t ntfs_attr_record_move(ntfs_attr_search_ctx *ctx)
 	if (a->non_resident) {
 		unsigned ofs;
 
-		ofs = (u8*)ctx->al_entry - base_ni->attr_list;
+		ofs = (unsigned)((u8*)ctx->al_entry - base_ni->attr_list);
 		err = ntfs_rl_write(base_ni->vol, base_ni->attr_list,
 				base_ni->attr_list_size,
 				&base_ni->attr_list_rl, ofs,
@@ -3987,7 +3989,8 @@ errno_t ntfs_attr_set_initialized_size(ntfs_inode *ni, s64 new_init_size)
 							"le16_to_cpu("
 							"a->value_offset)\n",
 							__FUNCTION__);
-				a->value_length = cpu_to_le32(new_init_size);
+				a->value_length =
+					cpu_to_le32((u32)new_init_size);
 			}
 			data_size_updated = TRUE;
 			if (ni == base_ni && !S_ISDIR(ni->mode))
@@ -5953,7 +5956,7 @@ errno_t ntfs_attr_extend_allocation(ntfs_inode *ni, s64 new_alloc_size,
 {
 	VCN vcn, lowest_vcn, stop_vcn;
 	s64 start, ll, old_alloc_size, alloc_size, alloc_start, alloc_end;
-	s64 nr_allocated, nr_freed;
+	s64 nr_allocated, nr_freed = 0;
 	ntfs_volume *vol = ni->vol;
 	ntfs_inode *base_ni;
 	MFT_RECORD *base_m, *m;
@@ -6126,7 +6129,7 @@ retry_extend:
 				lck_spin_lock(&ni->size_lock);
 				err = ntfs_attr_record_resize(m, a,
 						le16_to_cpu(a->value_offset) +
-						ni->allocated_size);
+						(u32)ni->allocated_size);
 				lck_spin_unlock(&ni->size_lock);
 				if (err)
 					panic("%s(): Failed to shrink "
@@ -7102,7 +7105,7 @@ skip_mpa_build:
 				goto free_undo;
 			}
 			al = base_ni->attr_list;
-			al_entry_ofs = (u8*)al_entry - al;
+			al_entry_ofs = (unsigned)((u8*)al_entry - al);
 			al_end = al + base_ni->attr_list_size;
 			memcpy(tmp, al, al_entry_ofs);
 			if ((u8*)al_entry < al_end)
@@ -7165,7 +7168,8 @@ skip_mpa_build:
 		 * value from the cache.
 		 */
 		err = ntfs_attr_list_sync_extend(base_ni, base_m,
-				(u8*)al_entry - base_ni->attr_list, actx);
+				(unsigned)((u8*)al_entry - base_ni->attr_list),
+				actx);
 		if (err || actx->is_error) {
 			/*
 			 * If @actx->is_error indicates error this is fatal as
@@ -7862,7 +7866,7 @@ retry_resize:
 	arec_size = (le16_to_cpu(a->value_offset) + new_size + 7) & ~7;
 	/* Resize the attribute record to best fit the new attribute size. */
 	if (new_size < vol->mft_record_size &&
-			!ntfs_resident_attr_value_resize(m, a, new_size)) {
+			!ntfs_resident_attr_value_resize(m, a, (u32)new_size)) {
 		/* The resize succeeded! */
 		NInoSetMrecNeedsDirtying(actx->ni);
 		lck_spin_lock(&ni->size_lock);
@@ -8660,7 +8664,7 @@ delete_attr:
 		unsigned al_ofs;
 		BOOL have_extent_records;
 
-		al_ofs = del_al_start - base_ni->attr_list;
+		al_ofs = (unsigned)(del_al_start - base_ni->attr_list);
 		ntfs_attr_list_entries_delete(base_ni,
 				(ATTR_LIST_ENTRY*)del_al_start, al_entry);
 		/*
@@ -8983,13 +8987,13 @@ errno_t ntfs_resident_attr_read(ntfs_inode *ni, const s64 ofs, const u32 cnt,
 	/* These can happen when we race with a shrinking truncate. */
 	attr_len = le32_to_cpu(a->value_length);
 	if (attr_len > ni->data_size)
-		attr_len = ni->data_size;
+		attr_len = (unsigned)ni->data_size;
 	max_size = ubc_getsize(ni->vn);
 	if (attr_len > max_size)
-		attr_len = max_size;
+		attr_len = (unsigned)max_size;
 	init_len = attr_len;
 	if (init_len > ni->initialized_size)
-		init_len = ni->initialized_size;
+		init_len = (unsigned)ni->initialized_size;
 	lck_spin_unlock(&ni->size_lock);
 	/*
 	 * If we are reading from the initialized attribute part, copy the data
@@ -8997,7 +9001,7 @@ errno_t ntfs_resident_attr_read(ntfs_inode *ni, const s64 ofs, const u32 cnt,
 	 */
 	bytes = cnt;
 	if (init_len > ofs) {
-		u32 available = init_len - ofs;
+		u32 available = init_len - (unsigned)ofs;
 		if (bytes > available)
 			bytes = available;
 		memcpy(buf, (u8*)a + le16_to_cpu(a->value_offset) + ofs, bytes);
@@ -9086,7 +9090,7 @@ errno_t ntfs_resident_attr_write(ntfs_inode *ni, u8 *buf, u32 cnt,
 	}
 	if (ofs + cnt > attr_len) {
 		ntfs_error(ni->vol->mp, "Truncating resident write.");
-		cnt = attr_len - ofs;
+		cnt = (u32)(attr_len - ofs);
 	}
 	if (ofs + cnt > ni->initialized_size)
 		ni->initialized_size = ofs + cnt;

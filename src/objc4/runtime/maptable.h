@@ -54,7 +54,7 @@ typedef struct _NXMapTable {
     void	* _Nullable buckets;
 } NXMapTable OBJC_MAP_AVAILABILITY;
 
-typedef struct _NXMapTablePrototype {
+typedef struct OBJC_MAP_AVAILABILITY _NXMapTablePrototype {
     unsigned	(* _Nonnull hash)(NXMapTable * _Nonnull,
                                   const void * _Nullable key);
     int		(* _Nonnull isEqual)(NXMapTable * _Nonnull,

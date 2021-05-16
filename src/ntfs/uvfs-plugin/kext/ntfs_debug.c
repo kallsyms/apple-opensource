@@ -158,7 +158,7 @@ void __ntfs_warning(const char *function,
 		struct mount *mp, const char *fmt, ...)
 {
 	va_list args;
-	int flen = 0;
+	size_t flen = 0;
 
 	if (function)
 		flen = strlen(function);
@@ -206,7 +206,7 @@ void __ntfs_error(const char *function,
 		struct mount *mp, const char *fmt, ...)
 {
 	va_list args;
-	int flen = 0;
+	size_t flen = 0;
 
 	if (function)
 		flen = strlen(function);
@@ -238,7 +238,7 @@ void __ntfs_debug(const char *file, int line,
 {
 	va_list args;
 	const char *filename;
-	int len;
+	size_t len;
 
 	if (!ntfs_debug_messages)
 		return;
@@ -291,13 +291,13 @@ void ntfs_debug_runlist_dump(const ntfs_runlist *runlist)
 		LCN lcn = rl[u].lcn;
 
 		if (lcn < (LCN)0) {
-			int index = -lcn - 1;
+			LCN index = -lcn - 1;
 
 			if (index > -LCN_ENOENT - 1)
 				index = 3;
 			printf("%-16llx %s %-16llx%s\n",
 					(unsigned long long)rl[u].vcn,
-					lcn_str[index],
+					lcn_str[(size_t)index],
 					(unsigned long long)rl[u].length,
 					rl[u].length ? "" : " (runlist end)");
 		} else

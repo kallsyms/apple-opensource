@@ -521,12 +521,12 @@ err:
 errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 {
 	s64 size, pos, ppos;
-	LSN rstr1_lsn, rstr2_lsn;
+	LSN rstr1_lsn = 0, rstr2_lsn = 0;
 	ntfs_volume *vol;
 	RESTART_PAGE_HEADER *rstr1_ph, *rstr2_ph;
-	upl_t upl;
-	upl_page_info_array_t pl;
-	u8 *paddr, *kaddr;
+	upl_t upl = UPL_NULL;
+	upl_page_info_array_t pl = NULL;
+	u8 *paddr = NULL, *kaddr;
 	unsigned log_page_size, log_page_mask;
 	errno_t err;
 	BOOL logfile_is_empty = TRUE;

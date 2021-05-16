@@ -1,4 +1,5 @@
 // TEST_CONFIG OS=macosx,iphoneos,tvos,watchos
+// TEST_ENV OBJC_DEBUG_SCRIBBLE_CACHES=YES
 
 // This test checks that objc_msgSend's recovery path works correctly.
 // It continuously runs msgSend on some background threads, then
@@ -72,7 +73,11 @@ int main() {
         });
     }
     for(int i = 0; i < 1000000; i++) {
-        task_restartable_ranges_synchronize(mach_task_self());;
+        task_restartable_ranges_synchronize(mach_task_self());
+    }
+    Class c = [C1 class];
+    for(int i = 0; i < 1000000; i++) {
+        _objc_flush_caches(c);
     }
     succeed(__FILE__);
 }

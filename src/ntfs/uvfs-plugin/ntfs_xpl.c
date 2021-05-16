@@ -22,6 +22,7 @@
 
 struct mount {
 	uint64_t flags;
+	int64_t mount_time;
 	int isrdonly;
 	struct vnode devvn;
 	uint32_t blocksize;
@@ -135,6 +136,7 @@ int xpl_vfs_mount_alloc_init(mount_t *out_mp, int fd, uint32_t blocksize,
 	memset(mp, 0, sizeof(*mp));
 
 	mp->flags = MNT_RDONLY;
+	mp->mount_time = time(NULL);
 	mp->isrdonly = 1;
 
 	mp->devvn.vnode_external = 1;
@@ -162,6 +164,11 @@ out:
 		free(mp);
 	}
 	return err;
+}
+
+int64_t xpl_vfs_mount_get_mount_time(mount_t mp)
+{
+	return mp->mount_time;
 }
 
 void xpl_vfs_mount_teardown(mount_t mp)
@@ -2418,9 +2425,14 @@ cluster_read_ext(vnode_t vp, struct uio *uio, off_t filesize, int xflags, int (*
 	blockmap_op = (int (*)(struct vnop_blockmap_args *a)) ops.vnop_blockmap;
 
 	offset = uio->offset;
-	size = (uio->resid > filesize) ? filesize : uio->resid;
-	if (size > filesize) {
-		size = filesize;
+	if (uio->offset >= filesize) {
+		size = 0;
+	}
+	else if (uio->resid > filesize - uio->offset) {
+		size = filesize - uio->offset;
+	}
+	else {
+		size = uio->resid;
 	}
 
 	while (count < size) {
@@ -2460,13 +2472,61 @@ cluster_read_ext(vnode_t vp, struct uio *uio, off_t filesize, int xflags, int (*
 			&((char*)(uintptr_t)uio->iov_baseaddr)[count]);
 
 		if (bpn != -1) {
+			const size_t aligned_run =
+				(run + vp->mp->blocksize_mask) &
+				~vp->mp->blocksize_mask;
+			void *const uiobuf =
+				&((char*)(uintptr_t)uio->iov_baseaddr)[count];
+
+			void *tmpbuf = NULL;
+			void *buf;
+
+			/* With uio_t buffers we can't assume that there's extra
+			 * space for alignment padding. So if the run is
+			 * misaligned we have to deal with it by reading into a
+			 * temporary buffer. */
+			if(aligned_run != run) {
+				xpl_debug("Allocating %zu-byte alignment "
+						"buffer for %zu-byte run at "
+						"bpn %" PRId64 " (byte offset "
+						"%" PRId64 ")...",
+						aligned_run, run, bpn,
+						bpn * vp->mp->blocksize);
+				tmpbuf = valloc(aligned_run);
+				if (!tmpbuf) {
+					err = (err = errno) ? err : EIO;
+					xpl_perror(errno, "Error while "
+							"allocating %zu-byte "
+							"alignment buffer for "
+							"%zu-byte run at bpn "
+							"%" PRId64 " (byte "
+							"offset %" PRId64 ")",
+							aligned_run, run, bpn,
+							bpn * vp->mp->
+							blocksize);
+					goto out;
+				}
+
+				buf = tmpbuf;
+			}
+			else {
+				buf = uiobuf;
+			}
+
 #ifdef XPL_IO_DEBUG
 			xpl_info("Reading %zu bytes from %lld...",
-					run, bpn * vp->mp->blocksize);
+					aligned_run, bpn * vp->mp->blocksize);
 #endif
-			res = xpl_pread(&vp->mp->devvn,
-					&((char*)(uintptr_t)uio->iov_baseaddr)
-					[count], run, bpn * vp->mp->blocksize);
+			res = xpl_pread(&vp->mp->devvn, buf, aligned_run,
+					 bpn * vp->mp->blocksize);
+			if (tmpbuf && res > 0) {
+				if (res > run) {
+					res = run;
+				}
+
+				memcpy(uiobuf, tmpbuf, res);
+				free(tmpbuf);
+			}
 			if (res < 0) {
 				err = (err = errno) ? err : EIO;
 				xpl_perror(errno, "Error while reading %zu "

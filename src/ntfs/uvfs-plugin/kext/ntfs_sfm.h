@@ -269,7 +269,7 @@ static inline sle32 ntfs_utc2ad(const struct timespec ts)
 		if (ad > INT32_MAX)
 			ad = INT32_MAX;
 	}
-	return cpu_to_sle32(ad);
+	return cpu_to_sle32((s32)ad);
 }
 
 /**

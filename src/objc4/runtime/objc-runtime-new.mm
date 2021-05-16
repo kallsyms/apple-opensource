@@ -2958,6 +2958,20 @@ static void realizeAllClassesInImage(header_info *hi)
         }
     }
 
+    stub_class_t * const *stublist = _getObjc2StubList(hi, &count);
+    for (i = 0; i < count; i++) {
+        // Only call the initiaizer if the class hasn't already been
+        // initialized. Initialized stubs are always remapped, so
+        // only call the initializer if there's no remapping.
+        if (remapClass((Class)stublist[i]) == (Class)stublist[i]) {
+            // Drop the lock while calling the initializer, it will
+            // probably call back into libobjc.
+            runtimeLock.unlock();
+            stublist[i]->initializer((Class)stublist[i], nil);
+            runtimeLock.lock();
+        }
+    }
+
     hi->setAllClassesRealized(YES);
 }
 
@@ -4426,21 +4440,23 @@ protocol_getMethodTypeEncoding_nolock(protocol_t *proto, SEL sel,
     runtimeLock.assertLocked();
 
     if (!proto) return nil;
-    if (!proto->extendedMethodTypes()) return nil;
-
     ASSERT(proto->isFixedUp());
 
-    method_t *m = 
-        protocol_getMethod_nolock(proto, sel, 
-                                  isRequiredMethod, isInstanceMethod, false);
-    if (m) {
-        uint32_t i = getExtendedTypesIndexForMethod(proto, m, 
-                                                    isRequiredMethod, 
-                                                    isInstanceMethod);
-        return proto->extendedMethodTypes()[i];
+    if (proto->extendedMethodTypes()) {
+        method_t *m = protocol_getMethod_nolock(proto, sel,
+                                                isRequiredMethod,
+                                                isInstanceMethod,
+                                                false);
+        if (m) {
+            uint32_t i = getExtendedTypesIndexForMethod(proto, m,
+                                                        isRequiredMethod,
+                                                        isInstanceMethod);
+            return proto->extendedMethodTypes()[i];
+        }
     }
 
-    // No method with that name. Search incorporated protocols.
+    // No method with that name, or no extended method types. Search
+    // incorporated protocols.
     if (proto->protocols) {
         for (uintptr_t i = 0; i < proto->protocols->count; i++) {
             const char *enc = 

@@ -251,6 +251,20 @@ _objc_error(id _Nullable rcv, const char * _Nonnull fmt, va_list args)
 
 
 /**
+ * Queries the Objective-C runtime for a selector matching the provided name.
+ *
+ * @param str A pointer to a C string. Pass the name of the method you wish to
+ *  look up.
+ *
+ * @return A nullable pointer of type SEL specifying the selector matching the
+ *  named method if any.
+ */
+OBJC_EXPORT SEL _Nullable
+sel_lookUpByName(const char * _Nonnull name)
+    OBJC_AVAILABLE(11.3, 14.5, 14.5, 7.3, 5.3);
+
+
+/**
  * Returns the names of all the classes within a library.
  *
  * @param image The mach header for library or framework you are inquiring about.

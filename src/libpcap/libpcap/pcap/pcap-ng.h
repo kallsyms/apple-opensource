@@ -320,11 +320,12 @@ struct pcapng_decryption_secrets_fields {
 /*
  * Packet Metadata Flags (PCAPNG_EPB_PMD_FLAGS option)
  */
-#define	PCAPNG_EPB_PMDF_NEW_FLOW	0x00000001 /* New Flow */
-#define	PCAPNG_EPB_PMDF_KEEP_ALIVE	0x00000002 /* Keep Alive */
-#define	PCAPNG_EPB_PMDF_REXMIT		0x00000004 /* Retransmit */
-#define	PCAPNG_EPB_PMDF_SOCKET		0x00000008 /* Socket */
-#define	PCAPNG_EPB_PMDF_NEXUS_CHANNEL	0x00000010 /* Nexus Channel */
+#define	PCAPNG_EPB_PMDF_NEW_FLOW        0x00000001 /* New Flow */
+#define	PCAPNG_EPB_PMDF_KEEP_ALIVE      0x00000002 /* Keep Alive */
+#define	PCAPNG_EPB_PMDF_REXMIT          0x00000004 /* Retransmit */
+#define	PCAPNG_EPB_PMDF_SOCKET          0x00000008 /* Socket */
+#define	PCAPNG_EPB_PMDF_NEXUS_CHANNEL   0x00000010 /* Nexus Channel */
+#define	PCAPNG_EPB_PMDF_WAKE_PKT        0x00000020 /* Wake packet */
 
 /*
  * Process Information Block

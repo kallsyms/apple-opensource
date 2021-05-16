@@ -1213,7 +1213,9 @@ errno_t ntfs_readdir(ntfs_inode *dir_ni, uio_t uio, int *eofflag,
 			de->d_namlen = 2;
 			de->d_name[1] = '.';
 		}
+#if __DARWIN_64_BIT_INO_T
 		de->d_seekoff = ofs + 1;
+#endif
 		/*
 		 * The name is one or two bytes long but we need to align the
 		 * entry record to a multiple of four bytes, thus add four
@@ -1264,7 +1266,7 @@ do_next:
 	 * Get the directory hint matching the current tag and offset if it
 	 * exists and if not get a new directory hint.
 	 */
-	dh = ntfs_dirhint_get(ia_ni, ofs | tag);
+	dh = ntfs_dirhint_get(ia_ni, (unsigned)ofs | tag);
 	if (!dh) {
 		/*
 		 * We have run out of memory and failed to allocate a new hint.
@@ -1366,7 +1368,9 @@ lookup_by_position:
 	while (!err) {
 do_dirent:
 		/* Submit the current directory entry to our helper function. */
+#if __DARWIN_64_BIT_INO_T
 		de->d_seekoff = ofs + 1;
+#endif
 		err = ntfs_do_dirent(vol, ictx->entry, de, uio, &entries);
 		if (err) {
 			/*
@@ -1418,8 +1422,8 @@ err:
 	 * this case however do update the tag so that we return a different
 	 * apparent offset to the caller between invocations.
 	 *
-	 * Note we have to avoid @ofs becomming (unsigned)-1 because we use
-	 * that to denote end of directory.
+	 * Note we have to avoid @ofs becoming (unsigned)-1 because we use that
+	 * to denote end of directory.
 	 */
 	if (!eof && ofs & ~(off_t)NTFS_DIR_POS_MASK) {
 		ofs = NTFS_DIR_POS_MASK;
@@ -1484,7 +1488,7 @@ err:
 			}
 		}
 		/* Finally set the directory hint to the current offset. */
-		dh->ofs = ofs | tag;
+		dh->ofs = (unsigned)ofs | tag;
 	}
 dh_done:
 	if (ictx)
@@ -1524,10 +1528,10 @@ errno_t ntfs_dir_is_empty(ntfs_inode *dir_ni)
 	MFT_RECORD *m;
 	ntfs_attr_search_ctx *ctx;
 	INDEX_ROOT *ir;
-	u8 *index_end, *bmp, *kaddr;
+	u8 *index_end, *bmp, *kaddr = NULL;
 	INDEX_ENTRY *ie;
-	upl_t bmp_upl, ia_upl = NULL;
-	upl_page_info_array_t bmp_pl, ia_pl;
+	upl_t bmp_upl = NULL, ia_upl = NULL;
+	upl_page_info_array_t bmp_pl = NULL, ia_pl = NULL;
 	INDEX_ALLOCATION *ia;
 	errno_t err;
 	int bmp_ofs;

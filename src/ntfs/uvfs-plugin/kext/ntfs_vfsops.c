@@ -79,6 +79,10 @@
 #include "ntfs_xpl.h"
 #endif
 
+#ifndef KERNEL
+#include <CommonCrypto/CommonDigest.h>
+#endif
+
 #include "ntfs.h"
 #include "ntfs_attr.h"
 #include "ntfs_attr_list.h"
@@ -1711,14 +1715,14 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 		if (err)
 			goto err;
 		if (ofs + u > data_size)
-			u = data_size - ofs;
+			u = (unsigned)(data_size - ofs);
 		memcpy((u8*)vol->upcase + ofs, kaddr, u);
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 	}
 	lck_rw_unlock_shared(&ni->lock);
 	(void)vnode_recycle(ni->vn);
 	(void)vnode_put(ni->vn);
-	vol->upcase_len = data_size >> NTFSCHAR_SIZE_SHIFT;
+	vol->upcase_len = (u32)(data_size >> NTFSCHAR_SIZE_SHIFT);
 	ntfs_debug("Read %lld bytes from $UpCase (expected %lu bytes).",
 			(long long)data_size, 64LU * 1024 * sizeof(ntfschar));
 	lck_mtx_lock(&ntfs_lock);
@@ -1828,14 +1832,14 @@ static errno_t ntfs_attrdef_load(ntfs_volume *vol)
 		if (err)
 			goto err;
 		if (ofs + u > data_size)
-			u = data_size - ofs;
+			u = (unsigned)(data_size - ofs);
 		memcpy((u8*)vol->attrdef + ofs, kaddr, u);
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 	}
 	lck_rw_unlock_shared(&ni->lock);
 	(void)vnode_recycle(ni->vn);
 	(void)vnode_put(ni->vn);
-	vol->attrdef_size = data_size;
+	vol->attrdef_size = (s32)data_size;
 	ntfs_debug("Done.  Read %lld bytes from $AttrDef.",
 			(long long)data_size);
 	return 0;
@@ -1983,9 +1987,17 @@ put_err:
 					"decomposed UTF-8 (error %d).",
 					(int)err);
 			goto put_err;
+		} else if (utf8_size > INT_MAX) {
+			ntfs_error(vol->mp, "Got oversized UTF-8 buffer size "
+					"from UTF-16LE to UTF-8 transcoding: "
+					"%zu bytes",
+					utf8_size);
+			OSFree(utf8_name, utf8_size, ntfs_malloc_tag);
+			err = EOVERFLOW;
+			goto err;
 		}
 		vol->name = (char*)utf8_name;
-		vol->name_size = utf8_size;
+		vol->name_size = (int)utf8_size;
 	}
 	/* Get the volume UUID (GUID), if there is one. */
 	ntfs_attr_search_ctx_reinit(ctx);
@@ -3812,6 +3824,7 @@ no_root:
 	if (!LIST_EMPTY(&vol->inodes)) {
 		size_t i = 0;
 		ntfs_inode *ni;
+		(void)i;
 		ntfs_debug("Attached inodes at unmount:");
 		LIST_FOREACH(ni, &vol->inodes, inodes) {
 			ntfs_debug("  [%zu] inode %p with mft_no %llu",
@@ -4833,9 +4846,7 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 
 		/* Volume format capabilities. */
 		ca->capabilities[VOL_CAPABILITIES_FORMAT] =
-				VOL_CAP_FMT_PERSISTENTOBJECTIDS |
 				VOL_CAP_FMT_SYMBOLICLINKS |
-				VOL_CAP_FMT_HARDLINKS |
 				VOL_CAP_FMT_JOURNAL |
 				/* We do not support journalling. */
 				//VOL_CAP_FMT_JOURNAL_ACTIVE |
@@ -4862,9 +4873,7 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 				// VOL_CAP_FMT_PATH_FROM_ID |
 				0;
 		ca->valid[VOL_CAPABILITIES_FORMAT] =
-				VOL_CAP_FMT_PERSISTENTOBJECTIDS |
 				VOL_CAP_FMT_SYMBOLICLINKS |
-				VOL_CAP_FMT_HARDLINKS |
 				VOL_CAP_FMT_JOURNAL |
 				VOL_CAP_FMT_JOURNAL_ACTIVE |
 				VOL_CAP_FMT_NO_ROOT_TIMES |
@@ -5243,6 +5252,49 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 		bcopy(vol->uuid, fsa->f_uuid, sizeof(uuid_t));
 		VFSATTR_SET_SUPPORTED(fsa, f_uuid);
 	}
+#ifndef KERNEL
+	/* In livefiles_ntfs we need a unique identifier so if the GUID is not
+	 * available we manufacture a UUID from the 64-bit volume serial number
+	 * and the number of clusters from the serial number and cluster count
+	 * based on the same method used in msdos.util (where the 32-bit volume
+	 * serial number and the 64-bit sector count is used as seed).
+	 * For the kernel... let's not change the current behaviour unless
+	 * requested (in which case... don't forget to update ntfs.util to
+	 * include this code). */
+	else if (VFSATTR_IS_ACTIVE(fsa, f_uuid)) {
+		/*
+		 * Normalize serial_no and nr_clusters to a little endian value
+		 * so that this returns the same UUID regardless of endianness.
+		 */
+		const le64 serial_no_le = cpu_to_le64(vol->serial_no);
+		const le64 clusters_le = cpu_to_le64(vol->nr_clusters);
+		CC_MD5_CTX c;
+
+		UUID_DEFINE(kFSUUIDNamespaceSHA1,
+				0xB3, 0xE2, 0x0F, 0x39, 0xF2, 0x92, 0x11, 0xD6,
+				0x97, 0xA4, 0x00, 0x30, 0x65, 0x43, 0xEC, 0xAC);
+
+/* We just want something unique, MD5 is good enough, silence the warning */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+		/*
+		 * Generate an MD5 hash of our "name space", and our unique bits
+		 * of data (the volume ID and total clusters).
+		 */
+		CC_MD5_Init(&c);
+		CC_MD5_Update(&c, kFSUUIDNamespaceSHA1, sizeof(uuid_t));
+		CC_MD5_Update(&c, &serial_no_le, sizeof(serial_no_le));
+		CC_MD5_Update(&c, &clusters_le, sizeof(clusters_le));
+		CC_MD5_Final(fsa->f_uuid, &c);
+#pragma clang diagnostic pop
+
+		/* Force the resulting UUID to be a version 3 UUID. */
+		fsa->f_uuid[6] = (fsa->f_uuid[6] & 0x0F) | 0x30;
+		fsa->f_uuid[8] = (fsa->f_uuid[8] & 0x3F) | 0x80;
+		VFSATTR_SET_SUPPORTED(fsa, f_uuid);
+	}
+#endif
 	ntfs_debug("Done.");
 	return 0;
 }
@@ -5265,7 +5317,7 @@ static errno_t ntfs_volume_rename(ntfs_volume *vol, char *name)
 	ATTR_RECORD *a;
 	u8 *utf8_name = NULL;
 	ntfschar *ntfs_name = NULL;
-	size_t utf8_name_size, ntfs_name_size;
+	size_t utf8_name_size, ntfs_name_size = 0;
 	signed ntfs_name_len = 0;
 	errno_t err;
 
@@ -5280,6 +5332,8 @@ static errno_t ntfs_volume_rename(ntfs_volume *vol, char *name)
 		ntfs_debug("The new name is the same as the old name, "
 				"ignoring the rename request.");
 		return 0;
+	} else if (utf8_name_size > UINT_MAX) {
+		return EOVERFLOW;
 	}
 	/*
 	 * If the new name is the empty string "", no need to convert it.  We
@@ -5514,9 +5568,9 @@ done:
 	name = vol->name;
 	ntfs_name_size = vol->name_size;
 	if (utf8_name_size < vol->name_size)
-		vol->name_size = utf8_name_size;
+		vol->name_size = (unsigned)utf8_name_size;
 	vol->name = (char*)utf8_name;
-	vol->name_size = utf8_name_size;
+	vol->name_size = (unsigned)utf8_name_size;
 	ntfs_attr_search_ctx_put(ctx);
 	ntfs_mft_record_unmap(ni);
 	(void)vnode_put(ni->vn);

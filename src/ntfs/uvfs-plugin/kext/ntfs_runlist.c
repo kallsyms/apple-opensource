@@ -307,7 +307,7 @@ static errno_t ntfs_rl_replace(ntfs_runlist *dst_runlist, ntfs_rl_element *src,
 		  * TODO: Optimise by using ntfs_rl_ins() but then the below
 		  * becomes different for the delta > 0 and delta <= 0 cases.
 		  */
-		err = ntfs_rl_inc(dst_runlist, delta);
+		err = ntfs_rl_inc(dst_runlist, (unsigned)delta);
 		if (err)
 			return err;
 		d_rl = dst_runlist->rl;
@@ -1774,7 +1774,7 @@ errno_t ntfs_rl_truncate_nolock(const ntfs_volume *vol,
 			 * sparse one, extend it.  Otherwise need to add a new,
 			 * sparse runlist element.
 			 */
-			if (element > 0 && (prev_element = element - 1,
+			if (element > 0 && ((void)(prev_element = element - 1),
 					rl[prev_element].lcn == LCN_HOLE))
 				rl[prev_element].length = new_length -
 						rl[prev_element].vcn;
@@ -2189,7 +2189,7 @@ errno_t ntfs_rl_read(ntfs_volume *vol, ntfs_runlist *runlist, u8 *dst,
 			}
 			/* Copy the data into the buffer. */
 			if (dst + block_size > dst_end)
-				block_size = dst_end - dst;
+				block_size = (unsigned)(dst_end - dst);
 			memcpy(dst, src, block_size);
 			err = buf_unmap(buf);
 			if (err)
@@ -2322,7 +2322,7 @@ errno_t ntfs_rl_write(ntfs_volume *vol, u8 *src, const s64 size,
 			 * attribute in the final partial buffer.
 			 */
 			if (src + block_size > src_end) {
-				delta = src_end - src;
+				delta = (unsigned)(src_end - src);
 				bzero(dst + delta, block_size - delta);
 				block_size = delta;
 			}

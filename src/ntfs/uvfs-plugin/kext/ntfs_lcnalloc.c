@@ -152,7 +152,7 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 	ntfs_inode *lcnbmp_ni;
 	ntfs_rl_element *rl = NULL;
 	upl_t upl = NULL;
-	upl_page_info_array_t pl;
+	upl_page_info_array_t pl = NULL;
 	u8 *b, *byte;
 	int rlpos, rlsize, bsize;
 	errno_t err;
@@ -312,7 +312,7 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 		b += bsize;
 		bsize = PAGE_SIZE - bsize;
 		if (last_read_pos + bsize > data_size)
-			bsize = data_size - last_read_pos;
+			bsize = (int)(data_size - last_read_pos);
 		bsize <<= 3;
 		lcn = bmp_pos & 7;
 		bmp_pos &= ~(LCN)7;

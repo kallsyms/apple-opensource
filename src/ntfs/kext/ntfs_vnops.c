@@ -139,7 +139,7 @@ int ntfs_cluster_iodone(buf_t cbp, void *arg __unused)
 						(unsigned)ni->name_len);
 		}
 		/* The offset in the attribute at which this buffer begins. */
-		ofs = (s64)buf_lblkno(cbp) << PAGE_SHIFT;
+		ofs = (s64)buf_lblkno(cbp) << ni->block_size_shift;
 		lck_spin_lock(&ni->size_lock);
 		data_size = ni->data_size;
 		init_size = ni->initialized_size;

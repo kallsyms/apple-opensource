@@ -133,7 +133,7 @@ errno_t __ntfs_bitmap_set_bits_in_run(ntfs_inode *ni, const s64 start_bit,
 	len = PAGE_SIZE - pos;
 	rem = cnt >> 3;
 	if (len > rem)
-		len = rem;
+		len = (unsigned)rem;
 	memset(kaddr + pos, value ? 0xff : 0, len);
 	cnt -= len << 3;
 	/* Update @len to point to the first not-done byte in the page. */
@@ -157,7 +157,7 @@ errno_t __ntfs_bitmap_set_bits_in_run(ntfs_inode *ni, const s64 start_bit,
 		len = PAGE_SIZE;
 		rem = cnt >> 3;
 		if (len > rem)
-			len = rem;
+			len = (unsigned)rem;
 		memset(kaddr, value ? 0xff : 0, len);
 		cnt -= len << 3;
 	}

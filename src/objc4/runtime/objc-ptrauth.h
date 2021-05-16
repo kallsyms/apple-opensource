@@ -26,39 +26,7 @@
 
 #include <objc/objc.h>
 
-// On some architectures, method lists and method caches store signed IMPs.
-
-// fixme simply include ptrauth.h once all build trains have it
-#if __has_include (<ptrauth.h>)
 #include <ptrauth.h>
-#else
-#define ptrauth_strip(__value, __key) __value
-#define ptrauth_blend_discriminator(__pointer, __integer) ((uintptr_t)0)
-#define ptrauth_sign_constant(__value, __key, __data) __value
-#define ptrauth_sign_unauthenticated(__value, __key, __data) __value
-#define ptrauth_auth_and_resign(__value, __old_key, __old_data, __new_key, __new_data) __value
-#define ptrauth_auth_function(__value, __old_key, __old_data) __value
-#define ptrauth_auth_data(__value, __old_key, __old_data) __value
-#define ptrauth_string_discriminator(__string) ((int)0)
-#define ptrauth_sign_generic_data(__value, __data) ((ptrauth_generic_signature_t)0)
-
-#define __ptrauth_function_pointer
-#define __ptrauth_return_address
-#define __ptrauth_block_invocation_pointer
-#define __ptrauth_block_copy_helper
-#define __ptrauth_block_destroy_helper
-#define __ptrauth_block_byref_copy_helper
-#define __ptrauth_block_byref_destroy_helper
-#define __ptrauth_objc_method_list_imp
-#define __ptrauth_cxx_vtable_pointer
-#define __ptrauth_cxx_vtt_vtable_pointer
-#define __ptrauth_swift_heap_object_destructor
-#define __ptrauth_cxx_virtual_function_pointer(__declkey)
-#define __ptrauth_swift_function_pointer(__typekey)
-#define __ptrauth_swift_class_method_pointer(__declkey)
-#define __ptrauth_swift_protocol_witness_function_pointer(__declkey)
-#define __ptrauth_swift_value_witness_function_pointer(__key)
-#endif
 
 // Workaround <rdar://problem/64531063> Definitions of ptrauth_sign_unauthenticated and friends generate unused variables warnings
 #if __has_feature(ptrauth_calls)
@@ -69,18 +37,18 @@
 
 #if __has_feature(ptrauth_calls)
 
-#if !__arm64__
-#error ptrauth other than arm64e is unimplemented
+#define ptrauth_trampoline_block_page_group \
+    __ptrauth(ptrauth_key_process_dependent_data, 1, \
+    ptrauth_string_discriminator("TrampolineBlockPageGroup"))
+
+#else
+
+#define ptrauth_trampoline_block_page_group
+
 #endif
 
 // Method lists use process-independent signature for compatibility.
 using MethodListIMP = IMP __ptrauth_objc_method_list_imp;
-
-#else
-
-using MethodListIMP = IMP;
-
-#endif
 
 // A struct that wraps a pointer using the provided template.
 // The provided Auth parameter is used to sign and authenticate

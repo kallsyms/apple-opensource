@@ -1147,6 +1147,41 @@ sub buildSharedCache {
     make("update_dyld_shared_cache -verbose -cache_dir $BUILDDIR -overlay $C{TESTLIBDIR}/../..");
 }
 
+my $platform_family_fallbacks;
+sub platform_family_fallbacks {
+    if ($platform_family_fallbacks)  {
+        return $platform_family_fallbacks;
+    }
+
+    foreach (getsdks()) {
+        my $sdk = $_;
+        if ( $sdk !~ /internal$/ ) {
+            next;
+        }
+
+        my $sdksettingspath = getsdkpath($_) . "/SDKSettings.plist";
+        if (! -e "$sdksettingspath") {
+            next;
+        }
+
+        my $output = `plutil -convert json -o - "$sdksettingspath"`;
+        if ($? != 0) {
+            next;
+        }
+
+        my $sdksettings = JSON::PP->new->utf8->decode($output);
+        foreach my $key (keys %{ $sdksettings->{SupportedTargets} }) {
+            my $target = $sdksettings->{SupportedTargets}{$key};
+            my $fallback = $target->{PlatformFamilyFallbackName};
+            if ($fallback) {
+                $platform_family_fallbacks->{$key} = $fallback;
+            }
+        }
+    }
+
+    return $platform_family_fallbacks;
+}
+
 sub make_one_config {
     my $configref = shift;
     my $root = shift;
@@ -1174,7 +1209,21 @@ sub make_one_config {
         "bridgeos" => "bridgeos",
         );
 
-    $C{OS} = $allowed_os_args{$os_arg} || die "unknown OS '$os_arg' (expected " . join(', ', sort keys %allowed_os_args) . ")\n";
+    # attempt to fallback to SDK target info if the platform is not recognized
+    my $didUseOSFallback = 0;
+    if (!($C{OS} = $allowed_os_args{$os_arg})) {
+        print "unknown OS $os_arg, looking for platform family fallbacks...\n";
+        my $fallbacks = platform_family_fallbacks();
+        if ($fallbacks->{$os_arg}) {
+            print "found valid fallback for OS $os_arg: $fallbacks->{$os_arg}\n";
+            $C{OS} = $os_arg;
+            $didUseOSFallback = 1;
+        }
+    }
+
+    if (!$C{OS}) {
+        die "unknown OS '$os_arg' (expected " . join(', ', sort keys %allowed_os_args) . ")\n";
+    }
 
     # set the config name now, after massaging the language and OS versions, 
     # but before adding other settings
@@ -1199,6 +1248,9 @@ sub make_one_config {
         $C{TOOLCHAIN} = "bridgeos";
     } elsif ($C{OS} eq "macosx") {
         $C{TOOLCHAIN} = "osx";
+    } elsif ($didUseOSFallback) {
+        #shaky, but works as long as things follow ${name}os / ${name}simulator
+        ($C{TOOLCHAIN} = $C{OS}) =~ s/simulator/os/;
     } else {
         colorprint $yellow, "WARN: don't know toolchain for OS $C{OS}";
         $C{TOOLCHAIN} = "default";
@@ -1386,7 +1438,10 @@ sub make_one_config {
         $cflags .= " -mbridgeos-version-min=$C{DEPLOYMENT_TARGET}";
         $target = "$C{ARCH}-apple-bridgeos$C{DEPLOYMENT_TARGET}";
     }
-    else {
+    elsif ($didUseOSFallback) {
+        $target = "$C{ARCH}-apple-$C{OS}$C{DEPLOYMENT_TARGET}";
+        $cflags .= " -target $target";
+    } else {
         $cflags .= " -mmacosx-version-min=$C{DEPLOYMENT_TARGET}";
         $target = "$C{ARCH}-apple-macosx$C{DEPLOYMENT_TARGET}";
     }

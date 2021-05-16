@@ -87,8 +87,8 @@ __private_extern__ errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni,
 struct _ntfs_dirhint {
 	TAILQ_ENTRY(_ntfs_dirhint) link;
 	unsigned ofs;
-	unsigned time;
 	unsigned fn_size;
+	__darwin_time_t time;
 	FILENAME_ATTR *fn;
 };
 typedef struct _ntfs_dirhint ntfs_dirhint;

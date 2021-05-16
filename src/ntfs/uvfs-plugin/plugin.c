@@ -104,6 +104,7 @@ plugin_fsops_scanvols(__unused int diskFd,
     reply->sr_volid = 0;
     reply->sr_volac = UAC_UNLOCKED;
     memset(reply->sr_volname, 0, sizeof(reply->sr_volname));
+    reply->sr_readOnly = true;
 
     os_log_debug(OS_LOG_DEFAULT, "ntfs:scanvols:finish:0");
     return 0;
@@ -754,9 +755,7 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 		VFSATTR_WANTED(&vfsattr, f_vol_name);
 	}
 	else if (!strcmp(LI_FSATTR_VOLUUID, attr)) {
-		xpl_error("Unsupported filesystem attribute VOLUUID.");
-		err = ENOTSUP;
-		goto out;
+		VFSATTR_WANTED(&vfsattr, f_uuid);
 	}
 	else if (!strcmp(LI_FSATTR_HAS_PERM_ENFORCEMENT, attr)) {
 		/* No permissions supported for NTFS.
@@ -789,10 +788,8 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 		VFSATTR_WANTED(&vfsattr, f_capabilities);
 	}
 	else if (!strcmp(LI_FSATTR_MOUNT_TIME, attr)) {
-		/* TODO: We could support this but what should be returned?
-		 * Seconds since 1970-01-01 00:00 UTC? */
-		xpl_error("Unsupported filesystem attribute MOUNT_TIME.");
-		err = ENOTSUP;
+		val->fsa_number =
+			xpl_vfs_mount_get_mount_time(((vnode_t)Node)->mp);
 		goto out;
 	}
 	else if (!strcmp(LI_FSATTR_LAST_MTIME, attr)) {
@@ -856,6 +853,11 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 
 		switch (f_active) {
 		case VFSATTR_f_bsize:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_bsize)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;
@@ -865,6 +867,11 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_number = vfsattr.f_bsize;
 			break;
 		case VFSATTR_f_iosize:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_iosize)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;
@@ -874,6 +881,11 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_number = vfsattr.f_iosize;
 			break;
 		case VFSATTR_f_blocks:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_blocks)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;
@@ -883,6 +895,11 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_number = vfsattr.f_blocks;
 			break;
 		case VFSATTR_f_bfree:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_bfree)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;
@@ -892,6 +909,11 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_number = vfsattr.f_bfree;
 			break;
 		case VFSATTR_f_bavail:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_bavail)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;
@@ -901,6 +923,11 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_number = vfsattr.f_bavail;
 			break;
 		case VFSATTR_f_bused:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_bused)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;
@@ -910,6 +937,11 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_number = vfsattr.f_bused;
 			break;
 		case VFSATTR_f_fssubtype:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_fssubtype)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;
@@ -919,8 +951,14 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_number = vfsattr.f_fssubtype;
 			break;
 		case VFSATTR_f_vol_name: {
-			const size_t vol_name_length = strlen(vfsattr.f_vol_name);
+			size_t vol_name_length;
 
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_vol_name)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
+			vol_name_length = strlen(vfsattr.f_vol_name);
 			*retlen = vol_name_length + 1;
 			if (len < vol_name_length + 1) {
 				err = E2BIG;
@@ -931,7 +969,26 @@ plugin_fsops_getfsattr(UVFSFileNode Node,
 			val->fsa_string[vol_name_length] = '\0';
 			break;
 		}
+		case VFSATTR_f_uuid:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_uuid)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
+			*retlen = sizeof(uuid_t);
+			if (len < sizeof(uuid_t)) {
+				err = E2BIG;
+				goto out;
+			}
+
+			memcpy(val->fsa_opaque, vfsattr.f_uuid, sizeof(uuid_t));
+			break;
 		case VFSATTR_f_capabilities:
+			if (!VFSATTR_IS_SUPPORTED(&vfsattr, f_capabilities)) {
+				err = ENOTSUP;
+				goto out;
+			}
+
 			*retlen = sizeof(val->fsa_number);
 			if (len < sizeof(val->fsa_number)) {
 				err = E2BIG;

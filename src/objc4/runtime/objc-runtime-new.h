@@ -285,6 +285,10 @@ public:
 #endif
     }
 
+    inline void scribbleIMP(uintptr_t value) {
+        _imp.store(value, memory_order_relaxed);
+    }
+
     template <Atomicity, IMPEncoding>
     void set(bucket_t *base, SEL newSel, IMP newImp, Class cls);
 };
@@ -455,7 +459,7 @@ public:
     Class cls() const;
 
 #if CONFIG_USE_PREOPT_CACHES
-    const preopt_cache_t *preopt_cache() const;
+    const preopt_cache_t *preopt_cache(bool authenticated = true) const;
 #endif
 
     mask_t occupied() const;

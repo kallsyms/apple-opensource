@@ -519,7 +519,7 @@ next_tag:
 		 * now.
 		 */
 		lg = 0;
-		for (u = dst - dst_sb_start - 1; u >= 0x10; u >>= 1)
+		for (u = (unsigned)(dst - dst_sb_start) - 1; u >= 0x10; u >>= 1)
 			lg++;
 		/* Get the phrase token. */
 		pt = le16_to_cpup((u16*)cb);
@@ -537,7 +537,7 @@ next_tag:
 		if (dst + length > dst_sb_end)
 			goto err;
 		/* The number of non-overlapping bytes. */
-		max_non_overlap = dst - dst_back_addr;
+		max_non_overlap = (unsigned)(dst - dst_back_addr);
 		if (length <= max_non_overlap) {
 			/* The byte sequence does not overlap, just copy it. */
 			memcpy(dst, dst_back_addr, length);
@@ -664,7 +664,7 @@ errno_t ntfs_read_compressed(ntfs_inode *ni, ntfs_inode *raw_ni, s64 ofs_start,
 
 		start_count = count;
 		/* Do not zero a partial final page yet. */
-		count = size - ofs;
+		count = (int)(size - ofs);
 		/*
 		 * If the beginning of the i/o exceeds the initialized size we
 		 * just need to zero the destination and are done.
@@ -689,7 +689,7 @@ errno_t ntfs_read_compressed(ntfs_inode *ni, ntfs_inode *raw_ni, s64 ofs_start,
 			return 0;
 		}
 		if (init_size < size)
-			zero_end_ofs = init_size - ofs;
+			zero_end_ofs = (int)(init_size - ofs);
 	}
 	dst_ofs_in_cb = ofs & (cb_size - 1);
 do_next_cb:

@@ -881,7 +881,7 @@ static errno_t ntfs_mft_bitmap_find_and_alloc_free_rec_nolock(ntfs_volume *vol,
 		size = PAGE_SIZE - page_ofs;
 		ll = ((pass_end + 7) >> 3) - ofs;
 		if (size > ll)
-			size = ll;
+			size = (unsigned)ll;
 		size <<= 3;
 		/*
 		 * If we are still within the active pass, search the next page
@@ -918,7 +918,7 @@ static errno_t ntfs_mft_bitmap_find_and_alloc_free_rec_nolock(ntfs_volume *vol,
 				 * which gives the same result but incurs extra
 				 * CPU overhead.
 				 */
-				b = ffs(~(unsigned long)*byte) - 1;
+				b = ffs(~(unsigned)*byte) - 1;
 				if (b < 8 && b >= (bit & 7)) {
 					ll = data_pos + (bit & ~7) + b;
 					if (ll > (1LL << 32)) {

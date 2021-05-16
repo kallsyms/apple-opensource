@@ -234,7 +234,7 @@ compressed:
 	to_read = size;
 	attr_size -= attr_ofs;
 	if (to_read > attr_size)
-		to_read = attr_size;
+		to_read = (unsigned)attr_size;
 	/*
 	 * We do not need @attr_size any more so reuse it to hold the number of
 	 * bytes available in the attribute starting at offset @attr_ofs up to
@@ -244,10 +244,11 @@ compressed:
 	attr_size = (to_read + PAGE_MASK) & ~PAGE_MASK;
 	/* Abort any pages outside the end of the attribute. */
 	if (size > attr_size && !(flags & UPL_NOCOMMIT)) {
-		ubc_upl_abort_range(upl, upl_ofs + attr_size, size - attr_size,
+		ubc_upl_abort_range(upl, upl_ofs + (unsigned)attr_size,
+				size - (unsigned)attr_size,
 				UPL_ABORT_FREE_ON_EMPTY | UPL_ABORT_ERROR);
 		/* Update @size. */
-		size = attr_size;
+		size = (unsigned)attr_size;
 	}
 	/* To access the page list contents, we need to map the page list. */
 	kerr = ubc_upl_map(upl, (vm_offset_t*)&kaddr);

@@ -395,8 +395,16 @@ pcap_ng_open_offline(const char *fname, char *errbuf)
 {
 	FILE *fp;
 	pcap_t *p;
-	
-	if (fname[0] == '-' && fname[1] == '\0')
+
+#ifdef __APPLE__
+    if (fname == NULL) {
+        pcap_snprintf(errbuf, PCAP_ERRBUF_SIZE,
+            "A null pointer was supplied as the file name");
+        return (NULL);
+    }
+#endif /* __APPLE__*/
+
+    if (fname[0] == '-' && fname[1] == '\0')
 	{
 		fp = stdin;
 #if defined(_WIN32) || defined(MSDOS)
@@ -449,7 +457,22 @@ pcap_fopen_offline_internal(FILE *fp, u_int precision,
 	u_int i;
 	int err;
 #ifdef __APPLE__
-	off_t offset = ftello(fp);
+	off_t offset;
+
+	/*
+	 * Fail if we were passed a NULL fp.
+	 *
+	 * That shouldn't happen if we're opening with a path name, but
+	 * it could happen if buggy code is opening with a FILE * and
+	 * didn't bother to make sure the FILE * isn't null.
+	 */
+	if (fp == NULL) {
+		snprintf(errbuf, PCAP_ERRBUF_SIZE,
+			 "Null FILE * pointer provided to savefile open routine");
+		return (NULL);
+	}
+
+	offset = ftello(fp);
 
 	p = NULL;
 #endif /* __APPLE__ */

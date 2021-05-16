@@ -913,6 +913,11 @@ void _objc_atfork_child()
 }
 
 
+#if HAS_OBJC_BP_ASSIST
+extern "C" kern_return_t objc_bp_assist_cfg_np(uint64_t adr, uint64_t ctl) __attribute__((weak));
+#endif
+
+
 /***********************************************************************
 * _objc_init
 * Bootstrap initialization. Registers our image notifier with dyld.
@@ -926,6 +931,12 @@ void _objc_init(void)
     initialized = true;
     
     // fixme defer initialization until an objc-using image is found?
+#if HAS_OBJC_BP_ASSIST
+    // Temporarily allow running on OSes that don't have this
+    // function call for convenience in development.
+    if (&objc_bp_assist_cfg_np)
+        configureObjCBPAssist(objc_bp_assist_cfg_np);
+#endif
     environ_init();
     tls_init();
     static_init();
@@ -950,11 +961,7 @@ void _objc_init(void)
 **********************************************************************/
 static const header_info *_headerForAddress(void *addr)
 {
-#if __OBJC2__
-    const char *segnames[] = { "__DATA", "__DATA_CONST", "__DATA_DIRTY" };
-#else
-    const char *segnames[] = { "__OBJC" };
-#endif
+    const char *segnames[] = { "__DATA", "__DATA_CONST", "__DATA_DIRTY", "__AUTH" };
     header_info *hi;
 
     for (hi = FirstHeader; hi != NULL; hi = hi->getNext()) {

@@ -639,7 +639,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	ntfschar *ntfs_name;
 	ntfs_dir_lookup_name *name = NULL;
 	u8 *utf8_name = NULL;
-	size_t ntfs_name_size, utf8_size;
+	size_t ntfs_name_size, utf8_size = 0;
 	signed ntfs_name_len;
 	int err;
 	/*
@@ -2551,13 +2551,14 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 		size = data_size - ofs;
 		if (size > start_count)
 			size = start_count;
-		count = size;
 		/*
 		 * Break up the i/o in chunks that fit into a 32-bit int so
 		 * we can call cluster_copy_ubc_data(), etc.
 		 */
 		if (size > NTFS_MAX_IO_REQUEST_SIZE)
 			count = NTFS_MAX_IO_REQUEST_SIZE;
+		else
+			count = (int)size;
 		/*
 		 * First of all, try to copy the data from the vm page cache.
 		 * This will work on the second and all later reads so this is
@@ -2608,7 +2609,7 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 		 */
 		size = (data_size - ofs + PAGE_MASK) & ~PAGE_MASK_64;
 		if (count > size)
-			count = size;
+			count = (int)size;
 		start_count = count;
 		kerr = ubc_create_upl(vn, ofs, count, &upl, &pl, UPL_SET_LITE);
 		if (kerr != KERN_SUCCESS)
@@ -2645,7 +2646,7 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 		if (count > orig_count)
 			count = orig_count;
 		if (ofs + count > data_size)
-			count = data_size - ofs;
+			count = (int)(data_size - ofs);
 		err = uiomove((caddr_t)(kaddr + delta), count, uio);
 		if (err) {
 			ntfs_error(ni->vol->mp, "uiomove() failed (error %d).",
@@ -2664,7 +2665,7 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 		 * pages.
 		 */
 		next_pg = 0;
-		last_pg = start_count >> PAGE_SHIFT;
+		last_pg = (int)(start_count >> PAGE_SHIFT);
 		do {
 			int commit_flags;
 			BOOL was_valid, was_dirty;
@@ -2734,7 +2735,7 @@ abort_err:
 	 * without modification as we have not touched it unless no caching is
 	 * requested and the page was clean in which case we dump it.
 	 */
-	last_pg = start_count >> PAGE_SHIFT;
+	last_pg = (int)(start_count >> PAGE_SHIFT);
 	for (cur_pg = 0; cur_pg < last_pg; cur_pg++) {
 		int abort_flags;
 
@@ -2920,7 +2921,7 @@ static errno_t ntfs_read(ntfs_inode *ni, uio_t uio, const int ioflags,
 				(unsigned long long)size, PAGE_SIZE);
 		size = PAGE_SIZE;
 	}
-	count = size;
+	count = (int)size;
 	err = cluster_copy_ubc_data(vn, uio, &count, 0);
 	if (err) {
 		/* The copying (uiomove()) failed with an error, abort. */
@@ -3497,7 +3498,7 @@ recheck_deleted:
 		panic("%s(): ofs > PAGE_SIZE\n", __FUNCTION__);
 	cnt = (int)count;
 	if (count > PAGE_SIZE - ofs) {
-		cnt = PAGE_SIZE - ofs;
+		cnt = (int)(PAGE_SIZE - ofs);
 		ntfs_warning(ni->vol->mp, "Unexpected count (0x%llx) > "
 				"PAGE_SIZE - ofs (0x%x), overriding it to "
 				"PAGE_SIZE - ofs.", (unsigned long long)count,
@@ -6630,7 +6631,7 @@ static int ntfs_vnop_symlink(struct vnop_symlink_args *a)
 	uio_t uio;
 	ntfs_inode *dir_ni, *ni, *raw_ni;
 	int err, err2;
-	unsigned len;
+	size_t len;
 
 	dir_ni = NTFS_I(a->a_dvp);
 	if (!dir_ni) {
@@ -6648,7 +6649,7 @@ static int ntfs_vnop_symlink(struct vnop_symlink_args *a)
 		if (len)
 			err = ENAMETOOLONG;
 		ntfs_error(dir_ni->vol->mp, "Invalid symbolic link target "
-				"length %d, returning %s.", len,
+				"length %zu, returning %s.", len,
 				len ? "ENAMETOOLONG" : "EINVAL");
 		return err;
 	}
@@ -7922,10 +7923,16 @@ static int ntfs_vnop_pagein(struct vnop_pagein_args *a)
 	ntfs_inode *base_ni, *ni = NTFS_I(a->a_vp);
 	int err;
 
+	if (a->a_size > UINT_MAX) {
+		ntfs_error(ni ? ni->vol->mp : NULL, "Invalid pagein size: %zu",
+				a->a_size);
+		return EINVAL;
+	}
 	if (!ni) {
 		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
 		if (!(a->a_flags & UPL_NOCOMMIT) && a->a_pl)
-			ubc_upl_abort_range(a->a_pl, a->a_pl_offset, a->a_size,
+			ubc_upl_abort_range(a->a_pl, a->a_pl_offset,
+					(unsigned)a->a_size,
 					UPL_ABORT_FREE_ON_EMPTY |
 					UPL_ABORT_ERROR);
 		return EINVAL;
@@ -7939,7 +7946,7 @@ static int ntfs_vnop_pagein(struct vnop_pagein_args *a)
 			(unsigned long long)a->a_f_offset,
 			(unsigned long long)a->a_size, a->a_flags,
 			(unsigned long long)a->a_pl_offset);
-	err = ntfs_pagein(ni, a->a_f_offset, a->a_size, a->a_pl,
+	err = ntfs_pagein(ni, a->a_f_offset, (unsigned)a->a_size, a->a_pl,
 			a->a_pl_offset, a->a_flags);
 	/*
 	 * Update the last_access_time (atime) if something was read and this
@@ -8024,7 +8031,7 @@ static int ntfs_mst_pageout(ntfs_inode *ni, upl_t upl, upl_offset_t upl_ofs,
 		unsigned to_write;
 
 		/* Abort any pages outside the end of the attribute. */
-		to_write = attr_size - attr_ofs;
+		to_write = (unsigned)(attr_size - attr_ofs);
 		nr_recs = to_write >> rec_shift;
 		to_write = (to_write + PAGE_MASK) & ~PAGE_MASK;
 		if (size != to_write) {
@@ -8207,11 +8214,17 @@ static int ntfs_vnop_pageout(struct vnop_pageout_args *a)
 	u8 *kaddr;
 	upl_offset_t upl_ofs = a->a_pl_offset;
 	kern_return_t kerr;
-	unsigned to_write, size = a->a_size;
+	unsigned to_write, size;
 	int err, flags = a->a_flags;
 	lck_rw_type_t lock_type = LCK_RW_TYPE_SHARED;
 	BOOL locked = FALSE;
 
+	if (a->a_size > UINT_MAX) {
+		ntfs_error(ni ? ni->vol->mp : NULL, "Invalid pageout size: %zu",
+				a->a_size);
+		return EINVAL;
+	}
+	size = (unsigned)a->a_size;
 	if (!ni) {
 		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
 		if (!(flags & UPL_NOCOMMIT) && upl)
@@ -8464,7 +8477,7 @@ compressed:
 	to_write = size;
 	bytes = attr_size - attr_ofs;
 	if (to_write > bytes)
-		to_write = bytes;
+		to_write = (unsigned)bytes;
 	/*
 	 * Calculate the number of bytes available in the attribute starting at
 	 * offset @attr_ofs up to a maximum of the number of bytes to be
@@ -8473,10 +8486,11 @@ compressed:
 	bytes = (to_write + PAGE_MASK) & ~PAGE_MASK;
 	/* Abort any pages outside the end of the attribute. */
 	if (size > bytes && !(flags & UPL_NOCOMMIT)) {
-		ubc_upl_abort_range(upl, upl_ofs + bytes, size - bytes,
+		ubc_upl_abort_range(upl, (unsigned)(upl_ofs + bytes),
+				(unsigned)(size - bytes),
 				UPL_ABORT_FREE_ON_EMPTY);
 		/* Update @size. */
-		size = bytes;
+		size = (unsigned)bytes;
 	}
 	/* To access the page list contents, we need to map the page list. */
 	kerr = ubc_upl_map(upl, (vm_offset_t*)&kaddr);
@@ -10277,7 +10291,7 @@ static int ntfs_vnop_blockmap(struct vnop_blockmap_args *a)
 {
 	const s64 byte_offset = a->a_foffset;
 	const s64 byte_size = a->a_size;
-	s64 max_size, data_size, init_size, clusters, bytes = 0;
+	s64 max_size, data_size, init_size, clusters = 0, bytes = 0;
 	VCN vcn;
 	LCN lcn;
 	ntfs_inode *ni = NTFS_I(a->a_vp);
