@@ -80,14 +80,6 @@ template<typename Result, typename... Args>
 struct FunctionTraits<Result(*)(Args...)> : public FunctionTraits<Result(Args...)> {
 };
 
-template<typename Result, typename... Args>
-struct FunctionTraits<Result(Args...) noexcept> : public FunctionTraits<Result(Args...)> {
-};
-
-template<typename Result, typename... Args>
-struct FunctionTraits<Result(*)(Args...) noexcept> : public FunctionTraits<Result(Args...)> {
-};
-
 } // namespace WTF
 
 using WTF::FunctionTraits;

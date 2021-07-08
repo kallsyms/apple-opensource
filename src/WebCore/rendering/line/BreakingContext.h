@@ -1236,9 +1236,7 @@ inline InlineIterator BreakingContext::handleEndOfLine()
         // Empty inline elements like <span></span> can produce such lines and now we just ignore these break opportunities
         // at the start of a line, if no width has been committed yet.
         // Behave as if it was actually empty and consume at least one object.
-        auto overflowingBoxIsInlineLevelBox = m_lineBreak.renderer() && !m_lineBreak.renderer()->isFloatingOrOutOfFlowPositioned();
-        if (overflowingBoxIsInlineLevelBox)
-            m_lineBreak.increment();
+        m_lineBreak.increment();
     }
 
     // Sanity check our whitespace collapsing transitions.

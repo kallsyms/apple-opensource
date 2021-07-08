@@ -200,7 +200,7 @@ static Ref<NetworkProcessProxy> networkProcessForSession(PAL::SessionID sessionI
     return NetworkProcessProxy::create();
 #else
     UNUSED_PARAM(sessionID);
-    return NetworkProcessProxy::ensureDefaultNetworkProcess();
+    return NetworkProcessProxy::defaultNetworkProcess();
 #endif
 }
 
@@ -2299,7 +2299,7 @@ bool WebsiteDataStore::networkProcessHasEntitlementForTesting(const String&)
 }
 #endif // !PLATFORM(COCOA)
 
-#if !USE(GLIB) && !PLATFORM(COCOA)
+#if !USE(GLIB)
 WTF::String WebsiteDataStore::defaultDeviceIdHashSaltsStorageDirectory()
 {
     // Not implemented.

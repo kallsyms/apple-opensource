@@ -618,15 +618,14 @@ void UserMediaPermissionRequestManagerProxy::checkUserMediaPermissionForSpeechRe
 
     auto request = UserMediaPermissionRequestProxy::create(*this, 0, frameIdentifier, frameIdentifier, requestingOrigin.isolatedCopy(), topOrigin.isolatedCopy(), Vector<WebCore::CaptureDevice> { device }, { }, { }, WTFMove(completionHandler));
 
-    // FIXME: Use switch on action.
     auto action = getRequestAction(request.get());
     if (action == RequestAction::Deny) {
-        request->decisionCompletionHandler()(false);
+        completionHandler(false);
         return;
     }
     
     if (action == RequestAction::Grant) {
-        request->decisionCompletionHandler()(true);
+        completionHandler(true);
         return;
     }
 

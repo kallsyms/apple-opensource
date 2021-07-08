@@ -571,7 +571,7 @@ void WebChromeClient::unavailablePluginButtonClicked(Element& element, RenderEmb
     uiDelegatePrivate3->didPressMissingPluginButton(e.get());
 }
 
-void WebChromeClient::print(Frame& frame, const StringWithDirection&)
+void WebChromeClient::print(Frame& frame)
 {
     COMPtr<IWebUIDelegate> uiDelegate;
     if (SUCCEEDED(m_webView->uiDelegate(&uiDelegate)))

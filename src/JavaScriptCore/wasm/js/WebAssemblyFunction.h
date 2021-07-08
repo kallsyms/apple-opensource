@@ -95,7 +95,7 @@ private:
 
     MacroAssemblerCodePtr<JSEntryPtrTag> jsCallEntrypointSlow();
     ptrdiff_t previousInstanceOffset() const;
-    bool usesTagRegisters() const;
+    bool useTagRegisters() const;
 
     RegisterSet calleeSaves() const;
 

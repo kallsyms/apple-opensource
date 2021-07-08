@@ -101,17 +101,17 @@ Vector<Ref<NetworkProcessProxy>> NetworkProcessProxy::allNetworkProcesses()
     return processes;
 }
 
-RefPtr<NetworkProcessProxy>& NetworkProcessProxy::defaultNetworkProcess()
+static RefPtr<NetworkProcessProxy>& defaultProcess()
 {
     static NeverDestroyed<RefPtr<NetworkProcessProxy>> process;
     return process.get();
 }
 
-Ref<NetworkProcessProxy> NetworkProcessProxy::ensureDefaultNetworkProcess()
+Ref<NetworkProcessProxy> NetworkProcessProxy::defaultNetworkProcess()
 {
-    if (!defaultNetworkProcess())
-        defaultNetworkProcess() = NetworkProcessProxy::create();
-    return *defaultNetworkProcess();
+    if (!defaultProcess())
+        defaultProcess() = NetworkProcessProxy::create();
+    return *defaultProcess();
 }
 
 void NetworkProcessProxy::terminate()
@@ -124,8 +124,8 @@ void NetworkProcessProxy::terminate()
 
 void NetworkProcessProxy::didTerminate()
 {
-    if (this == defaultNetworkProcess().get())
-        defaultNetworkProcess() = nullptr;
+    if (this == defaultProcess().get())
+        defaultProcess() = nullptr;
 }
 
 void NetworkProcessProxy::sendCreationParametersToNewProcess()
@@ -340,8 +340,8 @@ void NetworkProcessProxy::renameOriginInWebsiteData(PAL::SessionID sessionID, co
 
 void NetworkProcessProxy::networkProcessCrashed()
 {
-    if (defaultNetworkProcess() == this)
-        defaultNetworkProcess() = nullptr;
+    if (defaultProcess() == this)
+        defaultProcess() = nullptr;
 
     clearCallbackStates();
 
@@ -1350,9 +1350,6 @@ void NetworkProcessProxy::removeSession(WebsiteDataStore& websiteDataStore)
 
     if (canSendMessage())
         send(Messages::NetworkProcess::DestroySession { websiteDataStore.sessionID() }, 0);
-
-    if (m_websiteDataStores.computesEmpty())
-        defaultNetworkProcess() = nullptr;
 }
 
 WebsiteDataStore* NetworkProcessProxy::websiteDataStoreFromSessionID(PAL::SessionID sessionID)

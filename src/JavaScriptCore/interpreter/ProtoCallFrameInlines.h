@@ -37,7 +37,7 @@ inline void ProtoCallFrame::init(CodeBlock* codeBlock, JSGlobalObject* globalObj
     this->setCallee(callee);
     this->setGlobalObject(globalObject);
     this->setArgumentCountIncludingThis(argCountIncludingThis);
-    if (codeBlock && static_cast<unsigned>(argCountIncludingThis) < codeBlock->numParameters())
+    if (codeBlock && argCountIncludingThis < codeBlock->numParameters())
         this->hasArityMismatch = true;
     else
         this->hasArityMismatch = false;

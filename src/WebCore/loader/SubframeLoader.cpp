@@ -140,11 +140,6 @@ bool FrameLoader::SubframeLoader::pluginIsLoadable(const URL& url, const String&
             return false;
         }
 
-        if (!portAllowed(url)) {
-            FrameLoader::reportBlockedLoadFailed(m_frame, url);
-            return false;
-        }
-
         if (!MixedContentChecker::canRunInsecureContent(m_frame, document->securityOrigin(), url))
             return false;
     }
@@ -265,11 +260,6 @@ RefPtr<Frame> FrameLoader::SubframeLoader::loadSubframe(HTMLFrameOwnerElement& o
 
     if (!document->securityOrigin().canDisplay(url)) {
         FrameLoader::reportLocalLoadFailed(&m_frame, url.string());
-        return nullptr;
-    }
-
-    if (!portAllowed(url)) {
-        FrameLoader::reportBlockedLoadFailed(m_frame, url);
         return nullptr;
     }
 

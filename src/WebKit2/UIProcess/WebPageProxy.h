@@ -574,8 +574,6 @@ public:
     void setDrawingArea(std::unique_ptr<DrawingAreaProxy>&&);
 
     WeakPtr<SecKeyProxyStore> secKeyProxyStore(const WebCore::AuthenticationChallenge&);
-
-    void makeViewBlankIfUnpaintedSinceLastLoadCommit();
         
     void close();
     bool tryClose();
@@ -1974,7 +1972,7 @@ private:
     bool didChooseFilesForOpenPanelWithImageTranscoding(const Vector<String>& fileURLs, const Vector<String>& allowedMIMETypes);
     void showShareSheet(const WebCore::ShareDataWithParsedURL&, CompletionHandler<void(bool)>&&);
     void showContactPicker(const WebCore::ContactsRequestData&, CompletionHandler<void(Optional<Vector<WebCore::ContactInfo>>&&)>&&);
-    void printFrame(WebCore::FrameIdentifier, const String&, CompletionHandler<void()>&&);
+    void printFrame(WebCore::FrameIdentifier, CompletionHandler<void()>&&);
     void exceededDatabaseQuota(WebCore::FrameIdentifier, const String& originIdentifier, const String& databaseName, const String& displayName, uint64_t currentQuota, uint64_t currentOriginUsage, uint64_t currentDatabaseUsage, uint64_t expectedUsage, Messages::WebPageProxy::ExceededDatabaseQuotaDelayedReply&&);
     void reachedApplicationCacheOriginQuota(const String& originIdentifier, uint64_t currentQuota, uint64_t totalBytesNeeded, Messages::WebPageProxy::ReachedApplicationCacheOriginQuotaDelayedReply&&);
 
@@ -2120,8 +2118,6 @@ private:
     void didPerformDictionaryLookup(const WebCore::DictionaryPopupInfo&);
 #endif
 
-    void stopMakingViewBlankDueToLackOfRenderingUpdate();
-
     // Spelling and grammar.
     void checkSpellingOfString(const String& text, CompletionHandler<void(int32_t misspellingLocation, int32_t misspellingLength)>&&);
     void checkGrammarOfString(const String& text, CompletionHandler<void(Vector<WebCore::GrammarDetail>&&, int32_t badGrammarLocation, int32_t badGrammarLength)>&&);
@@ -2153,7 +2149,6 @@ private:
     void applicationManifestCallback(const Optional<WebCore::ApplicationManifest>&, CallbackID);
 #endif
 #if PLATFORM(MAC)
-    void didUpdateRenderingAfterCommittingLoad();
     void fontAtSelectionCallback(const FontInfo&, double, bool, CallbackID);
 #endif
 #if PLATFORM(IOS_FAMILY)
@@ -2454,6 +2449,7 @@ private:
     Optional<WebCore::InputMode> m_pendingInputModeChange;
     TransactionID m_firstLayerTreeTransactionIdAfterDidCommitLoad;
     int32_t m_deviceOrientation { 0 };
+    bool m_hasReceivedLayerTreeTransactionAfterDidCommitLoad { true };
     bool m_hasNetworkRequestsOnSuspended { false };
     bool m_isKeyboardAnimatingIn { false };
     bool m_isScrollingOrZooming { false };
@@ -2577,10 +2573,6 @@ private:
 
     bool m_isInPrintingMode { false };
     bool m_isPerformingDOMPrintOperation { false };
-
-#if PLATFORM(COCOA)
-    bool m_hasUpdatedRenderingAfterDidCommitLoad { true };
-#endif
 
     WebCore::ResourceRequest m_decidePolicyForResponseRequest;
     bool m_shouldSuppressAppLinksInNextNavigationPolicyDecision { false };

@@ -198,9 +198,9 @@ void JSGlobalObjectInspectorController::reportAPIException(JSGlobalObject* globa
     m_consoleAgent->addMessageToConsole(makeUnique<ConsoleMessage>(MessageSource::JS, MessageType::Log, MessageLevel::Error, errorMessage, WTFMove(callStack)));
 }
 
-WeakPtr<ConsoleClient> JSGlobalObjectInspectorController::consoleClient() const
+ConsoleClient* JSGlobalObjectInspectorController::consoleClient() const
 {
-    return makeWeakPtr(m_consoleClient.get());
+    return m_consoleClient.get();
 }
 
 bool JSGlobalObjectInspectorController::developerExtrasEnabled() const

@@ -31,8 +31,8 @@
 
 @interface _WKRemoteObjectInterface ()
 
-- (NSInvocation *)_invocationForSelector:(SEL)selector;
-- (NSInvocation *)_invocationForReplyBlockOfSelector:(SEL)selector;
+- (NSMethodSignature *)_methodSignatureForSelector:(SEL)selector;
+- (NSMethodSignature *)_methodSignatureForReplyBlockOfSelector:(SEL)selector;
 - (const Vector<HashSet<CFTypeRef>>&)_allowedArgumentClassesForSelector:(SEL)selector;
 - (const Vector<HashSet<CFTypeRef>>&)_allowedArgumentClassesForReplyBlockOfSelector:(SEL)selector;
 

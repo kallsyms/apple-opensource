@@ -64,7 +64,6 @@
 #include "RenderView.h"
 #include "RenderWidget.h"
 #include "RenderedPosition.h"
-#include "ScriptDisallowedScope.h"
 #include "Settings.h"
 #include "SimpleRange.h"
 #include "SpatialNavigation.h"
@@ -333,11 +332,17 @@ bool FrameSelection::setSelectionWithoutUpdatingAppearance(const VisibleSelectio
     if (shouldAlwaysUseDirectionalSelection(m_document.get()))
         newSelection.setIsDirectional(true);
 
+    if (!m_document || !m_document->frame()) {
+        m_selection = newSelection;
+        updateAssociatedLiveRange();
+        return false;
+    }
+
     // <http://bugs.webkit.org/show_bug.cgi?id=23464>: Infinite recursion at FrameSelection::setSelection
     // if document->frame() == m_document->frame() we can get into an infinite loop
     if (Document* newSelectionDocument = newSelection.base().document()) {
         if (RefPtr<Frame> newSelectionFrame = newSelectionDocument->frame()) {
-            if (m_document && newSelectionFrame != m_document->frame() && newSelectionDocument != m_document) {
+            if (newSelectionFrame != m_document->frame() && newSelectionDocument != m_document) {
                 newSelectionDocument->selection().setSelection(newSelection, options, AXTextStateChangeIntent(), align, granularity);
                 // It's possible that during the above set selection, this FrameSelection has been modified by
                 // selectFrameElementInParentIfFullySelected, but that the selection is no longer valid since
@@ -349,48 +354,27 @@ bool FrameSelection::setSelectionWithoutUpdatingAppearance(const VisibleSelectio
         }
     }
 
+    m_granularity = granularity;
+
+    if (closeTyping)
+        TypingCommand::closeTyping(*m_document);
+
+    if (shouldClearTypingStyle)
+        clearTypingStyle();
+
     VisibleSelection oldSelection = m_selection;
-    bool willMutateSelection = oldSelection != newSelection;
-    if (willMutateSelection && m_document)
+    bool didMutateSelection = oldSelection != newSelection;
+    if (didMutateSelection)
         m_document->editor().selectionWillChange();
 
-    {
-        ScriptDisallowedScope::InMainThread scriptDisallowedScope;
-        if (newSelection.isOrphan()) {
-            ASSERT_NOT_REACHED();
-            clear();
-            return false;
-        }
-
-        if (!m_document || !m_document->frame()) {
-            m_selection = newSelection;
-            updateAssociatedLiveRange();
-            return false;
-        }
-
-        bool selectionEndpointsBelongToMultipleDocuments = newSelection.base().document() && !newSelection.document();
-        bool selectionIsInAnotherDocument = newSelection.document() && newSelection.document() != m_document.get();
-        if (selectionEndpointsBelongToMultipleDocuments || selectionIsInAnotherDocument) {
-            clear();
-            return false;
-        }
-
-        if (closeTyping)
-            TypingCommand::closeTyping(*m_document);
-
-        if (shouldClearTypingStyle)
-            clearTypingStyle();
-
-        m_granularity = granularity;
-        m_selection = newSelection;
-        updateAssociatedLiveRange();
-    }
+    m_selection = newSelection;
+    updateAssociatedLiveRange();
 
     // Selection offsets should increase when LF is inserted before the caret in InsertLineBreakCommand. See <https://webkit.org/b/56061>.
     if (HTMLTextFormControlElement* textControl = enclosingTextFormControl(newSelection.start()))
         textControl->selectionChanged(options.contains(FireSelectEvent));
 
-    if (!willMutateSelection)
+    if (!didMutateSelection)
         return false;
 
     setCaretRectNeedsUpdate();
@@ -2806,11 +2790,6 @@ static bool containsEndpoints(const WeakPtr<Document>& document, const Range& li
 bool FrameSelection::isInDocumentTree() const
 {
     return containsEndpoints(m_document, m_selection.range());
-}
-
-bool FrameSelection::isConnectedToDocument() const
-{
-    return selection().document() == m_document.get();
 }
 
 RefPtr<Range> FrameSelection::associatedLiveRange()

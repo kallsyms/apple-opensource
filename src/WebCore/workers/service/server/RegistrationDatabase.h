@@ -61,8 +61,7 @@ private:
     
     String databaseDirectoryIsolatedCopy() const { return m_databaseDirectory.isolatedCopy(); }
 
-    enum class ShouldRetry { No, Yes };
-    void schedulePushChanges(Vector<ServiceWorkerContextData>&&, Vector<ServiceWorkerRegistrationKey>&&, ShouldRetry, CompletionHandler<void()>&&);
+    void schedulePushChanges(Vector<ServiceWorkerContextData>&&, Vector<ServiceWorkerRegistrationKey>&&, CompletionHandler<void()>&&);
     void postTaskToWorkQueue(Function<void()>&&);
 
     // Methods to be run on the work queue.

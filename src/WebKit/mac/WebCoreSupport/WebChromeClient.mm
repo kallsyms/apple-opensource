@@ -678,7 +678,7 @@ void WebChromeClient::setToolTip(const String& toolTip)
         [(WebHTMLView *)documentView _setToolTip:toolTip];
 }
 
-void WebChromeClient::print(Frame& frame, const StringWithDirection&)
+void WebChromeClient::print(Frame& frame)
 {
     WebFrame *webFrame = kit(&frame);
     if ([[m_webView UIDelegate] respondsToSelector:@selector(webView:printFrame:)])

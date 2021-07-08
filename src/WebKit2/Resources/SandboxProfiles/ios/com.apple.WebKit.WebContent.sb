@@ -582,9 +582,6 @@
     required-etc-files
     (literal "/"))
 
-(deny file-read* (with no-report)
-      (literal "/private/etc/passwd"))
-
 (allow file-read*
        (subpath "/private/var/MobileAsset/PreinstalledAssetsV2/InstallWithOs"))
 
@@ -1316,7 +1313,8 @@
         (fcntl-command F_OFD_SETLK))
 
     (allow system-fcntl
-        (fcntl-command F_GETPROTECTIONCLASS))
+        (fcntl-command F_GETPROTECTIONCLASS)
+        (fcntl-command F_SETPROTECTIONCLASS))
 )
 
 (when (defined? 'process-codesigning*)

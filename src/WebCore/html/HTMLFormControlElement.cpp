@@ -595,13 +595,11 @@ void HTMLFormControlElement::updateValidity()
         invalidateStyleForSubtree();
 
         if (!m_isValid) {
-            if (isConnected())
-                addInvalidElementToAncestorFromInsertionPoint(*this, parentNode());
+            addInvalidElementToAncestorFromInsertionPoint(*this, parentNode());
             if (HTMLFormElement* form = this->form())
                 form->registerInvalidAssociatedFormControl(*this);
         } else {
-            if (isConnected())
-                removeInvalidElementToAncestorFromInsertionPoint(*this, parentNode());
+            removeInvalidElementToAncestorFromInsertionPoint(*this, parentNode());
             if (HTMLFormElement* form = this->form())
                 form->removeInvalidAssociatedFormControlIfNeeded(*this);
         }

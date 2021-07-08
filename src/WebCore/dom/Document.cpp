@@ -777,7 +777,6 @@ Document::~Document()
 
 void Document::removedLastRef()
 {
-    ScriptDisallowedScope::InMainThread scriptDisallowedScope;
     ASSERT(!m_deletionHasBegun);
     if (m_referencingNodeCount) {
         // Node::removedLastRef doesn't set refCount() to zero because it's not observable.
@@ -807,8 +806,6 @@ void Document::removedLastRef()
         m_fontSelector->unregisterForInvalidationCallbacks(*this);
 
         detachParser();
-
-        RELEASE_ASSERT(m_selection->isNone());
 
         // removeDetachedChildren() doesn't always unregister IDs,
         // so tear down scope information up front to avoid having
@@ -1686,14 +1683,8 @@ void Document::updateTitle(const StringWithDirection& title)
     m_title.string = canonicalizedTitle(*this, title.string);
     m_title.direction = title.direction;
 
-    if (!m_updateTitleTaskScheduled) {
-        eventLoop().queueTask(TaskSource::DOMManipulation, [protectedThis = makeRef(*this), this]() mutable {
-            m_updateTitleTaskScheduled = false;
-            if (auto documentLoader = makeRefPtr(loader()))
-                documentLoader->setTitle(m_title);
-        });
-        m_updateTitleTaskScheduled = true;
-    }
+    if (auto* loader = this->loader())
+        loader->setTitle(m_title);
 }
 
 void Document::updateTitleFromTitleElement()
@@ -2633,8 +2624,6 @@ void Document::willBeRemovedFromFrame()
         disconnectDescendantFrames();
     }
     RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(!m_frame || !m_frame->tree().childCount());
-
-    ScriptDisallowedScope::InMainThread scriptDisallowedScope;
 
     if (m_domWindow && m_frame)
         m_domWindow->willDetachDocumentFromFrame();

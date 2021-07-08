@@ -539,9 +539,6 @@ public:
     VisiblePositionRange lineRangeForPosition(const VisiblePosition&) const override;
 
     Optional<SimpleRange> rangeForPlainTextRange(const PlainTextRange&) const override;
-#if PLATFORM(MAC)
-    AXTextMarkerRangeRef textMarkerRangeForNSRange(const NSRange&) const override;
-#endif
 
     static String stringForVisiblePositionRange(const VisiblePositionRange&);
     String stringForRange(const SimpleRange&) const override;
@@ -826,7 +823,7 @@ inline void AccessibilityObject::detachPlatformWrapper(AccessibilityDetachmentTy
 #endif
 
 #if !(ENABLE(ACCESSIBILITY) && USE(ATK))
-inline bool AccessibilityObject::allowsTextRanges() const { return true; }
+inline bool AccessibilityObject::allowsTextRanges() const { return isTextControl(); }
 inline unsigned AccessibilityObject::getLengthForTextRange() const { return text().length(); }
 #endif
 

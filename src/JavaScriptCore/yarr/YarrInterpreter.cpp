@@ -45,7 +45,6 @@ public:
     struct ParenthesesDisjunctionContext;
 
     struct BackTrackInfoParentheses {
-        uintptr_t begin;
         uintptr_t matchAmount;
         ParenthesesDisjunctionContext* lastContext;
     };
@@ -1016,7 +1015,6 @@ public:
         BackTrackInfoParentheses* backTrack = reinterpret_cast<BackTrackInfoParentheses*>(context->frame + term.frameLocation);
         ByteDisjunction* disjunctionBody = term.atom.parenthesesDisjunction;
 
-        backTrack->begin = input.getPos();
         backTrack->matchAmount = 0;
         backTrack->lastContext = nullptr;
 
@@ -1170,19 +1168,7 @@ public:
                 popParenthesesDisjunctionContext(backTrack);
                 freeParenthesesDisjunctionContext(context);
 
-                if (backTrack->matchAmount < term.atom.quantityMinCount) {
-                    while (backTrack->matchAmount) {
-                        context = backTrack->lastContext;
-                        resetMatches(term, context);
-                        popParenthesesDisjunctionContext(backTrack);
-                        freeParenthesesDisjunctionContext(context);
-                    }
-
-                    input.setPos(backTrack->begin);
-                    return result;
-                }
-
-                if (result != JSRegExpNoMatch)
+                if (result != JSRegExpNoMatch || backTrack->matchAmount < term.atom.quantityMinCount)
                     return result;
             }
 

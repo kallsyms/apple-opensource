@@ -300,10 +300,7 @@ void JSBuiltinInternalFunctions::visit(JSC::SlotVisitor& visitor)
     UNUSED_PARAM(visitor);
 }
 
-SUPRESS_ASAN void JSBuiltinInternalFunctions::initialize(JSDOMGlobalObject& globalObject)
-template void JSBuiltinInternalFunctions::visit(AbstractSlotVisitor&);
-template void JSBuiltinInternalFunctions::visit(SlotVisitor&);
-
+void JSBuiltinInternalFunctions::initialize(JSDOMGlobalObject& globalObject)
 {
     UNUSED_PARAM(globalObject);
 #if ENABLE(FETCH_API)

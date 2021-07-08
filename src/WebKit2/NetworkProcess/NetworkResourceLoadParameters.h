@@ -64,8 +64,7 @@ public:
     bool pageHasResourceLoadClient { false };
     Optional<WebCore::FrameIdentifier> parentFrameID;
     bool crossOriginAccessControlCheckEnabled { true };
-    URL documentURL;
-    
+
 #if ENABLE(SERVICE_WORKER)
     WebCore::ServiceWorkersMode serviceWorkersMode { WebCore::ServiceWorkersMode::None };
     Optional<WebCore::ServiceWorkerRegistrationIdentifier> serviceWorkerRegistrationIdentifier;

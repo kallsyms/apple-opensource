@@ -56,7 +56,6 @@ public:
     ShouldDispatchWhenWaitingForSyncReply shouldDispatchMessageWhenWaitingForSyncReply() const;
 
     void setFullySynchronousModeForTesting();
-    void setShouldMaintainOrderingWithAsyncMessages();
 
     void wrapForTesting(std::unique_ptr<Encoder>);
 

@@ -47,7 +47,6 @@
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLPlugInElement.h"
 #include "Logging.h"
-#include "ThreadableBlobRegistry.h"
 #include <wtf/CompletionHandler.h>
 
 #if USE(QUICK_LOOK)
@@ -111,14 +110,13 @@ CompletionHandlerCallingScope FrameLoader::PolicyChecker::extendBlobURLLifetimeI
         return { };
 
     // Create a new temporary blobURL in case this one gets revoked during the asynchronous navigation policy decision.
-    auto origin = SecurityOrigin::create(BlobURL::getOriginURL(request.url()));
-    URL temporaryBlobURL = BlobURL::createPublicURL(origin.ptr());
-    ThreadableBlobRegistry::registerBlobURL(origin.ptr(), temporaryBlobURL, request.url());
+    URL temporaryBlobURL = BlobURL::createPublicURL(&m_frame.document()->securityOrigin());
+    blobRegistry().registerBlobURL(temporaryBlobURL, request.url());
     request.setURL(temporaryBlobURL);
     if (loader)
         loader->request().setURL(temporaryBlobURL);
     return CompletionHandler<void()>([temporaryBlobURL = WTFMove(temporaryBlobURL)] {
-        ThreadableBlobRegistry::unregisterBlobURL(temporaryBlobURL);
+        blobRegistry().unregisterBlobURL(temporaryBlobURL);
     });
 }
 

@@ -169,7 +169,7 @@ public:
     ExpressionType push(NoConsistencyCheckTag)
     {
         m_maxStackSize = std::max(m_maxStackSize, ++m_stackSize);
-        return virtualRegisterForLocal((m_stackSize - 1).unsafeGet());
+        return virtualRegisterForLocal(m_stackSize - 1);
     }
 
     ExpressionType push()
@@ -312,7 +312,7 @@ private:
     {
         startOffset = target.stackSize() + 1;
         keep = target.branchTargetArity();
-        drop = (m_stackSize - target.stackSize() - target.branchTargetArity()).unsafeGet();
+        drop = m_stackSize - target.stackSize() - target.branchTargetArity();
     }
 
     void dropKeep(Stack& values, const ControlType& target, bool dropValues)
@@ -345,7 +345,7 @@ private:
     template<typename Functor>
     void walkExpressionStack(Stack& expressionStack, const Functor& functor)
     {
-        walkExpressionStack(expressionStack, m_stackSize.unsafeGet(), functor);
+        walkExpressionStack(expressionStack, m_stackSize, functor);
     }
 
     template<typename Functor>
@@ -370,7 +370,7 @@ private:
             });
         }
         walkExpressionStack(m_parser->expressionStack(), [&](VirtualRegister expression, VirtualRegister slot) {
-            ASSERT(expression == slot || expression.isConstant() || expression.isArgument() || static_cast<unsigned>(expression.toLocal()) < m_codeBlock->m_numVars);
+            ASSERT(expression == slot || expression.isConstant() || expression.isArgument() || expression.toLocal() < m_codeBlock->m_numVars);
         });
 #endif // ASSERT_ENABLED
     }
@@ -382,7 +382,7 @@ private:
 
         checkConsistency();
         walkExpressionStack(expressionStack, [&](TypedExpression& expression, VirtualRegister slot) {
-            ASSERT(expression.value() == slot || expression.value().isConstant() || expression.value().isArgument() || static_cast<unsigned>(expression.value().toLocal()) < m_codeBlock->m_numVars);
+            ASSERT(expression.value() == slot || expression.value().isConstant() || expression.value().isArgument() || expression.value().toLocal() < m_codeBlock->m_numVars);
             if (expression.value() == slot)
                 return;
             WasmMov::emit(this, slot, expression);
@@ -398,7 +398,7 @@ private:
         m_stackSize -= newStack.size();
         checkConsistency();
         walkExpressionStack(enclosingStack, [&](TypedExpression& expression, VirtualRegister slot) {
-            ASSERT(expression.value() == slot || expression.value().isConstant() || expression.value().isArgument() || static_cast<unsigned>(expression.value().toLocal()) < m_codeBlock->m_numVars);
+            ASSERT(expression.value() == slot || expression.value().isConstant() || expression.value().isArgument() || expression.value().toLocal() < m_codeBlock->m_numVars);
             if (expression.value() == slot || expression.value().isConstant())
                 return;
             WasmMov::emit(this, slot, expression);
@@ -429,8 +429,8 @@ private:
     ResultList m_unitializedLocals;
     HashMap<EncodedJSValue, VirtualRegister, WTF::IntHash<EncodedJSValue>, ConstantMapHashTraits> m_constantMap;
     Vector<VirtualRegister, 2> m_results;
-    Checked<unsigned> m_stackSize { 0 };
-    Checked<unsigned> m_maxStackSize { 0 };
+    unsigned m_stackSize { 0 };
+    unsigned m_maxStackSize { 0 };
 };
 
 Expected<std::unique_ptr<FunctionCodeBlock>, String> parseAndCompileBytecode(const uint8_t* functionStart, size_t functionLength, const Signature& signature, const ModuleInformation& info, uint32_t functionIndex)
@@ -479,9 +479,7 @@ LLIntGenerator::LLIntGenerator(const ModuleInformation& info, unsigned functionI
 std::unique_ptr<FunctionCodeBlock> LLIntGenerator::finalize()
 {
     RELEASE_ASSERT(m_codeBlock);
-    size_t numCalleeLocals = WTF::roundUpToMultipleOf(stackAlignmentRegisters(), m_maxStackSize.unsafeGet());
-    m_codeBlock->m_numCalleeLocals = numCalleeLocals;
-    RELEASE_ASSERT(numCalleeLocals == m_codeBlock->m_numCalleeLocals);
+    m_codeBlock->m_numCalleeLocals = WTF::roundUpToMultipleOf(stackAlignmentRegisters(), m_maxStackSize);
 
     auto& threadSpecific = threadSpecificBuffer();
     Buffer usedBuffer;
@@ -569,7 +567,7 @@ auto LLIntGenerator::callInformationForCaller(const Signature& signature) -> LLI
     // FIXME: we are allocating the extra space for the argument/return count in order to avoid interference, but we could do better
     // NOTE: We increase arg count by 1 for the case of indirect calls
     m_stackSize += std::max(signature.argumentCount() + 1, signature.returnCount()) + gprCount + fprCount + stackCount + CallFrame::headerSizeInRegisters;
-    if (m_stackSize.unsafeGet() % stackAlignmentRegisters())
+    if (m_stackSize % stackAlignmentRegisters())
         ++m_stackSize;
     if (m_maxStackSize < m_stackSize)
         m_maxStackSize = m_stackSize;
@@ -578,7 +576,7 @@ auto LLIntGenerator::callInformationForCaller(const Signature& signature) -> LLI
     ResultList arguments(signature.argumentCount());
     ResultList temporaryResults(signature.returnCount());
 
-    const unsigned stackOffset = m_stackSize.unsafeGet();
+    const unsigned stackOffset = m_stackSize;
     const unsigned base = stackOffset - CallFrame::headerSizeInRegisters;
 
     const uint32_t gprLimit = base - stackCount - gprCount;
@@ -867,7 +865,7 @@ auto LLIntGenerator::addLoop(BlockSignature signature, Stack& enclosingStack, Co
     Ref<Label> body = newEmittedLabel();
     Ref<Label> continuation = newLabel();
 
-    block = ControlType::loop(signature, m_stackSize.unsafeGet(), WTFMove(body), WTFMove(continuation));
+    block = ControlType::loop(signature, m_stackSize, WTFMove(body), WTFMove(continuation));
 
     Vector<VirtualRegister> osrEntryData;
     for (uint32_t i = 0; i < m_codeBlock->m_numArguments; i++)
@@ -876,7 +874,7 @@ auto LLIntGenerator::addLoop(BlockSignature signature, Stack& enclosingStack, Co
     const auto& callingConvention = wasmCallingConvention();
     const uint32_t gprCount = callingConvention.gprArgs.size();
     const uint32_t fprCount = callingConvention.fprArgs.size();
-    for (uint32_t i = gprCount + fprCount + numberOfLLIntCalleeSaveRegisters; i < m_codeBlock->m_numVars; i++)
+    for (int32_t i = gprCount + fprCount + numberOfLLIntCalleeSaveRegisters; i < m_codeBlock->m_numVars; i++)
         osrEntryData.append(virtualRegisterForLocal(i));
     for (unsigned controlIndex = 0; controlIndex < m_parser->controlStack().size(); ++controlIndex) {
         Stack& expressionStack = m_parser->controlStack()[controlIndex].enclosedExpressionStack;
@@ -895,13 +893,13 @@ auto LLIntGenerator::addLoop(BlockSignature signature, Stack& enclosingStack, Co
 
 auto LLIntGenerator::addTopLevel(BlockSignature signature) -> ControlType
 {
-    return ControlType::topLevel(signature, m_stackSize.unsafeGet(), newLabel());
+    return ControlType::topLevel(signature, m_stackSize, newLabel());
 }
 
 auto LLIntGenerator::addBlock(BlockSignature signature, Stack& enclosingStack, ControlType& newBlock, Stack& newStack) -> PartialResult
 {
     splitStack(signature, enclosingStack, newStack);
-    newBlock = ControlType::block(signature, m_stackSize.unsafeGet(), newLabel());
+    newBlock = ControlType::block(signature, m_stackSize, newLabel());
     return { };
 }
 
@@ -914,7 +912,7 @@ auto LLIntGenerator::addIf(ExpressionType condition, BlockSignature signature, S
 
     WasmJfalse::emit(this, condition, alternate->bind(this));
 
-    result = ControlType::if_(signature, m_stackSize.unsafeGet(), WTFMove(alternate), WTFMove(continuation));
+    result = ControlType::if_(signature, m_stackSize, WTFMove(alternate), WTFMove(continuation));
     return { };
 }
 
@@ -932,7 +930,7 @@ auto LLIntGenerator::addElseToUnreachable(ControlType& data) -> PartialResult
 
     ControlIf& control = WTF::get<ControlIf>(data);
     emitLabel(control.m_alternate.get());
-    data = ControlType::block(data.m_signature, m_stackSize.unsafeGet(), WTFMove(data.m_continuation));
+    data = ControlType::block(data.m_signature, m_stackSize, WTFMove(data.m_continuation));
     return { };
 }
 

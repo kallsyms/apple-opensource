@@ -59,14 +59,6 @@ void AXIsolatedObject::detachPlatformWrapper(AccessibilityDetachmentType detachm
     [wrapper() detachIsolatedObject:detachmentType];
 }
 
-AXTextMarkerRangeRef AXIsolatedObject::textMarkerRangeForNSRange(const NSRange& range) const
-{
-    return Accessibility::retrieveValueFromMainThread<AXTextMarkerRangeRef>([&range, this] () -> AXTextMarkerRangeRef {
-        auto* axObject = associatedAXObject();
-        return axObject ? axObject->textMarkerRangeForNSRange(range) : nullptr;
-    });
-}
-
 } // WebCore
 
 #endif // ENABLE(ACCESSIBILITY_ISOLATED_TREE) && PLATFORM(MAC)

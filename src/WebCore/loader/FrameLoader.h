@@ -141,7 +141,6 @@ public:
     void retryAfterFailedCacheOnlyMainResourceLoad();
 
     static void reportLocalLoadFailed(Frame*, const String& url);
-    static void reportBlockedLoadFailed(Frame&, const URL&);
 
     // FIXME: These are all functions which stop loads. We have too many.
     void stopAllLoadersAndCheckCompleteness();

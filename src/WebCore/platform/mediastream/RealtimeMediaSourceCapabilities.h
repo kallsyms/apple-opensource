@@ -49,8 +49,8 @@ public:
     Type type() const { return m_type; }
 
     union ValueUnion {
-        double asDouble;
         int asInt;
+        double asDouble;
     };
 
     CapabilityValueOrRange()
@@ -106,9 +106,9 @@ public:
     template<class Decoder> static WARN_UNUSED_RETURN bool decode(Decoder&, CapabilityValueOrRange&);
 
 private:
-    ValueUnion m_minOrValue { };
-    ValueUnion m_max { };
-    Type m_type { Undefined };
+    ValueUnion m_minOrValue;
+    ValueUnion m_max;
+    Type m_type;
 };
 
 template<class Encoder>
@@ -206,7 +206,7 @@ private:
     CapabilityValueOrRange m_volume;
     CapabilityValueOrRange m_sampleRate;
     CapabilityValueOrRange m_sampleSize;
-    EchoCancellation m_echoCancellation { EchoCancellation::ReadOnly };
+    EchoCancellation m_echoCancellation;
     AtomString m_deviceId;
     AtomString m_groupId;
 
@@ -226,8 +226,8 @@ void RealtimeMediaSourceCapabilities::encode(Encoder& encoder) const
         << m_sampleSize
         << m_deviceId
         << m_groupId
-        << m_supportedConstraints
-        << m_echoCancellation;
+        << m_supportedConstraints;
+    encoder << m_echoCancellation;
 }
 
 template<class Decoder>

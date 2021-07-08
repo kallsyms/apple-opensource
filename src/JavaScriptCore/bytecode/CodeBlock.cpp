@@ -967,7 +967,7 @@ void CodeBlock::setAlternative(VM& vm, CodeBlock* alternative)
     m_alternative.set(vm, this, alternative);
 }
 
-void CodeBlock::setNumParameters(unsigned newValue)
+void CodeBlock::setNumParameters(int newValue)
 {
     m_numParameters = newValue;
 
@@ -1989,7 +1989,7 @@ void CodeBlock::ensureCatchLivenessIsComputedForBytecodeIndexSlow(const OpCatch&
         liveOperands.append(virtualRegisterForLocal(liveLocal));
     });
 
-    for (unsigned i = 0; i < numParameters(); ++i)
+    for (int i = 0; i < numParameters(); ++i)
         liveOperands.append(virtualRegisterForArgumentIncludingThis(i));
 
     auto profiles = makeUnique<ValueProfileAndVirtualRegisterBuffer>(liveOperands.size());
@@ -3161,9 +3161,7 @@ SpeculatedType CodeBlock::valueProfilePredictionForBytecodeIndex(const Concurren
 
 ValueProfile& CodeBlock::valueProfileForBytecodeIndex(BytecodeIndex bytecodeIndex)
 {
-    ValueProfile* profile = tryGetValueProfileForBytecodeIndex(bytecodeIndex);
-    ASSERT(profile);
-    return *profile;
+    return *tryGetValueProfileForBytecodeIndex(bytecodeIndex);
 }
 
 void CodeBlock::validate()

@@ -56,16 +56,16 @@ WebAuthnProcessProxy& WebAuthnProcessProxy::singleton()
     ASSERT(RunLoop::isMain());
 
     static std::once_flag onceFlag;
-    static LazyNeverDestroyed<Ref<WebAuthnProcessProxy>> webAuthnProcess;
+    static LazyNeverDestroyed<WebAuthnProcessProxy> webAuthnProcess;
 
     std::call_once(onceFlag, [] {
-        webAuthnProcess.construct(adoptRef(*new WebAuthnProcessProxy));
+        webAuthnProcess.construct();
 
         WebAuthnProcessCreationParameters parameters;
 
         // Initialize the WebAuthn process.
-        webAuthnProcess.get()->send(Messages::WebAuthnProcess::InitializeWebAuthnProcess(parameters), 0);
-        webAuthnProcess.get()->updateProcessAssertion();
+        webAuthnProcess->send(Messages::WebAuthnProcess::InitializeWebAuthnProcess(parameters), 0);
+        webAuthnProcess->updateProcessAssertion();
     });
 
     return webAuthnProcess.get();

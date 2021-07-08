@@ -32,14 +32,19 @@ namespace WebCore {
 WEBCORE_EXPORT void setPresentingApplicationPID(int);
 WEBCORE_EXPORT int presentingApplicationPID();
 
+#if PLATFORM(WIN)
+inline bool isInWebProcess() { return false; }
+inline bool isInGPUProcess() { return false; }
+#elif !PLATFORM(COCOA) && !USE(GLIB)
+inline bool isInWebProcess() { return true; }
+inline bool isInGPUProcess() { return false; }
+inline bool isInNetworkProcess() { return false; }
+#endif
+
 #if PLATFORM(COCOA) || USE(GLIB)
 bool isInWebProcess();
 bool isInGPUProcess();
 bool isInNetworkProcess();
-#else
-inline bool isInWebProcess() { return false; }
-inline bool isInGPUProcess() { return false; }
-inline bool isInNetworkProcess() { return false; }
 #endif
 
 #if PLATFORM(COCOA)
@@ -115,7 +120,6 @@ WEBCORE_EXPORT bool isJWLibrary();
 WEBCORE_EXPORT bool isPaperIO();
 WEBCORE_EXPORT bool isCrunchyroll();
 bool isWechat();
-WEBCORE_EXPORT bool isLutron();
 
 } // IOSApplication
 

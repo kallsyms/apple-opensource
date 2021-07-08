@@ -243,8 +243,6 @@ void EditCommandComposition::unapply()
 
     if (AXObjectCache::accessibilityEnabled())
         m_replacedText.postTextStateChangeNotificationForUnapply(m_document->existingAXObjectCache());
-
-    RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(m_document->selection().isNone() || m_document->selection().isConnectedToDocument());
 }
 
 void EditCommandComposition::reapply()
@@ -272,8 +270,6 @@ void EditCommandComposition::reapply()
 
     if (AXObjectCache::accessibilityEnabled())
         m_replacedText.postTextStateChangeNotificationForReapply(m_document->existingAXObjectCache());
-
-    RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(m_document->selection().isNone() || m_document->selection().isConnectedToDocument());
 }
 
 void EditCommandComposition::append(SimpleEditCommand* command)
@@ -616,7 +612,7 @@ void CompositeEditCommand::removeNodePreservingChildren(Node& node, ShouldAssume
 
 void CompositeEditCommand::removeNodeAndPruneAncestors(Node& node)
 {
-    auto parent = makeRefPtr(node.parentNode());
+    RefPtr<ContainerNode> parent = node.parentNode();
     removeNode(node);
     prune(parent.get());
 }
@@ -660,7 +656,7 @@ HTMLElement* CompositeEditCommand::replaceElementWithSpanPreservingChildrenAndAt
 
 void CompositeEditCommand::prune(Node* node)
 {
-    if (auto highestNodeToRemove = makeRefPtr(highestNodeToRemoveInPruning(node)))
+    if (auto* highestNodeToRemove = highestNodeToRemoveInPruning(node))
         removeNode(*highestNodeToRemove);
 }
 
@@ -1297,7 +1293,7 @@ void CompositeEditCommand::cleanupAfterDeletion(VisiblePosition destination)
     if (!caretAfterDelete.equals(destination) && isStartOfParagraph(caretAfterDelete) && isEndOfParagraph(caretAfterDelete)) {
         // Note: We want the rightmost candidate.
         Position position = caretAfterDelete.deepEquivalent().downstream();
-        auto node = makeRefPtr(position.deprecatedNode());
+        Node* node = position.deprecatedNode();
         ASSERT(node);
         // Normally deletion will leave a br as a placeholder.
         if (is<HTMLBRElement>(*node))
@@ -1306,11 +1302,11 @@ void CompositeEditCommand::cleanupAfterDeletion(VisiblePosition destination)
         // doesn't require a placeholder to prop itself open (like a bordered
         // div or an li), remove it during the move (the list removal code
         // expects this behavior).
-        else if (isBlock(node.get())) {
+        else if (isBlock(node)) {
             // If caret position after deletion and destination position coincides,
             // node should not be removed.
             if (!position.rendersInDifferentPosition(destination.deepEquivalent())) {
-                prune(node.get());
+                prune(node);
                 return;
             }
             removeNodeAndPruneAncestors(*node);
@@ -1603,7 +1599,7 @@ bool CompositeEditCommand::breakOutOfEmptyMailBlockquotedParagraph()
     auto* brPtr = br.ptr();
     // We want to replace this quoted paragraph with an unquoted one, so insert a br
     // to hold the caret before the highest blockquote.
-    insertNodeBefore(br.copyRef(), *highestBlockquote);
+    insertNodeBefore(WTFMove(br), *highestBlockquote);
     VisiblePosition atBR(positionBeforeNode(brPtr));
     // If the br we inserted collapsed, for example foo<br><blockquote>...</blockquote>, insert
     // a second one.
@@ -1624,11 +1620,11 @@ bool CompositeEditCommand::breakOutOfEmptyMailBlockquotedParagraph()
     else if (is<Text>(*caretPos.deprecatedNode())) {
         ASSERT(caretPos.deprecatedEditingOffset() == 0);
         Text& textNode = downcast<Text>(*caretPos.deprecatedNode());
-        auto parentNode = makeRefPtr(textNode.parentNode());
+        ContainerNode* parentNode = textNode.parentNode();
         // The preserved newline must be the first thing in the node, since otherwise the previous
         // paragraph would be quoted, and we verified that it wasn't above.
         deleteTextFromNode(textNode, 0, 1);
-        prune(parentNode.get());
+        prune(parentNode);
     }
 
     return true;

@@ -86,10 +86,13 @@ AudioSourceProviderAVFObjC::AudioSourceProviderAVFObjC(AVPlayerItem *item)
 
 AudioSourceProviderAVFObjC::~AudioSourceProviderAVFObjC()
 {
-    // FIXME: this is not correct, as this indicates that there might be simultaneous calls
-    // to the destructor and a member function. This undefined behavior will be addressed in the future
-    // commits. https://bugs.webkit.org/show_bug.cgi?id=224480
     setClient(nullptr);
+    if (m_tapStorage) {
+        auto locker = holdLock(m_tapStorage->lock);
+        m_tapStorage->_this = nullptr;
+    }
+
+    m_tapStorage = nullptr;
 }
 
 void AudioSourceProviderAVFObjC::provideInput(AudioBus* bus, size_t framesToProcess)
@@ -148,62 +151,64 @@ void AudioSourceProviderAVFObjC::setClient(AudioSourceProviderClient* client)
 {
     if (m_client == client)
         return;
-    destroyMixIfNeeded();
+
+    if (m_avAudioMix)
+        destroyMix();
+
     m_client = client;
-    createMixIfNeeded();
+
+    if (m_client && m_avPlayerItem)
+        createMix();
 }
 
 void AudioSourceProviderAVFObjC::setPlayerItem(AVPlayerItem *avPlayerItem)
 {
     if (m_avPlayerItem == avPlayerItem)
         return;
-    destroyMixIfNeeded();
+
+    if (m_avAudioMix)
+        destroyMix();
+
     m_avPlayerItem = avPlayerItem;
-    createMixIfNeeded();
+
+    if (m_client && m_avPlayerItem && m_avAssetTrack)
+        createMix();
 }
 
 void AudioSourceProviderAVFObjC::setAudioTrack(AVAssetTrack *avAssetTrack)
 {
     if (m_avAssetTrack == avAssetTrack)
         return;
-    destroyMixIfNeeded();
+
+    if (m_avAudioMix)
+        destroyMix();
+
     m_avAssetTrack = avAssetTrack;
-    createMixIfNeeded();
+
+    if (m_client && m_avPlayerItem && m_avAssetTrack)
+        createMix();
 }
 
-void AudioSourceProviderAVFObjC::destroyMixIfNeeded()
+void AudioSourceProviderAVFObjC::destroyMix()
 {
-    if (!m_avAudioMix)
-        return;
-    ASSERT(m_tapStorage);
-    auto locker = holdLock(m_tapStorage->lock);
     if (m_avPlayerItem)
         [m_avPlayerItem setAudioMix:nil];
     [m_avAudioMix setInputParameters:@[ ]];
     m_avAudioMix.clear();
     m_tap.clear();
-    m_tapStorage->_this = nullptr;
-    m_tapStorage = nullptr;
-    // Call unprepare, since Tap cannot call it after clear.
-    unprepare();
-    m_weakFactory.revokeAll();
 }
 
-void AudioSourceProviderAVFObjC::createMixIfNeeded()
+void AudioSourceProviderAVFObjC::createMix()
 {
-    if (!m_client || !m_avPlayerItem || !m_avAssetTrack)
-        return;
-
     ASSERT(!m_avAudioMix);
-    ASSERT(!m_tapStorage);
-    ASSERT(!m_tap);
+    ASSERT(m_avPlayerItem);
+    ASSERT(m_client);
 
-    auto tapStorage = adoptRef(new TapStorage(this));
-    auto locker = holdLock(tapStorage->lock);
+    m_avAudioMix = adoptNS([PAL::allocAVMutableAudioMixInstance() init]);
 
     MTAudioProcessingTapCallbacks callbacks = {
         0,
-        tapStorage.get(),
+        this,
         initCallback,
         finalizeCallback,
         prepareCallback,
@@ -213,14 +218,12 @@ void AudioSourceProviderAVFObjC::createMixIfNeeded()
 
     MTAudioProcessingTapRef tap = nullptr;
     OSStatus status = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, 1, &tap);
+    ASSERT(tap);
+    ASSERT(m_tap == tap);
     if (status != noErr) {
-        if (tap)
-            CFRelease(tap);
+        m_tap = nullptr;
         return;
     }
-    m_tap = adoptCF(tap);
-    m_tapStorage = WTFMove(tapStorage);
-    m_avAudioMix = adoptNS([PAL::allocAVMutableAudioMixInstance() init]);
 
     RetainPtr<AVMutableAudioMixInputParameters> parameters = adoptNS([PAL::allocAVMutableAudioMixInputParametersInstance() init]);
     [parameters setAudioTapProcessor:m_tap.get()];
@@ -230,22 +233,31 @@ void AudioSourceProviderAVFObjC::createMixIfNeeded()
     
     [m_avAudioMix setInputParameters:@[parameters.get()]];
     [m_avPlayerItem setAudioMix:m_avAudioMix.get()];
-    m_weakFactory.initializeIfNeeded(*this);
 }
 
 void AudioSourceProviderAVFObjC::initCallback(MTAudioProcessingTapRef tap, void* clientInfo, void** tapStorageOut)
 {
-    ASSERT_UNUSED(tap, tap);
-    TapStorage* tapStorage = static_cast<TapStorage*>(clientInfo);
-    *tapStorageOut = tapStorage;
+    ASSERT(tap);
+    AudioSourceProviderAVFObjC* _this = static_cast<AudioSourceProviderAVFObjC*>(clientInfo);
+    _this->m_tap = adoptCF(tap);
+    _this->m_tapStorage = adoptRef(new TapStorage(_this));
+    _this->init(clientInfo, tapStorageOut);
+    *tapStorageOut = _this->m_tapStorage.get();
+
     // ref balanced by deref in finalizeCallback:
-    tapStorage->ref();
+    _this->m_tapStorage->ref();
 }
 
 void AudioSourceProviderAVFObjC::finalizeCallback(MTAudioProcessingTapRef tap)
 {
     ASSERT(tap);
     TapStorage* tapStorage = static_cast<TapStorage*>(MTAudioProcessingTapGetStorage(tap));
+
+    {
+        auto locker = holdLock(tapStorage->lock);
+        if (tapStorage->_this)
+            tapStorage->_this->finalize();
+    }
     tapStorage->deref();
 }
 
@@ -280,6 +292,21 @@ void AudioSourceProviderAVFObjC::processCallback(MTAudioProcessingTapRef tap, CM
 
     if (tapStorage->_this)
         tapStorage->_this->process(tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut);
+}
+
+void AudioSourceProviderAVFObjC::init(void* clientInfo, void** tapStorageOut)
+{
+    ASSERT(clientInfo == this);
+    UNUSED_PARAM(clientInfo);
+    *tapStorageOut = this;
+}
+
+void AudioSourceProviderAVFObjC::finalize()
+{
+    if (m_tapStorage) {
+        m_tapStorage->_this = nullptr;
+        m_tapStorage = nullptr;
+    }
 }
 
 void AudioSourceProviderAVFObjC::prepare(CMItemCount maxFrames, const AudioStreamBasicDescription *processingFormat)
@@ -323,10 +350,8 @@ void AudioSourceProviderAVFObjC::prepare(CMItemCount maxFrames, const AudioStrea
     memset(m_list.get(), 0, bufferListSize);
     m_list->mNumberBuffers = numberOfChannels;
 
-    callOnMainThread([weakThis = m_weakFactory.createWeakPtr(*this), numberOfChannels, sampleRate] {
-        auto* self = weakThis.get();
-        if (self && self->m_client)
-            self->m_client->setFormat(numberOfChannels, sampleRate);
+    callOnMainThread([protectedThis = makeRef(*this), numberOfChannels, sampleRate] {
+        protectedThis->m_client->setFormat(numberOfChannels, sampleRate);
     });
 }
 

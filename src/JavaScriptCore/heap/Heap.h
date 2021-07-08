@@ -271,7 +271,7 @@ public:
     void deleteAllUnlinkedCodeBlocks(DeleteAllCodeEffort);
 
     void didAllocate(size_t);
-    bool isPagedOut();
+    bool isPagedOut(MonotonicTime deadline);
     
     const JITStubRoutineSet& jitStubRoutines() { return *m_jitStubRoutines; }
     

@@ -87,11 +87,10 @@ static inline Optional<size_t> firstTextRunIndex(const InlineContentBreaker::Con
     return { };
 }
 
-static inline bool isWrappingAllowed(const InlineItem& inlineItem)
+static inline bool isWrappingAllowed(const RenderStyle& style)
 {
     // Do not try to wrap overflown 'pre' and 'no-wrap' content to next line.
-    auto& styleToUse = inlineItem.isBox() ? inlineItem.layoutBox().parent().style() : inlineItem.layoutBox().style();
-    return styleToUse.whiteSpace() != WhiteSpace::Pre && styleToUse.whiteSpace() != WhiteSpace::NoWrap;
+    return style.whiteSpace() != WhiteSpace::Pre && style.whiteSpace() != WhiteSpace::NoWrap;
 }
 
 static inline Optional<size_t> lastWrapOpportunityIndex(const InlineContentBreaker::ContinuousContent::RunList& runList)
@@ -103,7 +102,7 @@ static inline Optional<size_t> lastWrapOpportunityIndex(const InlineContentBreak
     // Return #0 as the index where the second continuous content can wrap at.
     ASSERT(!runList.isEmpty());
     auto lastItemIndex = runList.size() - 1;
-    return isWrappingAllowed(runList[lastItemIndex].inlineItem) ? makeOptional(lastItemIndex) : WTF::nullopt;
+    return isWrappingAllowed(runList[lastItemIndex].inlineItem.style()) ? makeOptional(lastItemIndex) : WTF::nullopt;
 }
 
 bool InlineContentBreaker::shouldKeepEndOfLineWhitespace(const ContinuousContent& continuousContent) const
@@ -227,20 +226,20 @@ InlineContentBreaker::Result InlineContentBreaker::processOverflowingContent(con
         // e.g. <div style="white-space: nowrap">some text<div style="display: inline-block; white-space: pre-wrap"></div></div>.
         // While the inline-block has pre-wrap which allows wrapping, the content lives in a nowrap context.
         if (lastInlineItem.isBox() || lastInlineItem.isInlineBoxStart() || lastInlineItem.isInlineBoxEnd())
-            return isWrappingAllowed(lastInlineItem);
+            return isWrappingAllowed(lastInlineItem.layoutBox().parent().style());
         if (lastInlineItem.isText()) {
             if (runs.size() == 1) {
                 // Fast path for the most common case of an individual text item.
-                return isWrappingAllowed(lastInlineItem);
+                return isWrappingAllowed(lastInlineItem.layoutBox().style());
             }
             for (auto& run : WTF::makeReversedRange(runs)) {
                 auto& inlineItem = run.inlineItem;
                 if (inlineItem.isInlineBoxStart() || inlineItem.isInlineBoxStart())
-                    return isWrappingAllowed(inlineItem);
+                    return isWrappingAllowed(inlineItem.layoutBox().parent().style());
                 ASSERT(!inlineItem.isBox());
             }
             // This must be a set of individual text runs. We could just check the last item.
-            return isWrappingAllowed(lastInlineItem);
+            return isWrappingAllowed(lastInlineItem.layoutBox().style());
         }
         ASSERT_NOT_REACHED();
         return true;
@@ -262,7 +261,7 @@ Optional<TrailingTextContent> InlineContentBreaker::processOverflowingTextConten
             return false;
         }
         // Check if this text run needs to stay on the current line.  
-        return isWrappingAllowed(run.inlineItem);
+        return isWrappingAllowed(run.inlineItem.style());
     };
 
     // Check where the overflow occurs and use the corresponding style to figure out the breaking behaviour.

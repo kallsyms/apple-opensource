@@ -354,9 +354,9 @@ Heap::~Heap()
         WeakBlock::destroy(*this, block);
 }
 
-bool Heap::isPagedOut()
+bool Heap::isPagedOut(MonotonicTime deadline)
 {
-    return m_objectSpace.isPagedOut();
+    return m_objectSpace.isPagedOut(deadline);
 }
 
 void Heap::dumpHeapStatisticsAtVMDestruction()

@@ -74,7 +74,7 @@ void InlineTextItem::createAndAppendTextItems(InlineItems& inlineContent, const 
     auto& style = inlineTextBox.style();
     auto& font = style.fontCascade();
     auto whitespaceContentIsTreatedAsSingleSpace = !TextUtil::shouldPreserveSpacesAndTabs(inlineTextBox);
-    auto lineBreakIterator = LazyLineBreakIterator { text, style.computedLocale(), TextUtil::lineBreakIteratorMode(style.lineBreak()) };
+    LazyLineBreakIterator lineBreakIterator(text);
     unsigned currentPosition = 0;
 
     auto inlineItemWidth = [&](auto startPosition, auto length) -> Optional<InlineLayoutUnit> {

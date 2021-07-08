@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2021 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,47 +35,45 @@
 
 namespace WebCore {
 
-Checked<unsigned, RecordOverflow> ImageData::dataSize(const IntSize& size)
-{
-    Checked<unsigned, RecordOverflow> checkedDataSize = 4;
-    checkedDataSize *= static_cast<unsigned>(size.width());
-    checkedDataSize *= static_cast<unsigned>(size.height());
-    return checkedDataSize;
-}
-
 ExceptionOr<Ref<ImageData>> ImageData::create(unsigned sw, unsigned sh)
 {
     if (!sw || !sh)
         return Exception { IndexSizeError };
-    IntSize size(sw, sh);
-    auto dataSize = ImageData::dataSize(size);
+
+    Checked<int, RecordOverflow> dataSize = 4;
+    dataSize *= sw;
+    dataSize *= sh;
     if (dataSize.hasOverflowed())
         return Exception { RangeError, "Cannot allocate a buffer of this size"_s };
-    auto byteArray = Uint8ClampedArray::tryCreateUninitialized(dataSize.unsafeGet());
-    if (!byteArray) {
-        // FIXME: Does this need to be a "real" out of memory error with setOutOfMemoryError called on it?
-        return Exception { RangeError, "Out of memory"_s };
-    }
-    byteArray->zeroFill();
-    return adoptRef(*new ImageData(size, byteArray.releaseNonNull()));
+
+    IntSize size(sw, sh);
+    auto data = adoptRef(*new ImageData(size));
+    data->data()->zeroFill();
+    return data;
 }
 
 RefPtr<ImageData> ImageData::create(const IntSize& size)
 {
-    auto dataSize = ImageData::dataSize(size);
+    Checked<int, RecordOverflow> dataSize = 4;
+    dataSize *= size.width();
+    dataSize *= size.height();
     if (dataSize.hasOverflowed())
         return nullptr;
-    auto byteArray = Uint8ClampedArray::tryCreateUninitialized(dataSize.unsafeGet());
-    if (!byteArray)
-        return nullptr;
-    return adoptRef(*new ImageData(size, byteArray.releaseNonNull()));
+
+    return adoptRef(*new ImageData(size));
 }
 
 RefPtr<ImageData> ImageData::create(const IntSize& size, Ref<Uint8ClampedArray>&& byteArray)
 {
-    auto dataSize = ImageData::dataSize(size);
-    if (dataSize.hasOverflowed() || dataSize.unsafeGet() > byteArray->length())
+    Checked<int, RecordOverflow> dataSize = 4;
+    dataSize *= size.width();
+    dataSize *= size.height();
+    if (dataSize.hasOverflowed())
         return nullptr;
+
+    if (dataSize.unsafeGet() < 0 || static_cast<unsigned>(dataSize.unsafeGet()) > byteArray->length())
+        return nullptr;
+
     return adoptRef(*new ImageData(size, WTFMove(byteArray)));
 }
 
@@ -85,6 +83,7 @@ ExceptionOr<Ref<ImageData>> ImageData::create(Ref<Uint8ClampedArray>&& byteArray
     if (!length || length % 4)
         return Exception { InvalidStateError, "Length is not a non-zero multiple of 4"_s };
 
+    ASSERT(length > 0);
     length /= 4;
     if (!sw || length % sw)
         return Exception { IndexSizeError, "Length is not a multiple of sw"_s };
@@ -97,6 +96,12 @@ ExceptionOr<Ref<ImageData>> ImageData::create(Ref<Uint8ClampedArray>&& byteArray
     if (!result)
         return Exception { RangeError };
     return result.releaseNonNull();
+}
+
+ImageData::ImageData(const IntSize& size)
+    : m_size(size)
+    , m_data(Uint8ClampedArray::createUninitialized((size.area() * 4).unsafeGet()))
+{
 }
 
 ImageData::ImageData(const IntSize& size, Ref<Uint8ClampedArray>&& byteArray)

@@ -3871,8 +3871,6 @@ ALLOW_DEPRECATED_IMPLEMENTATIONS_END
         return convertToNSArray(results);
     }
 
-    // TextMarker attributes.
-
     if ([attribute isEqualToString:NSAccessibilityEndTextMarkerForBoundsParameterizedAttribute]) {
         return Accessibility::retrieveAutoreleasedValueFromMainThread<id>([&rect, protectedSelf = retainPtr(self)] () -> RetainPtr<id> {
             auto* backingObject = protectedSelf.get().axBackingObject;
@@ -3906,10 +3904,6 @@ ALLOW_DEPRECATED_IMPLEMENTATIONS_END
             return (id)textMarkerForCharacterOffset(cache, characterOffset);
         });
     }
-
-    // TextMarkerRange attributes.
-    if ([attribute isEqualToString:@"AXTextMarkerRangeForNSRange"])
-        return (id)backingObject->textMarkerRangeForNSRange(range);
 
     if ([attribute isEqualToString:NSAccessibilityLineTextMarkerRangeForTextMarkerParameterizedAttribute])
         return (id)[self lineTextMarkerRangeForTextMarker:textMarker forUnit:TextUnit::Line];
@@ -4045,14 +4039,15 @@ ALLOW_DEPRECATED_IMPLEMENTATIONS_END
             auto* backingObject = protectedSelf.get().axBackingObject;
             if (!backingObject)
                 return CGRectZero;
-
-            auto start = backingObject->visiblePositionForIndex(range.location);
-            auto end = backingObject->visiblePositionForIndex(range.location + range.length);
-            auto webRange = makeSimpleRange({ start, end });
-            if (!webRange)
+            auto* cache = backingObject->axObjectCache();
+            if (!cache)
                 return CGRectZero;
-
-            auto bounds = FloatRect(backingObject->boundsForRange(*webRange));
+            CharacterOffset start = cache->characterOffsetForIndex(range.location, backingObject);
+            CharacterOffset end = cache->characterOffsetForIndex(range.location+range.length, backingObject);
+            auto range = cache->rangeForUnorderedCharacterOffsets(start, end);
+            if (!range)
+                return CGRectZero;
+            auto bounds = FloatRect(backingObject->boundsForRange(*range));
             return [protectedSelf convertRectToSpace:bounds space:AccessibilityConversionSpace::Screen];
         });
         return [NSValue valueWithRect:rect];

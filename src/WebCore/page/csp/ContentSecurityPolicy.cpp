@@ -651,16 +651,11 @@ bool ContentSecurityPolicy::allowBaseURI(const URL& url, bool overrideContentSec
     return allPoliciesAllow(WTFMove(handleViolatedDirective), &ContentSecurityPolicyDirectiveList::violatedDirectiveForBaseURI, url);
 }
 
-static bool shouldReportProtocolOnly(const URL& url)
-{
-    return !url.isHierarchical() || url.protocolIs("file");
-}
-
 String ContentSecurityPolicy::deprecatedURLForReporting(const URL& url) const
 {
     if (!url.isValid())
         return { };
-    if (shouldReportProtocolOnly(url))
+    if (!url.isHierarchical() || url.protocolIs("file"))
         return url.protocol().toString();
     return static_cast<SecurityOriginData>(*m_selfSource).securityOrigin()->canRequest(url) ? url.strippedForUseAsReferrer() : SecurityOrigin::create(url)->toString();
 }
@@ -691,9 +686,7 @@ void ContentSecurityPolicy::reportViolation(const String& effectiveViolatedDirec
 
     // FIXME: Support sending reports from worker.
     CSPInfo info;
-
-    info.documentURI = m_documentURL ? m_documentURL.value().strippedForUseAsReferrer() : deprecatedURLForReporting(blockedURL);
-
+    info.documentURI = blockedURL.string();
     if (m_client)
         m_client->willSendCSPViolationReport(info);
     else {
@@ -705,7 +698,7 @@ void ContentSecurityPolicy::reportViolation(const String& effectiveViolatedDirec
         if (!frame)
             return;
 
-        info.documentURI = shouldReportProtocolOnly(document.url()) ? document.url().protocol().toString() : document.url().strippedForUseAsReferrer();
+        info.documentURI = document.url().strippedForUseAsReferrer();
 
         auto stack = createScriptCallStack(JSExecState::currentState(), 2);
         auto* callFrame = stack->firstNonNativeCallFrame();

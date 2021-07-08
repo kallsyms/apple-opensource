@@ -584,7 +584,6 @@ void CachedImage::finishLoading(SharedBuffer* data, const NetworkLoadMetrics& me
         return;
     }
 
-    setLoading(false);
     notifyObservers();
     CachedResource::finishLoading(data, metrics);
 }

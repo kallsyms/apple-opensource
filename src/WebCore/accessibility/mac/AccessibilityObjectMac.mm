@@ -280,13 +280,6 @@ String AccessibilityObject::rolePlatformDescription() const
     return String();
 }
 
-AXTextMarkerRangeRef AccessibilityObject::textMarkerRangeForNSRange(const NSRange& range) const
-{
-    return textMarkerRangeFromVisiblePositions(axObjectCache(),
-        visiblePositionForIndex(range.location),
-        visiblePositionForIndex(range.location + range.length));
-}
-
 namespace Accessibility {
 
 PlatformRoleMap createPlatformRoleMap()

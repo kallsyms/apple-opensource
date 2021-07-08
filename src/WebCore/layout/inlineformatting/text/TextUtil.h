@@ -52,9 +52,7 @@ public:
         InlineLayoutUnit logicalWidth { 0 };
     };
     static SplitData split(const InlineTextItem&, InlineLayoutUnit textWidth, InlineLayoutUnit availableWidth, InlineLayoutUnit contentLogicalLeft);
-
     static unsigned findNextBreakablePosition(LazyLineBreakIterator&, unsigned startPosition, const RenderStyle&);
-    static LineBreakIteratorMode lineBreakIteratorMode(LineBreak);
 
     static bool shouldPreserveSpacesAndTabs(const Box&);
 

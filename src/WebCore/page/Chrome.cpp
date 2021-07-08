@@ -406,7 +406,7 @@ bool Chrome::print(Frame& frame)
         return false;
     }
 
-    m_client.print(frame, frame.document()->titleWithDirection());
+    m_client.print(frame);
     return true;
 }
 

@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 2000 Harri Porten (porten@kde.org)
  *  Copyright (C) 2006 Jon Shier (jshier@iastate.edu)
- *  Copyright (C) 2003-2021 Apple Inc. All rights reseved.
+ *  Copyright (C) 2003-2020 Apple Inc. All rights reseved.
  *  Copyright (C) 2006 Alexey Proskuryakov (ap@webkit.org)
  *  Copyright (c) 2015 Canon Inc. All rights reserved.
  *
@@ -101,8 +101,11 @@ JSDOMWindowBase::JSDOMWindowBase(VM& vm, Structure* structure, RefPtr<DOMWindow>
     m_proxy.set(vm, this, proxy);
 }
 
-SUPPRESS_ASAN inline void JSDOMWindowBase::initStaticGlobals(JSC::VM& vm)
+void JSDOMWindowBase::finishCreation(VM& vm, JSWindowProxy* proxy)
 {
+    Base::finishCreation(vm, proxy);
+    ASSERT(inherits(vm, info()));
+
     auto& builtinNames = static_cast<JSVMClientData*>(vm.clientData)->builtinNames();
 
     GlobalPropertyInfo staticGlobals[] = {
@@ -111,14 +114,6 @@ SUPPRESS_ASAN inline void JSDOMWindowBase::initStaticGlobals(JSC::VM& vm)
     };
 
     addStaticGlobals(staticGlobals, WTF_ARRAY_LENGTH(staticGlobals));
-}
-
-void JSDOMWindowBase::finishCreation(VM& vm, JSWindowProxy* proxy)
-{
-    Base::finishCreation(vm, proxy);
-    ASSERT(inherits(vm, info()));
-
-    initStaticGlobals(vm);
 
     if (m_wrapped && m_wrapped->frame() && m_wrapped->frame()->settings().needsSiteSpecificQuirks())
         setNeedsSiteSpecificQuirks(true);

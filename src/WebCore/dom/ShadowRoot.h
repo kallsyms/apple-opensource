@@ -93,7 +93,6 @@ public:
     void slotFallbackDidChange(HTMLSlotElement&);
     void resolveSlotsBeforeNodeInsertionOrRemoval();
     void willRemoveAllChildren(ContainerNode&);
-    void willRemoveAssignedNode(const Node&);
 
     void didRemoveAllChildrenOfShadowHost();
     void didChangeDefaultSlot();

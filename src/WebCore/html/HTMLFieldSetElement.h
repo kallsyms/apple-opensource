@@ -24,7 +24,7 @@
 #pragma once
 
 #include "HTMLFormControlElement.h"
-#include <wtf/WeakHashSet.h>
+#include <wtf/HashSet.h>
 
 namespace WebCore {
 
@@ -60,7 +60,7 @@ private:
     bool matchesValidPseudoClass() const final;
     bool matchesInvalidPseudoClass() const final;
 
-    WeakHashSet<HTMLFormControlElement> m_invalidDescendants;
+    HashSet<const HTMLFormControlElement*> m_invalidDescendants;
     bool m_hasDisabledAttribute { false };
 };
 
