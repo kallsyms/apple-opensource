@@ -628,12 +628,12 @@ Node* highestNodeToRemoveInPruning(Node* node)
 {
     Node* previousNode = nullptr;
     auto* rootEditableElement = node ? node->rootEditableElement() : nullptr;
-    for (; node; node = node->parentNode()) {
-        if (auto* renderer = node->renderer()) {
-            if (!renderer->canHaveChildren() || hasARenderedDescendant(node, previousNode) || rootEditableElement == node)
+    for (auto currentNode = makeRefPtr(node); currentNode; currentNode = currentNode->parentNode()) {
+        if (auto* renderer = currentNode->renderer()) {
+            if (!renderer->canHaveChildren() || hasARenderedDescendant(currentNode.get(), previousNode) || rootEditableElement == currentNode.get())
                 return previousNode;
         }
-        previousNode = node;
+        previousNode = currentNode.get();
     }
     return nullptr;
 }
@@ -1101,7 +1101,8 @@ VisiblePosition visiblePositionForIndexUsingCharacterIterator(Node& node, int in
 
     auto range = makeRangeSelectingNodeContents(node);
     CharacterIterator it(range);
-    it.advance(index - 1);
+    if (!it.atEnd())
+        it.advance(index - 1);
 
     if (!it.atEnd() && it.text().length() == 1 && it.text()[0] == '\n') {
         // FIXME: workaround for collapsed range (where only start position is correct) emitted for some emitted newlines.
